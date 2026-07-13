@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>En una nota · Ensalada mixta 🎵</title>
+  <meta name="description" content="El juego para cantar con amigos: suena una canción, se corta y el equipo que dice YO tiene que seguir cantando la que sigue." />
+  <link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="brand">
+      <span class="note">🎵</span>
+      <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
+    </div>
+    <div class="tagline">🥗 ensalada mixta</div>
+    <div class="sub">El juego para cantar con amigos · edición casera</div>
+
+    <!-- ===================== SETUP ===================== -->
+    <section id="s-setup" class="screen on">
+
+      <div class="card">
+        <h3>1 · Elegí los géneros</h3>
+        <div id="genres" class="genres"></div>
+        <p class="hint" style="margin-top:14px">Se mezclan todas las canciones de los géneros elegidos. La app sortea al azar y la tapa: <b>nadie sabe cuál suena</b> hasta revelarla.</p>
+      </div>
+
+      <div class="card">
+        <h3>2 · ¿Quiénes juegan?</h3>
+        <div id="players" class="players"></div>
+        <div class="row">
+          <button class="btn ghost mini" onclick="addPlayer()">＋ Agregar jugador</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>3 · Opciones</h3>
+        <label class="toggle" style="justify-content:space-between">
+          <span>🎵 Canciones por partida</span>
+          <select id="opt-maxsongs">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+            <option value="0">Sin límite</option>
+          </select>
+        </label>
+        <div style="height:12px"></div>
+        <label class="toggle"><input type="checkbox" id="opt-randomstart" checked> Empezar cada canción en un punto al azar (más difícil)</label>
+        <div style="height:10px"></div>
+        <label class="toggle"><input type="checkbox" id="opt-norepeat" checked> No repetir canciones (al agotarse, termina la partida)</label>
+      </div>
+
+      <div id="pool-warn"></div>
+
+      <button class="btn mag big" onclick="startGame()">▶ ¡A jugar!</button>
+      <div style="height:12px"></div>
+      <button class="btn ghost big" onclick="show('s-armar')">🔗 Armar / vincular canciones</button>
+    </section>
+
+    <!-- ===================== ARMAR PLAYLIST ===================== -->
+    <section id="s-armar" class="screen">
+      <div class="row spread" style="margin-bottom:14px">
+        <h2>🔗 Armar playlist</h2>
+        <button class="btn ghost mini" onclick="show('s-setup')">← Volver</button>
+      </div>
+      <div class="card" style="border-color:var(--lime)">
+        <h3 style="color:var(--lime)">🎵 Tus archivos de audio (recomendado)</h3>
+        <p class="hint" style="margin:0 0 12px">La forma más segura de que <b>siempre suene</b>: cargá canciones desde tu compu (MP3, M4A, etc.). Se reproducen sin internet y quedan guardadas para la próxima. Van a la playlist <b>“Mis canciones”</b>.</p>
+        <input type="file" id="audiofiles" accept="audio/*" multiple style="display:none" onchange="onAudioFiles(this)">
+        <button class="btn lime big" onclick="document.getElementById('audiofiles').click()">📂 Cargar canciones de mi compu</button>
+        <div id="local-list" style="margin-top:12px"></div>
+      </div>
+
+      <p class="hint">— o — usá <b>YouTube</b>: pegá el link de cada canción (tocá <b>Buscar</b>, copiá el link y pegalo). Ojo: si abrís el archivo con doble clic, YouTube suele bloquear la reproducción; por eso conviene usar tus audios.</p>
+
+      <div class="card">
+        <div class="row spread" style="margin-bottom:10px">
+          <span class="pill" id="link-count">0 vinculadas</span>
+          <button class="btn ghost mini" onclick="addCustomSong()">＋ Canción propia (YouTube)</button>
+        </div>
+        <div id="songlist" class="songlist"></div>
+      </div>
+      <button class="btn mag big" onclick="show('s-setup')">Listo</button>
+    </section>
+
+    <!-- ===================== GAME ===================== -->
+    <section id="s-game" class="screen">
+      <div class="row spread" style="margin-bottom:10px">
+        <span class="pill" id="round-pill">Canción 1</span>
+        <button class="btn ghost mini" onclick="endGame()">Terminar 🏁</button>
+      </div>
+
+      <div class="turn">
+        <div class="who" id="phase-title">🎧 Escuchen todos</div>
+        <div class="lbl" id="phase-sub">El equipo que dice “¡YO!” primero, arriesga</div>
+      </div>
+
+      <div class="stage">
+        <div id="ytplayer"></div>
+        <audio id="localaudio" style="display:none"></audio>
+        <div class="cover" id="cover">
+          <div>
+            <div class="eq" id="eq"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="st" id="cover-state">Listo para sonar 🎧</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls" id="controls"></div>
+
+      <div class="card" style="margin-top:18px">
+        <h3>Tablero</h3>
+        <div id="board" class="board"></div>
+      </div>
+    </section>
+
+    <!-- ===================== RESULTS ===================== -->
+    <section id="s-results" class="screen">
+      <div class="card center">
+        <div class="medal">🏆</div>
+        <h2 style="justify-content:center">¡Terminó el juego!</h2>
+        <div id="winner" style="margin:10px 0 20px"></div>
+        <div id="final-board" class="board"></div>
+        <div style="height:18px"></div>
+        <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos jugadores)</button>
+        <div style="height:10px"></div>
+        <button class="btn ghost big" onclick="location.reload()">🏠 Menú principal</button>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
+      Tus links y canciones quedan guardados solo en este navegador.
+    </div>
+  </div>
+
+  <div class="flash" id="flash"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# dependencias
+node_modules/
+
+# build
+dist/
+.vite/
+
+# netlify
+.netlify/
+
+# configuración local del editor / agente
+.claude/
+
+# sistema
+.DS_Store
+Thumbs.db
+*.log

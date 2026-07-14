@@ -3,9 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>En una nota · Ensalada mixta 🎵</title>
-  <meta name="description" content="El juego para cantar con amigos: suena una canción, se corta y el equipo que dice YO tiene que seguir cantando la que sigue." />
+  <title>En una nota · Ensalada mixta — juego para cantar con amigos</title>
+  <meta name="description" content="Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. Más de 260 canciones en 11 géneros (rock, cumbia, pop, folklore y más)." />
+  <meta name="keywords" content="en una nota, juego para cantar, adivinar canciones, karaoke, juego con amigos, ensalada mixta, música, previa, argentina" />
+  <meta name="author" content="Juan Paladea" />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#140a24" />
+  <link rel="canonical" href="https://enunanota.com.ar/" />
   <link rel="icon" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+
+  <!-- Open Graph / redes sociales -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="En una nota · Ensalada mixta" />
+  <meta property="og:title" content="En una nota · Ensalada mixta — juego para cantar con amigos" />
+  <meta property="og:description" content="Suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. +260 canciones en 11 géneros. ¡Gratis!" />
+  <meta property="og:url" content="https://enunanota.com.ar/" />
+  <meta property="og:image" content="https://enunanota.com.ar/og.svg" />
+  <meta property="og:image:type" content="image/svg+xml" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="es_AR" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="En una nota · Ensalada mixta" />
+  <meta name="twitter:description" content="Juego para cantar con amigos: suena un segundo, se corta y seguís la canción. +260 temas en 11 géneros." />
+  <meta name="twitter:image" content="https://enunanota.com.ar/og.svg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "En una nota · Ensalada mixta",
+    "url": "https://enunanota.com.ar/",
+    "description": "Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y hay que seguir cantando la que sigue. Más de 260 canciones en 11 géneros.",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "es",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ARS" },
+    "author": { "@type": "Person", "name": "Juan Paladea" }
+  }
+  </script>
 </head>
 <body>
   <div class="wrap">
@@ -49,8 +89,6 @@
         </label>
         <div style="height:12px"></div>
         <label class="toggle"><input type="checkbox" id="opt-randomstart" checked> Empezar cada canción en un punto al azar (más difícil)</label>
-        <div style="height:10px"></div>
-        <label class="toggle"><input type="checkbox" id="opt-norepeat" checked> No repetir canciones (al agotarse, termina la partida)</label>
       </div>
 
       <div id="pool-warn"></div>
@@ -130,6 +168,14 @@
         <button class="btn ghost big" onclick="location.reload()">🏠 Menú principal</button>
       </div>
     </section>
+
+    <div class="support">
+      <div class="support-txt">¿Te gusta el juego? Bancá el proyecto ☕</div>
+      <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" aria-label="Invitame un café en cafecito.app">
+        <img srcset="https://cdn.cafecito.app/imgs/buttons/button_1.png 1x, https://cdn.cafecito.app/imgs/buttons/button_1_2x.png 2x, https://cdn.cafecito.app/imgs/buttons/button_1_3.75x.png 3.75x"
+             src="https://cdn.cafecito.app/imgs/buttons/button_1.png" alt="Invitame un café en cafecito.app" />
+      </a>
+    </div>
 
     <div class="footer-note">
       Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>

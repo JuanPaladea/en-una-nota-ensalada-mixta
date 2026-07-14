@@ -156,6 +156,10 @@
   .big-num{font-size:64px;font-weight:900;line-height:1}
   .medal{font-size:34px}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6}
+  .support{text-align:center;margin-top:30px}
+  .support-txt{color:var(--muted);font-size:14px;font-weight:700;margin-bottom:10px}
+  .support img{height:44px;width:auto;border-radius:10px;transition:transform .12s}
+  .support a:hover img{transform:scale(1.05)}
   a{color:var(--cyan)}
   .flash{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0}
   .flash.go{animation:fl .6s ease}

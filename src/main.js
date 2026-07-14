@@ -398,7 +398,7 @@ function startGame(){
   players.forEach((p,i)=>{ if(!p.name.trim()) p.name="Equipo "+(i+1); p.score=0; });
   if(players.length===0){ players=[{name:"Equipo 1",score:0}]; }
   opts.randomStart = document.getElementById("opt-randomstart").checked;
-  opts.noRepeat = document.getElementById("opt-norepeat").checked;
+  opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
   const ms = document.getElementById("opt-maxsongs");
   opts.maxSongs = ms ? parseInt(ms.value,10) : 0;
   played=[]; brokenIds=new Set(); songNo=1;

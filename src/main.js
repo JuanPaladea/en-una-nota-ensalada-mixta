@@ -269,6 +269,20 @@ let brokenIds=new Set(), skipTries=0;
 let mediaKind=null;   // 'yt' | 'local' — qué medio usa la canción actual
 const localAudioEl = () => document.getElementById("localaudio");
 
+// Reproducción por segundos
+const SNIPPET_MS = 1000;      // cuánto suena cada "1 segundo"
+let snippetTimer=null;        // timeout que corta el fragmento
+let pauseAfterSnippet=false;  // true = frenar automáticamente al cumplir SNIPPET_MS
+let mediaStarted=false;       // la canción actual ya arrancó (para reanudar vs cargar)
+let continuousMode=false;     // true = suena sin cortar hasta apretar detener
+function clearSnippetTimer(){ if(snippetTimer){ clearTimeout(snippetTimer); snippetTimer=null; } }
+// Al empezar a sonar (evento del medio), si estamos en modo fragmento, programa el corte.
+function armSnippet(){
+  if(!pauseAfterSnippet) return;
+  clearSnippetTimer();
+  snippetTimer = setTimeout(snippetPause, SNIPPET_MS);
+}
+
 function onYouTubeIframeAPIReady(){
   yt = new YT.Player("ytplayer",{
     height:"100%", width:"100%",
@@ -285,13 +299,7 @@ function onPlayerState(e){
   if(e.data===YT.PlayerState.PLAYING){
     try{ yt.unMute(); yt.setVolume(100); }catch(_){}
     if(eq) eq.classList.remove("paused");
-    // salto a un punto al azar una sola vez por canción
-    if(opts.randomStart && !seekedThisRound){
-      seekedThisRound=true;
-      const d = yt.getDuration ? yt.getDuration() : 0;
-      let start = (d && d>40) ? Math.floor(d*0.15 + Math.random()*d*0.5) : 15 + Math.floor(Math.random()*45);
-      try{ yt.seekTo(start, true); }catch(_){}
-    }
+    armSnippet();   // si es fragmento de 1s, programa el corte
   } else if(e.data===YT.PlayerState.PAUSED){
     if(eq) eq.classList.add("paused");
   }
@@ -301,13 +309,12 @@ function onPlayerState(e){
 function onPlayerError(e){
   if(mediaKind!=='yt') return;
   if(currentSong) brokenIds.add(currentSong.id);
-  if(phase!=='playing') return;
+  if(phase!=='listening' && phase!=='continuous') return;
   if(skipTries++ > 12){ setCover("😕 YouTube bloquea estos videos al abrir el archivo directo. Usá la playlist 🎵 “Mis canciones” (suena sin internet).", true); return; }
   const alt = pickSong(true);
   if(!alt){ setCover("😕 No hay canciones reproducibles en estas playlists.", true); return; }
-  currentSong = alt; seekedThisRound=false;
-  setCover("🎵 Sonando… ¡escuchen todos!");
-  mediaStart();
+  currentSong = alt; seekedThisRound=false; mediaStarted=false;
+  if(continuousMode) playContinuous(); else playSnippet();
 }
 
 /* ---- Capa de medios: unifica audio local (<audio>) y YouTube ---- */
@@ -323,7 +330,7 @@ function wireAudio(){
       try{ a.currentTime=st; }catch(_){}
     }
   });
-  a.addEventListener("playing", eqPlaying);
+  a.addEventListener("playing", ()=>{ eqPlaying(); armSnippet(); });
   a.addEventListener("pause", eqPaused);
   a.addEventListener("error", onLocalError);
 }
@@ -335,30 +342,32 @@ async function playLocal(s){
   try{ await a.play(); }catch(e){ try{ a.play(); }catch(_){} }
 }
 function onLocalError(){
-  if(mediaKind!=='local' || phase!=='playing') return;
+  if(mediaKind!=='local' || (phase!=='listening' && phase!=='continuous')) return;
   if(skipTries++ > 12){ setCover("😕 No se pudo reproducir ese archivo. Revisá tus canciones cargadas.", true); return; }
   const alt = pickSong(true);
   if(!alt){ setCover("😕 No hay canciones reproducibles.", true); return; }
-  currentSong = alt; seekedThisRound=false;
-  setCover("🎵 Sonando… ¡escuchen todos!");
-  mediaStart();
+  currentSong = alt; seekedThisRound=false; mediaStarted=false;
+  if(continuousMode) playContinuous(); else playSnippet();
 }
-// arranca la canción actual con el medio que corresponda
+// arranca (carga) la canción actual con el medio que corresponda; devuelve true si pudo
 function mediaStart(){
-  const s=currentSong; if(!s) return;
+  const s=currentSong; if(!s) return false;
   if(s.local){
     mediaKind='local';
     if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
-    playLocal(s);
-  } else {
-    mediaKind='yt';
-    try{ localAudioEl().pause(); }catch(_){}
-    if(!ytReady || !yt){ setCover("⏳ YouTube está cargando… reintentá. (Tip: usá 🎵 “Mis canciones”, suena sin internet)", true); return; }
-    try{ yt.loadVideoById({videoId:s.id, startSeconds:0}); }
-    catch(e){ onPlayerError({data:5}); }
+    playLocal(s);   // el punto al azar lo fija el evento loadedmetadata
+    return true;
   }
+  mediaKind='yt';
+  try{ localAudioEl().pause(); }catch(_){}
+  if(!ytReady || !yt){ setCover("⏳ YouTube está cargando… reintentá en un segundo. (Tip: usá 🎵 “Mis canciones”, suena sin internet)", true); return false; }
+  const start = opts.randomStart ? Math.floor(15 + Math.random()*45) : 0;
+  try{ yt.loadVideoById({videoId:s.id, startSeconds:start}); }
+  catch(e){ onPlayerError({data:5}); }
+  return true;
 }
 function mediaPause(){
+  clearSnippetTimer();
   if(mediaKind==='local'){ try{ localAudioEl().pause(); }catch(_){} }
   else if(yt && yt.pauseVideo){ yt.pauseVideo(); }
   eqPaused();
@@ -368,6 +377,7 @@ function mediaResume(){
   else if(yt && yt.playVideo){ yt.playVideo(); }
 }
 function mediaStop(){
+  clearSnippetTimer(); pauseAfterSnippet=false; continuousMode=false;
   if(mediaKind==='local'){ const a=localAudioEl(); try{ a.pause(); a.currentTime=0; }catch(_){} }
   else if(yt && yt.stopVideo){ yt.stopVideo(); }
 }
@@ -375,7 +385,7 @@ function mediaStop(){
 /* ============================================================
    JUEGO
    ============================================================ */
-let phase='ready';        // ready | playing | buzzed | answering
+let phase='ready';        // ready | listening | continuous | decide | answering
 let answeringTeam=-1;   // índice de equipo, 'all' (todos) o -1 (nadie)
 let revealed=false;
 let skipping=false;     // true cuando se saltea la canción sin puntos
@@ -430,6 +440,7 @@ function newSong(){
   if(!s){ endGame('agotada'); return; }
   currentSong = s;
   seekedThisRound=false; revealed=false; answeringTeam=-1; skipping=false; skipTries=0;
+  mediaStarted=false; continuousMode=false; pauseAfterSnippet=false; clearSnippetTimer();
   phase='ready';
   const tot = totalSongs();
   document.getElementById("round-pill").textContent = tot ? ("Canción "+songNo+" / "+tot) : ("Canción "+songNo);
@@ -437,41 +448,67 @@ function newSong(){
   renderPhase(); renderBoard();
 }
 
-function playSong(){
-  phase='playing';
-  setCover("🎵 Sonando… ¡escuchen todos!");
+// Reproduce un fragmento de 1 segundo y frena (el corazón del juego).
+function playSnippet(){
+  clearSnippetTimer();
+  continuousMode=false;
+  pauseAfterSnippet=true;
+  phase='listening';
+  setCover("🎵 Sonando…");
   renderPhase();
-  mediaStart();
+  if(!mediaStarted){
+    if(mediaStart()) mediaStarted=true;
+    else { pauseAfterSnippet=false; phase='ready'; renderPhase(); }
+  } else mediaResume();
 }
-
-// alguien gritó "¡YO!" → se corta
-function buzz(){
+// Reproduce sin cortar hasta que aprieten detener.
+function playContinuous(){
+  clearSnippetTimer();
+  pauseAfterSnippet=false;
+  continuousMode=true;
+  phase='continuous';
+  setCover("🎵 Sonando… ¡hasta que corten!");
+  renderPhase();
+  if(!mediaStarted){
+    if(mediaStart()) mediaStarted=true;
+    else { continuousMode=false; phase='decide'; renderPhase(); }
+  } else mediaResume();
+}
+// Corta: fin automático del fragmento, o botón "detener".
+function snippetPause(){
+  clearSnippetTimer();
+  pauseAfterSnippet=false;
   mediaPause();
-  flash("var(--amber)");
-  phase='buzzed'; answeringTeam=-1;
-  setCover("✋ ¡ALTO! ¿Quién dijo YO?", true);
+  phase='decide';
+  setCover("✋ ¿Quién arriesga?", true);
   renderPhase(); renderBoard();
 }
-
-function resumePlay(){
-  phase='playing';
-  setCover("🎵 Sonando… ¡escuchen todos!");
-  renderPhase();
-  mediaResume();
+function stopPlayback(){
+  continuousMode=false;
+  flash("var(--amber)");
+  snippetPause();
 }
 
 function pickTeam(i){
+  clearSnippetTimer(); continuousMode=false;
   answeringTeam=i; skipping=false; phase='answering'; revealed=false;
   renderPhase(); renderBoard();
 }
 function pickAll(){
+  clearSnippetTimer(); continuousMode=false;
   answeringTeam='all'; skipping=false; phase='answering'; revealed=false;
   renderPhase(); renderBoard();
 }
-function backToBuzz(){ phase='buzzed'; answeringTeam=-1; renderPhase(); renderBoard(); }
+function backToDecide(){
+  clearSnippetTimer(); continuousMode=false;
+  phase='decide'; answeringTeam=-1;
+  setCover("✋ ¿Quién arriesga?", true);
+  renderPhase(); renderBoard();
+}
 
 // saltear la canción (nadie la sabe / punto para nadie): revela y no da puntos
 function skipSong(){
+  clearSnippetTimer(); continuousMode=false;
   skipping=true; answeringTeam=-1; phase='answering'; revealed=true;
   revealCover(); mediaResume();
   renderPhase(); renderBoard();
@@ -509,16 +546,19 @@ function renderPhase(){
   const sub=document.getElementById("phase-sub");
   if(phase==='ready'){
     t.textContent="🎧 Escuchen todos";
-    sub.textContent="El equipo que dice “¡YO!” primero, arriesga";
-    c.innerHTML=`<button class="btn cyan big" onclick="playSong()">▶ Reproducir</button>`;
-  } else if(phase==='playing'){
+    sub.textContent="Suena 1 segundo y se corta. Después, ¿quién arriesga?";
+    c.innerHTML=`<button class="btn cyan big" onclick="playSnippet()">▶ Reproducir 1 segundo</button>`;
+  } else if(phase==='listening'){
     t.textContent="🎵 Sonando…";
-    sub.textContent="Cuando alguien grite “¡YO!”, cortá";
-    c.innerHTML=`<button class="btn amber big" onclick="buzz()">✋ ¡Dijeron YO! · Cortar</button>
-      <button class="btn ghost" onclick="skipSong()">⏭ Saltear (no la sabe nadie)</button>`;
-  } else if(phase==='buzzed'){
-    t.textContent="✋ ¿Quién dijo YO primero?";
-    sub.textContent="Toquen el equipo que arriesga";
+    sub.textContent="Escuchen bien…";
+    c.innerHTML=`<button class="btn amber big" onclick="stopPlayback()">✋ Cortar ya</button>`;
+  } else if(phase==='continuous'){
+    t.textContent="🎵 Sonando sin cortar…";
+    sub.textContent="Apretá detener cuando quieran";
+    c.innerHTML=`<button class="btn amber big" onclick="stopPlayback()">✋ Detener</button>`;
+  } else if(phase==='decide'){
+    t.textContent="✋ ¿Quién arriesga?";
+    sub.textContent="Elijan quién canta la que sigue — o escuchen un poco más";
     c.innerHTML=`<div class="teamgrid">`+
       players.map((p,i)=>`<button class="btn lime" onclick="pickTeam(${i})">${esc(p.name)}</button>`).join("")+
       `</div>
@@ -526,7 +566,10 @@ function renderPhase(){
         <button class="btn cyan" style="flex:1" onclick="pickAll()">🤝 Para todos</button>
         <button class="btn ghost" style="flex:1" onclick="skipSong()">⏭ Nadie · saltear</button>
       </div>
-      <button class="btn ghost" onclick="resumePlay()">▶ Seguir escuchando</button>`;
+      <div class="row" style="gap:10px">
+        <button class="btn amber" style="flex:1" onclick="playSnippet()">▶ 1 segundo más</button>
+        <button class="btn ghost" style="flex:1" onclick="playContinuous()">▶▶ Sin cortar</button>
+      </div>`;
   } else if(phase==='answering'){
     if(skipping){
       t.textContent="⏭ Nadie la pegó";
@@ -537,7 +580,7 @@ function renderPhase(){
       if(!revealed){
         sub.textContent="Que canten la que sigue… después revelá";
         c.innerHTML=`<button class="btn mag big" onclick="revealAnswer()">👀 Revelar y comprobar</button>
-          <button class="btn ghost" onclick="backToBuzz()">↩ Volver</button>`;
+          <button class="btn ghost" onclick="backToDecide()">↩ Volver</button>`;
       } else {
         sub.textContent="¿La pegaron?";
         c.innerHTML=`<div class="score-mark on">
@@ -550,7 +593,7 @@ function renderPhase(){
       if(!revealed){
         sub.textContent="Que cante la que sigue… después revelá para comprobar";
         c.innerHTML=`<button class="btn mag big" onclick="revealAnswer()">👀 Revelar y comprobar</button>
-          <button class="btn ghost" onclick="backToBuzz()">↩ Elegí otro equipo</button>`;
+          <button class="btn ghost" onclick="backToDecide()">↩ Elegí otro equipo</button>`;
       } else {
         sub.textContent="¿La pegó?";
         c.innerHTML=`<div class="score-mark on">
@@ -607,8 +650,9 @@ function rematch(){
 Object.assign(window, {
   show, toggleGenre, addPlayer, removePlayer, setPlayerName, setLink,
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
-  startGame, playSong, buzz, resumePlay, pickTeam, pickAll, backToBuzz,
-  skipSong, revealAnswer, scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch,
+  startGame, playSnippet, playContinuous, stopPlayback,
+  pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
+  scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch,
   onYouTubeIframeAPIReady,
 });
 

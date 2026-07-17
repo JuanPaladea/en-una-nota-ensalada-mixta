@@ -133,7 +133,7 @@ function updatePoolWarn(){
       <b>⚠️ No hay canciones para jugar</b> en lo que elegiste.
       Entrá a <a href="#" onclick="show('s-armar');return false">🔗 Armar canciones</a> y ${onlyLocal?'cargá tus archivos de audio':'cargá tus audios o pegá links de YouTube'} para poder jugar.</div>`;
   } else {
-    el.innerHTML=`<div class="pill" style="display:block;text-align:center">🎶 ${pool.length} canciones listas para sortear</div><div style="height:12px"></div>`;
+    el.innerHTML=`<div class="pill" style="display:block;text-align:center">🎶 Playlist lista para sortear</div><div style="height:12px"></div>`;
   }
 }
 

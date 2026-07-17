@@ -9,13 +9,16 @@ Después se **revela** la canción y el grupo decide si la pegó.
 
 ## ✨ Características
 
-- **11 playlists** con +100 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
+- **11 playlists** con +350 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
   Pop/Reggaetón, Internacional, Clásicos, Disney, Fiesta, Rock en Español, Trap/Urbano,
   Baladas y Folklore). Se pueden combinar géneros.
 - Reproductor **oculto**: la canción suena pero no se ve el título hasta revelarla.
 - **Cortar / revelar** con control preciso (pausa y reanuda en el segundo exacto).
 - Puntaje flexible: a **un equipo**, a **todos** o a **nadie** (saltear).
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
+- **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
+  evitan en partidas siguientes hasta agotar la playlist elegida (se puede reiniciar el
+  historial manualmente).
 - **Tus propios audios**: cargá MP3/M4A desde tu compu (se guardan con IndexedDB y
   funcionan **sin internet**), ideal para jugar sin depender de YouTube.
 - Responsive (pensado también para celular).

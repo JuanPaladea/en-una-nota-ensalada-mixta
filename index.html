@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>En una nota · Ensalada mixta — juego para cantar con amigos</title>
-  <meta name="description" content="Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. Más de 260 canciones en 11 géneros (rock, cumbia, pop, folklore y más)." />
+  <meta name="description" content="Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. Más de 350 canciones en 11 géneros (rock, cumbia, pop, folklore y más)." />
   <meta name="keywords" content="en una nota, juego para cantar, adivinar canciones, karaoke, juego con amigos, ensalada mixta, música, previa, argentina" />
   <meta name="author" content="Juan Paladea" />
   <meta name="robots" content="index, follow" />
@@ -17,7 +17,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="En una nota · Ensalada mixta" />
   <meta property="og:title" content="En una nota · Ensalada mixta — juego para cantar con amigos" />
-  <meta property="og:description" content="Suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. +260 canciones en 11 géneros. ¡Gratis!" />
+  <meta property="og:description" content="Suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. +350 canciones en 11 géneros. ¡Gratis!" />
   <meta property="og:url" content="https://enunanota.com.ar/" />
   <meta property="og:image" content="https://enunanota.com.ar/og.svg" />
   <meta property="og:image:type" content="image/svg+xml" />
@@ -28,7 +28,7 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="En una nota · Ensalada mixta" />
-  <meta name="twitter:description" content="Juego para cantar con amigos: suena un segundo, se corta y seguís la canción. +260 temas en 11 géneros." />
+  <meta name="twitter:description" content="Juego para cantar con amigos: suena un segundo, se corta y seguís la canción. +350 temas en 11 géneros." />
   <meta name="twitter:image" content="https://enunanota.com.ar/og.svg" />
 
   <script type="application/ld+json">
@@ -37,7 +37,7 @@
     "@type": "WebApplication",
     "name": "En una nota · Ensalada mixta",
     "url": "https://enunanota.com.ar/",
-    "description": "Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y hay que seguir cantando la que sigue. Más de 260 canciones en 11 géneros.",
+    "description": "Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y hay que seguir cantando la que sigue. Más de 350 canciones en 11 géneros.",
     "applicationCategory": "GameApplication",
     "operatingSystem": "Web",
     "inLanguage": "es",
@@ -89,6 +89,9 @@
         </label>
         <div style="height:12px"></div>
         <label class="toggle"><input type="checkbox" id="opt-randomstart" checked> Empezar cada canción en un punto al azar (más difícil)</label>
+        <div style="height:12px"></div>
+        <button class="btn ghost mini" onclick="resetHistory()">🔄 Reiniciar historial de canciones ya escuchadas</button>
+        <p class="hint" style="margin-top:8px">Las canciones que ya sonaron en partidas anteriores no se repiten hasta agotar la playlist elegida. Usá esto si querés que puedan volver a salir antes.</p>
       </div>
 
       <div id="pool-warn"></div>

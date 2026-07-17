@@ -9,9 +9,11 @@ import { idbPut, idbGet, idbDel } from "./idb.js";
 const LS_LINKS = "eun_links_v1";
 const LS_CUSTOM = "eun_custom_v1";
 const LS_LOCAL = "eun_local_v1";
+const LS_HISTORY = "eun_played_hist_v1";
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
+let playedHistory = load(LS_HISTORY, []); // keys ya sonadas en partidas anteriores (persiste entre partidas)
 const localUrls = {};                     // id -> objectURL (cache de sesión)
 const memBlobs = {};                      // id -> File (respaldo en memoria si IndexedDB no está disponible)
 let selectedGenres = new Set();
@@ -71,13 +73,11 @@ function flash(color){
 function renderGenres(){
   const el = document.getElementById("genres");
   let html = GENRES.map(g=>{
-    const n = g.songs.length;
     const sel = selectedGenres.has(g.id) ? "sel":"";
     return `<div class="genre ${sel}" onclick="toggleGenre('${g.id}')">
       <div class="tick">✓</div>
       <div class="em">${g.em}</div>
       <div class="gn">${esc(g.name)}</div>
-      <div class="gc">${n} canci${n===1?'ón':'ones'}</div>
     </div>`;
   }).join("");
   // Playlist de audios locales (siempre visible; destaca porque suena seguro)
@@ -173,7 +173,7 @@ function renderSongList(){
       return songRow({t,a,yt:yt||null,gid:g.id});
     }).join("");
     html += `<details class="gsec" open>
-      <summary><span class="gsum-name">${g.em} ${esc(g.name)}</span><span class="gcount">${g.songs.length}</span></summary>
+      <summary><span class="gsum-name">${g.em} ${esc(g.name)}</span></summary>
       <div class="gbody">${rows}</div>
     </details>`;
   });
@@ -413,16 +413,35 @@ function totalSongs(){
 
 // Devuelve una canción nueva, o null si se agotaron (con "no repetir" activo).
 // force=true: solo lo usa el auto-salto de errores, permite repetir para no trabarse.
+// Además de no repetir dentro de la partida, evita (mientras sea posible) canciones
+// que ya sonaron en partidas anteriores — ese historial se guarda en localStorage.
 function pickSong(force){
   let cands = pool.filter(s=> !brokenIds.has(s.id));
   if(!cands.length) return null;
   if(opts.noRepeat && !force){
     cands = cands.filter(s=> !played.includes(s.key));
     if(!cands.length) return null;   // ya sonaron todas → termina la partida
+    const unheard = cands.filter(s=> !playedHistory.includes(s.key));
+    if(unheard.length){
+      cands = unheard;
+    } else {
+      // ya sonaron todas alguna vez: se reinicia el historial de este pool y se vuelve a sortear libre
+      const poolKeys = new Set(pool.map(s=>s.key));
+      playedHistory = playedHistory.filter(k=> !poolKeys.has(k));
+    }
   }
   const s = cands[Math.floor(Math.random()*cands.length)];
   if(!played.includes(s.key)) played.push(s.key);
+  if(opts.noRepeat && !playedHistory.includes(s.key)){
+    playedHistory.push(s.key);
+    save(LS_HISTORY, playedHistory);
+  }
   return s;
+}
+function resetHistory(){
+  playedHistory = [];
+  save(LS_HISTORY, playedHistory);
+  alert("Listo, se reinició el historial. Las canciones ya escuchadas pueden volver a salir desde la próxima partida.");
 }
 
 function setCover(txt, paused){
@@ -653,7 +672,7 @@ Object.assign(window, {
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
   scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch,
-  onYouTubeIframeAPIReady,
+  onYouTubeIframeAPIReady, resetHistory,
 });
 
 function boot(){

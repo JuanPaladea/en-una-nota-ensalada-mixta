@@ -31,14 +31,21 @@ let currentSong = null;
    ALMACENAMIENTO / DATOS DE CANCIONES
    ============================================================ */
 // devuelve un objectURL para el id (desde cache, IndexedDB o el File en memoria)
-async function localUrlFor(id){
-  if(localUrls[id]) return localUrls[id];
-  let blob = memBlobs[id];
-  if(!blob){ try{ blob = await idbGet(id); }catch(e){ blob=null; } }
-  if(!blob) return null;
-  const url = URL.createObjectURL(blob);
-  localUrls[id]=url;
-  return url;
+// Se cachea la promesa además del resultado: la precarga y el play pueden pedir
+// el mismo id casi a la vez, y sin esto se creaban dos objectURL para el mismo blob.
+const localUrlPending = {};
+function localUrlFor(id){
+  if(localUrls[id]) return Promise.resolve(localUrls[id]);
+  if(localUrlPending[id]) return localUrlPending[id];
+  localUrlPending[id] = (async ()=>{
+    let blob = memBlobs[id];
+    if(!blob){ try{ blob = await idbGet(id); }catch(e){ blob=null; } }
+    if(!blob) return null;
+    const url = URL.createObjectURL(blob);
+    localUrls[id]=url;
+    return url;
+  })().finally(()=>{ delete localUrlPending[id]; });
+  return localUrlPending[id];
 }
 function allSongs(){
   const base = [];
@@ -284,6 +291,14 @@ let brokenIds=new Set(), skipTries=0;
 let mediaKind=null;   // 'yt' | 'local' — qué medio usa la canción actual
 const localAudioEl = () => document.getElementById("localaudio");
 
+// Precarga: la canción se deja cargada y buscada apenas se sortea, mientras el
+// grupo todavía está leyendo la pantalla. Sin esto, "Reproducir 1 segundo"
+// arrancaba recién después de bufferear (en datos móviles, varios segundos de
+// silencio incómodo antes de un fragmento que dura uno).
+let preparedFor=null;   // key de la canción que ya está lista en el reproductor
+let startAt=0;          // segundo desde el que arranca la canción actual
+let prebuffering=false; // true mientras bufferea en silencio (muteado y tapado)
+
 // Reproducción por segundos
 const SNIPPET_MS = 1000;      // cuánto suena cada "1 segundo"
 let snippetTimer=null;        // timeout que corta el fragmento
@@ -303,7 +318,11 @@ function onYouTubeIframeAPIReady(){
     height:"100%", width:"100%",
     playerVars:{ controls:0, disablekb:1, modestbranding:1, rel:0, iv_load_policy:3, playsinline:1, fs:0 },
     events:{
-      onReady:()=>{ ytReady=true; try{ yt.setVolume(100); }catch(_){} },
+      onReady:()=>{
+        ytReady=true; try{ yt.setVolume(100); }catch(_){}
+        // Si la API tardó más que el sorteo, precargamos la canción ya elegida.
+        if(phase==='ready' && currentSong && !currentSong.local) prepareMedia(currentSong);
+      },
       onStateChange:onPlayerState,
       onError:onPlayerError
     }
@@ -312,6 +331,18 @@ function onYouTubeIframeAPIReady(){
 function onPlayerState(e){
   const eq=document.getElementById("eq");
   if(e.data===YT.PlayerState.PLAYING){
+    // En 'ready' todavía nadie apretó play: lo que está sonando es la precarga
+    // (o un rebote del seek). Se frena y se mantiene muteado — que se escuche
+    // acá sería revelar la canción antes de tiempo, así que nunca se desmutea
+    // en esta fase. El seek al punto de arranque se hace una sola vez.
+    if(phase==='ready'){
+      try{
+        yt.pauseVideo();
+        if(prebuffering) yt.seekTo(startAt, true);
+      }catch(_){}
+      prebuffering=false;
+      return;
+    }
     try{ yt.unMute(); yt.setVolume(100); }catch(_){}
     if(eq) eq.classList.remove("paused");
     armSnippet();   // si es fragmento de 1s, programa el corte
@@ -322,8 +353,23 @@ function onPlayerState(e){
 // Si un video de YouTube no se puede reproducir (embed deshabilitado 101/150, etc.)
 // lo marca como roto y salta solito a otra canción, sin frenar el juego.
 function onPlayerError(e){
-  if(mediaKind!=='yt') return;
-  if(currentSong) brokenIds.add(currentSong.id);
+  const s = currentSong;
+  if(!s || s.local) return;
+  if(phase!=='ready' && mediaKind!=='yt') return;
+  brokenIds.add(s.id);
+  // El video se rompió durante la precarga: todavía no apretaron play, así que
+  // cambiamos la canción sin que se note. Antes el video roto aparecía recién
+  // frente a todos y el juego tenía que saltar en pleno silencio.
+  if(phase==='ready'){
+    prebuffering=false; preparedFor=null;
+    if(skipTries++ > 12) return;
+    const nuevo = pickSong(true);
+    if(!nuevo) return;
+    currentSong = nuevo;
+    preloadArt(nuevo);
+    prepareMedia(nuevo);
+    return;
+  }
   if(phase!=='listening' && phase!=='continuous') return;
   if(skipTries++ > 12){ setCover("😕 YouTube bloquea estos videos al abrir el archivo directo. Usá la playlist 🎵 “Mis canciones” (suena sin internet).", true); return; }
   const alt = pickSong(true);
@@ -364,20 +410,60 @@ function onLocalError(){
   currentSong = alt; seekedThisRound=false; mediaStarted=false;
   if(continuousMode) playContinuous(); else playSnippet();
 }
+/* ---- Precarga silenciosa ----
+   Se llama al sortear la canción, no al apretar play. El video se carga muteado
+   y se frena solo apenas bufferea (ver onPlayerState), así queda listo y buscado
+   en el segundo de arranque. cueVideoById no sirve para esto: según la API de
+   YouTube no pide el stream hasta que llamás playVideo(), así que el stall
+   quedaba igual. */
+function prepareMedia(s){
+  preparedFor=null; prebuffering=false; startAt=0;
+  if(!s) return;
+  if(s.local){
+    if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
+    prepareLocal(s);
+    return;
+  }
+  if(!ytReady || !yt) return;   // la API todavía no cargó: se carga al apretar play
+  try{ localAudioEl().pause(); }catch(_){}
+  startAt = opts.randomStart ? Math.floor(15 + Math.random()*45) : 0;
+  prebuffering=true;
+  try{
+    yt.mute(); yt.setVolume(0);        // silencio total antes de tocar el video
+    yt.loadVideoById({videoId:s.id, startSeconds:startAt});
+    preparedFor = s.key;
+  }catch(e){ prebuffering=false; preparedFor=null; }
+}
+async function prepareLocal(s){
+  const url = await localUrlFor(s.id);
+  if(!url) return;                     // el error real se maneja al reproducir
+  if(!currentSong || currentSong.key!==s.key) return;   // ya cambió la canción
+  const a=localAudioEl();
+  a.src=url; a.volume=1;
+  try{ a.load(); }catch(_){}           // el punto al azar lo fija loadedmetadata
+  preparedFor = s.key;
+}
+
 // arranca (carga) la canción actual con el medio que corresponda; devuelve true si pudo
 function mediaStart(){
   const s=currentSong; if(!s) return false;
   if(s.local){
     mediaKind='local';
     if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
-    playLocal(s);   // el punto al azar lo fija el evento loadedmetadata
+    if(preparedFor===s.key){ localAudioEl().play().catch(()=>playLocal(s)); }
+    else playLocal(s);   // el punto al azar lo fija el evento loadedmetadata
     return true;
   }
   mediaKind='yt';
   try{ localAudioEl().pause(); }catch(_){}
   if(!ytReady || !yt){ setCover("⏳ YouTube está cargando… reintentá en un segundo. (Tip: usá 🎵 “Mis canciones”, suena sin internet)", true); return false; }
+  // Ya está precargada y buscada: suena al instante.
+  if(preparedFor===s.key){
+    prebuffering=false;   // si todavía bufferea, que siga de largo y suene
+    try{ yt.unMute(); yt.setVolume(100); yt.playVideo(); return true; }catch(e){}
+  }
   const start = opts.randomStart ? Math.floor(15 + Math.random()*45) : 0;
-  try{ yt.loadVideoById({videoId:s.id, startSeconds:start}); }
+  try{ yt.unMute(); yt.setVolume(100); yt.loadVideoById({videoId:s.id, startSeconds:start}); }
   catch(e){ onPlayerError({data:5}); }
   return true;
 }
@@ -393,6 +479,7 @@ function mediaResume(){
 }
 function mediaStop(){
   clearSnippetTimer(); pauseAfterSnippet=false; continuousMode=false;
+  preparedFor=null; prebuffering=false;
   if(mediaKind==='local'){ const a=localAudioEl(); try{ a.pause(); a.currentTime=0; }catch(_){} }
   else if(yt && yt.stopVideo){ yt.stopVideo(); }
 }
@@ -478,6 +565,7 @@ function newSong(){
   seekedThisRound=false; revealed=false; answeringTeam=-1; skipping=false; skipTries=0;
   mediaStarted=false; continuousMode=false; pauseAfterSnippet=false; clearSnippetTimer();
   phase='ready';
+  prepareMedia(s);   // se carga mientras leen la pantalla, no cuando aprietan play
   const tot = totalSongs();
   document.getElementById("round-pill").textContent = tot ? ("Canción "+songNo+" / "+tot) : ("Canción "+songNo);
   setCover("Listo para sonar 🎧", true);

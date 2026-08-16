@@ -1,0 +1,19 @@
+{
+  "name": "En una nota · Ensalada mixta",
+  "short_name": "En una nota",
+  "description": "El juego para cantar con amigos: suena un segundo de una canción, se corta y hay que seguir la que sigue.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#140a24",
+  "theme_color": "#140a24",
+  "lang": "es-AR",
+  "categories": ["games", "music", "entertainment"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -40,7 +40,9 @@
   .tagline{display:block;width:fit-content;margin:8px auto 0;text-align:center;
     font-weight:900;font-size:clamp(15px,4vw,20px);letter-spacing:.5px;color:var(--ink);
     background:var(--lime);padding:4px 16px;border-radius:20px;transform:rotate(-1.5deg);box-shadow:var(--sh)}
-  .sub{color:var(--muted);text-align:center;margin:14px 0 26px;font-size:15px}
+  /* 22px de aire: la pastilla está rotada y tiene sombra de 10px, sin esto se
+     superpone con el texto de abajo (se notaba sobre todo en celular). */
+  .sub{color:var(--muted);text-align:center;margin:22px 0 26px;font-size:15px}
 
   h2{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
   .hint{color:var(--muted);font-size:14px;margin:0 0 16px}
@@ -76,8 +78,8 @@
     background:var(--cyan);color:var(--ink);display:none;place-items:center;font-weight:900}
   .genre.sel .tick{display:grid}
 
-  /* Players */
-  .players{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  /* Equipos */
+  .teams{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
   .prow{display:flex;gap:8px;align-items:center}
   .prow .dot{width:14px;height:14px;border-radius:50%;flex:none}
   input[type=text],input[type=url]{flex:1;background:var(--ink);border:2px solid var(--line);color:var(--paper);
@@ -102,8 +104,21 @@
   .cover{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;
     background:radial-gradient(circle at 50% 40%, #3a1c66, #170b2c);z-index:3}
   .cover .st{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase}
-  .cover .rev-t{font-size:clamp(22px,5vw,34px);font-weight:900;color:var(--amber);margin-top:4px}
+  .cover .rev-t{font-size:clamp(22px,5vw,34px);font-weight:900;color:var(--amber);margin-top:4px;line-height:1.1}
   .cover .rev-a{font-size:16px;color:var(--paper);opacity:.85}
+  /* Reveal: texto + imagen de la canción debajo */
+  .cover .rev{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;width:100%;height:100%;min-height:0}
+  /* flex:0 1 auto + min-height:0 => si el título ocupa dos líneas, la imagen cede
+     espacio en vez de desbordar la tapa */
+  .cover .rev-img{height:clamp(52px,38%,150px);flex:0 1 auto;min-height:0;width:auto;max-width:min(80%,270px);
+    aspect-ratio:16/9;object-fit:cover;border-radius:12px;border:2px solid rgba(255,255,255,.35);
+    box-shadow:0 8px 24px rgba(0,0,0,.5);margin-top:6px;animation:artin .35s ease}
+  @keyframes artin{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+  /* Fondo difuminado con la misma imagen, para que el reveal se sienta “de la canción” */
+  .cover .rev-bg{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;
+    filter:blur(26px) saturate(1.3);opacity:.4;transform:scale(1.15)}
+  .cover .rev-bg::after{content:"";position:absolute;inset:0;background:rgba(12,6,24,.45)}
   /* equalizer */
   .eq{display:flex;gap:6px;align-items:flex-end;height:64px;margin-bottom:10px}
   .eq span{width:9px;background:linear-gradient(var(--cyan),var(--magenta));border-radius:6px;animation:bar 1s ease-in-out infinite}
@@ -156,10 +171,33 @@
   .big-num{font-size:64px;font-weight:900;line-height:1}
   .medal{font-size:34px}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6}
-  .support{text-align:center;margin-top:30px}
-  .support-txt{color:var(--muted);font-size:14px;font-weight:700;margin-bottom:10px}
-  .support img{height:44px;width:auto;border-radius:10px;transition:transform .12s}
+  /* Bancá el proyecto (Cafecito) */
+  .support{text-align:center;margin-top:30px;background:linear-gradient(180deg,var(--card),var(--card2));
+    border:2px solid var(--amber);border-radius:20px;padding:22px 18px;
+    box-shadow:0 6px 24px rgba(0,0,0,.25)}
+  .support-title{font-size:19px;font-weight:900;color:var(--amber);margin:0 0 10px}
+  .support-txt{color:var(--paper);font-size:14.5px;line-height:1.65;margin:0 auto 8px;max-width:560px;opacity:.92}
+  .support-txt b{color:var(--lime)}
+  .support-list{list-style:none;padding:0;margin:12px auto 16px;max-width:420px;text-align:left;
+    color:var(--muted);font-size:14px;line-height:1.9}
+  .support-list li{display:flex;gap:8px;align-items:flex-start}
+  .support img{height:46px;width:auto;border-radius:10px;transition:transform .12s}
   .support a:hover img{transform:scale(1.05)}
+  .support-after{color:var(--muted);font-size:13px;margin:12px 0 0;line-height:1.6}
+
+  /* Cómo se juega / preguntas frecuentes (contenido para buscadores y para el que llega nuevo) */
+  .info{margin-top:26px}
+  .info h2{font-size:20px;justify-content:center;margin-bottom:14px}
+  .info p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 12px}
+  .info ol{color:var(--muted);font-size:14.5px;line-height:1.8;padding-left:20px;margin:0 0 8px}
+  .info li b,.info p b{color:var(--paper)}
+  .faq{border-top:1px solid var(--line);padding:12px 0 0;margin-top:8px}
+  .faq summary{cursor:pointer;font-weight:800;font-size:15px;padding:8px 0;list-style:none;display:flex;
+    justify-content:space-between;gap:10px;align-items:center}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:'＋';color:var(--amber);font-weight:900;flex:none}
+  .faq[open] summary::after{content:'－'}
+  .faq p{margin:2px 0 10px}
   a{color:var(--cyan)}
   .flash{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0}
   .flash.go{animation:fl .6s ease}
@@ -170,7 +208,7 @@
   @media (max-width:560px){
     .wrap{padding:14px 12px 60px}
     .brand{gap:10px;margin:6px 0 14px}
-    .sub{margin:-4px 0 18px;font-size:13px}
+    .sub{margin:20px 0 18px;font-size:13px}
     .card{padding:14px;border-radius:16px;margin-bottom:14px}
     .card>h3{font-size:13px}
     h2{font-size:19px}
@@ -188,6 +226,9 @@
     .turn .who{font-size:23px;line-height:1.1}
     .turn .lbl{font-size:12px}
     .rev-t{font-size:22px}
+    .cover{padding:10px}
+    .cover .st{font-size:13px;letter-spacing:2px}
+    .cover .rev-a{font-size:14px}
     .brow{padding:10px 12px}
     .brow .pts{font-size:18px}
     .song .link-row{flex-wrap:wrap}

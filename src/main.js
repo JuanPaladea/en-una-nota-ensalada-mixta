@@ -10,6 +10,7 @@ const LS_LINKS = "eun_links_v1";
 const LS_CUSTOM = "eun_custom_v1";
 const LS_LOCAL = "eun_local_v1";
 const LS_HISTORY = "eun_played_hist_v1";
+const LS_TEAMS = "eun_teams_v1";
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
@@ -17,7 +18,9 @@ let playedHistory = load(LS_HISTORY, []); // keys ya sonadas en partidas anterio
 const localUrls = {};                     // id -> objectURL (cache de sesión)
 const memBlobs = {};                      // id -> File (respaldo en memoria si IndexedDB no está disponible)
 let selectedGenres = new Set();
-let players = [];                          // [{name, score}]
+// Equipos: los nombres se guardan en localStorage y sobreviven a la revancha,
+// al volver al menú principal y a recargar la página (los puntos no).
+let teams = loadTeams();                  // [{name, score}]
 let opts = { randomStart:true, noRepeat:true, maxSongs:10 };
 
 let pool = [];        // canciones jugables [{t,a,gid,id,key}]
@@ -94,23 +97,35 @@ function toggleGenre(id){
   selectedGenres.has(id) ? selectedGenres.delete(id) : selectedGenres.add(id);
   renderGenres(); updatePoolWarn();
 }
-function addPlayer(name){
-  players.push({name: name||"", score:0});
-  renderPlayers();
+// Los nombres de los equipos se recuerdan entre partidas y entre sesiones.
+function loadTeams(){
+  const saved = load(LS_TEAMS, null);
+  if(!Array.isArray(saved) || !saved.length) return [];
+  return saved
+    .filter(n => typeof n === "string")
+    .slice(0, 12)
+    .map(n => ({ name: n.slice(0,20), score: 0 }));
 }
-function renderPlayers(){
+function saveTeams(){ save(LS_TEAMS, teams.map(t => t.name)); }
+
+function addTeam(name){
+  teams.push({name: name||"", score:0});
+  saveTeams();
+  renderTeams();
+}
+function renderTeams(){
   const colors=["#ff2e88","#25e0d6","#ffcb2e","#a6ff3d","#9d7bff","#ff8a3d","#5ad1ff","#ff5e9e"];
-  const el=document.getElementById("players");
-  el.innerHTML = players.map((p,i)=>`
+  const el=document.getElementById("teams");
+  el.innerHTML = teams.map((p,i)=>`
     <div class="prow">
       <span class="dot" style="background:${colors[i%colors.length]}"></span>
-      <input type="text" value="${esc(p.name)}" placeholder="Jugador ${i+1}"
-        oninput="setPlayerName(${i}, this.value)" maxlength="20">
-      ${players.length>1?`<button class="x" onclick="removePlayer(${i})" title="Quitar">✕</button>`:""}
+      <input type="text" value="${esc(p.name)}" placeholder="Equipo ${i+1}"
+        oninput="setTeamName(${i}, this.value)" maxlength="20">
+      ${teams.length>1?`<button class="x" onclick="removeTeam(${i})" title="Quitar">✕</button>`:""}
     </div>`).join("");
 }
-function setPlayerName(i, val){ if(players[i]) players[i].name = val; }
-function removePlayer(i){ players.splice(i,1); renderPlayers(); }
+function setTeamName(i, val){ if(teams[i]){ teams[i].name = val; saveTeams(); } }
+function removeTeam(i){ teams.splice(i,1); saveTeams(); renderTeams(); }
 
 function buildPool(){
   pool = [];
@@ -395,8 +410,9 @@ function startGame(){
   if(selectedGenres.size===0){ alert("Elegí al menos un género."); return; }
   buildPool();
   if(pool.length===0){ alert("No hay canciones para jugar. Entrá a 🔗 Armar canciones y agregá algunos links."); return; }
-  players.forEach((p,i)=>{ if(!p.name.trim()) p.name="Equipo "+(i+1); p.score=0; });
-  if(players.length===0){ players=[{name:"Equipo 1",score:0}]; }
+  teams.forEach((p,i)=>{ if(!p.name.trim()) p.name="Equipo "+(i+1); p.score=0; });
+  if(teams.length===0){ teams=[{name:"Equipo 1",score:0}]; }
+  saveTeams();   // los nombres quedan guardados para la próxima partida
   opts.randomStart = document.getElementById("opt-randomstart").checked;
   opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
   const ms = document.getElementById("opt-maxsongs");
@@ -458,6 +474,7 @@ function newSong(){
   const s = pickSong();
   if(!s){ endGame('agotada'); return; }
   currentSong = s;
+  preloadArt(s);
   seekedThisRound=false; revealed=false; answeringTeam=-1; skipping=false; skipTries=0;
   mediaStarted=false; continuousMode=false; pauseAfterSnippet=false; clearSnippetTimer();
   phase='ready';
@@ -533,14 +550,32 @@ function skipSong(){
   renderPhase(); renderBoard();
 }
 
+// Imagen de la canción: la miniatura del video de YouTube.
+// Los audios locales no tienen imagen (devuelve null y se muestra solo el texto).
+function songArtUrl(s){
+  if(!s || s.local || !s.id) return null;
+  if(!/^[\w-]{11}$/.test(s.id)) return null;
+  return `https://i.ytimg.com/vi/${s.id}/hqdefault.jpg`;
+}
+// Se precarga apenas se sortea la canción para que al revelar aparezca al instante.
+function preloadArt(s){
+  const url = songArtUrl(s);
+  if(url){ const im = new Image(); im.src = url; }
+}
+
 function revealCover(){
   const cover=document.getElementById("cover");
+  const art = songArtUrl(currentSong);
   cover.style.background="radial-gradient(circle at 50% 40%, #4a2170, #180b30)";
-  cover.innerHTML=`<div>
-    <div class="st">Era…</div>
-    <div class="rev-t">${esc(currentSong.t)}</div>
-    <div class="rev-a">${esc(currentSong.a)}</div>
-  </div>`;
+  cover.innerHTML=`
+    ${art?`<div class="rev-bg" style="background-image:url('${art}')"></div>`:""}
+    <div class="rev">
+      <div class="st">Era…</div>
+      <div class="rev-t">${esc(currentSong.t)}</div>
+      <div class="rev-a">${esc(currentSong.a)}</div>
+      ${art?`<img class="rev-img" src="${art}" alt="Imagen de ${esc(currentSong.t)}, de ${esc(currentSong.a)}"
+        onerror="this.remove();var b=document.querySelector('.rev-bg');if(b)b.remove()">`:""}
+    </div>`;
 }
 function revealAnswer(){
   revealed=true; revealCover();
@@ -555,8 +590,8 @@ function finishRound(){
   renderBoard();
   setTimeout(newSong, 300);
 }
-function scoreTeam(){ if(typeof answeringTeam==='number' && answeringTeam>=0) players[answeringTeam].score++; flash("var(--ok)"); finishRound(); }
-function scoreAll(){ players.forEach(p=>p.score++); flash("var(--ok)"); finishRound(); }
+function scoreTeam(){ if(typeof answeringTeam==='number' && answeringTeam>=0) teams[answeringTeam].score++; flash("var(--ok)"); finishRound(); }
+function scoreAll(){ teams.forEach(p=>p.score++); flash("var(--ok)"); finishRound(); }
 function scoreNone(){ flash("var(--no)"); finishRound(); }
 
 function renderPhase(){
@@ -579,7 +614,7 @@ function renderPhase(){
     t.textContent="✋ ¿Quién arriesga?";
     sub.textContent="Elijan quién canta la que sigue — o escuchen un poco más";
     c.innerHTML=`<div class="teamgrid">`+
-      players.map((p,i)=>`<button class="btn lime" onclick="pickTeam(${i})">${esc(p.name)}</button>`).join("")+
+      teams.map((p,i)=>`<button class="btn lime" onclick="pickTeam(${i})">${esc(p.name)}</button>`).join("")+
       `</div>
       <div class="row" style="gap:10px">
         <button class="btn cyan" style="flex:1" onclick="pickAll()">🤝 Para todos</button>
@@ -608,7 +643,7 @@ function renderPhase(){
         </div>`;
       }
     } else {
-      t.textContent="🎤 Canta "+esc(players[answeringTeam].name);
+      t.textContent="🎤 Canta "+esc(teams[answeringTeam].name);
       if(!revealed){
         sub.textContent="Que cante la que sigue… después revelá para comprobar";
         c.innerHTML=`<button class="btn mag big" onclick="revealAnswer()">👀 Revelar y comprobar</button>
@@ -626,7 +661,7 @@ function renderPhase(){
 
 function renderBoard(){
   const cur = (i)=> answeringTeam==='all' || i===answeringTeam;
-  const board = players.map((p,i)=>`
+  const board = teams.map((p,i)=>`
     <div class="brow ${cur(i)?'cur':''}">
       <span>${cur(i)?'🎤 ':''}${esc(p.name)}</span>
       <span class="pts">${p.score}</span>
@@ -639,7 +674,7 @@ function endGame(reason){
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
   const head = document.querySelector("#s-results h2");
   if(head) head.textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
-  const sorted = [...players].sort((a,b)=>b.score-a.score);
+  const sorted = [...teams].sort((a,b)=>b.score-a.score);
   const top = sorted[0];
   const winners = sorted.filter(p=>p.score===top.score);
   const wtxt = winners.length>1
@@ -656,9 +691,38 @@ function endGame(reason){
 }
 
 function rematch(){
-  players.forEach(p=>p.score=0);
+  teams.forEach(p=>p.score=0);
   played=[]; brokenIds=new Set(); songNo=1;
   show("s-game"); newSong();
+}
+
+// Volver al menú sin recargar la página: así los equipos (y sus nombres) siguen ahí.
+function goHome(){
+  try{ mediaStop(); }catch(_){}
+  if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
+  teams.forEach(p=>p.score=0);
+  played=[]; brokenIds=new Set(); songNo=1;
+  currentSong=null; phase='ready'; answeringTeam=-1; revealed=false;
+  renderTeams(); renderGenres(); updatePoolWarn();
+  show("s-setup");
+}
+
+/* ============================================================
+   COMPARTIR
+   ============================================================ */
+const SHARE_URL = "https://enunanota.com.ar/";
+const SHARE_TEXT = "🎤 En una nota · Ensalada mixta: suena 1 segundo de una canción y tenés que seguir cantando la que sigue. Gratis, sin instalar nada:";
+async function shareGame(){
+  if(navigator.share){
+    try{ await navigator.share({ title:"En una nota · Ensalada mixta", text:SHARE_TEXT, url:SHARE_URL }); return; }
+    catch(e){ if(e && e.name === "AbortError") return; }
+  }
+  try{
+    await navigator.clipboard.writeText(SHARE_TEXT + " " + SHARE_URL);
+    alert("¡Link copiado! Pegalo en el grupo y jueguen todos 🎶");
+  }catch(e){
+    prompt("Copiá el link y compartilo:", SHARE_URL);
+  }
 }
 
 /* ============================================================
@@ -667,16 +731,18 @@ function rematch(){
    así que exponemos los handlers en window.
    ============================================================ */
 Object.assign(window, {
-  show, toggleGenre, addPlayer, removePlayer, setPlayerName, setLink,
+  show, toggleGenre, addTeam, removeTeam, setTeamName, setLink,
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
-  scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch,
-  onYouTubeIframeAPIReady, resetHistory,
+  scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch, goHome,
+  onYouTubeIframeAPIReady, resetHistory, shareGame,
 });
 
 function boot(){
-  addPlayer("Equipo 1"); addPlayer("Equipo 2");
+  // Si es la primera vez (o se borraron los datos), arranca con dos equipos.
+  if(teams.length === 0){ addTeam("Equipo 1"); addTeam("Equipo 2"); }
+  else renderTeams();
   wireAudio();
   renderGenres();
   renderLocalList();

@@ -11,7 +11,8 @@
   <meta name="theme-color" content="#140a24" />
   <link rel="canonical" href="https://enunanota.com.ar/" />
   <link rel="icon" href="/favicon.svg" />
-  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
 
   <!-- Open Graph / redes sociales -->
   <meta property="og:type" content="website" />
@@ -19,17 +20,19 @@
   <meta property="og:title" content="En una nota · Ensalada mixta — juego para cantar con amigos" />
   <meta property="og:description" content="Suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. +350 canciones en 11 géneros. ¡Gratis!" />
   <meta property="og:url" content="https://enunanota.com.ar/" />
-  <meta property="og:image" content="https://enunanota.com.ar/og.svg" />
-  <meta property="og:image:type" content="image/svg+xml" />
+  <!-- PNG: WhatsApp, Facebook e Instagram no muestran previews en SVG -->
+  <meta property="og:image" content="https://enunanota.com.ar/og.png" />
+  <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="En una nota · Ensalada mixta — el juego para cantar con amigos" />
   <meta property="og:locale" content="es_AR" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="En una nota · Ensalada mixta" />
   <meta name="twitter:description" content="Juego para cantar con amigos: suena un segundo, se corta y seguís la canción. +350 temas en 11 géneros." />
-  <meta name="twitter:image" content="https://enunanota.com.ar/og.svg" />
+  <meta name="twitter:image" content="https://enunanota.com.ar/og.png" />
 
   <script type="application/ld+json">
   {
@@ -43,7 +46,50 @@
     "inLanguage": "es",
     "isAccessibleForFree": true,
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ARS" },
-    "author": { "@type": "Person", "name": "Juan Paladea" }
+    "author": { "@type": "Person", "name": "Juan Paladea" },
+    "browserRequirements": "Requiere un navegador moderno con JavaScript",
+    "screenshot": "https://enunanota.com.ar/og.png",
+    "featureList": [
+      "Más de 350 canciones en 11 géneros",
+      "Juego por equipos con puntaje",
+      "Reproducción de 1 segundo y revelación de la canción",
+      "Cargá tus propios audios y jugá sin internet"
+    ]
+  }
+  </script>
+
+  <!-- Preguntas frecuentes: habilita el resultado enriquecido de Google -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "¿Cómo se juega a En una nota?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Se eligen los géneros y los equipos. La app sortea una canción tapada y suena un segundo. El equipo que grita “¡YO!” primero tiene que seguir cantando la parte que sigue. Después se revela la canción y el grupo decide si la pegó: vale 1 punto." }
+      },
+      {
+        "@type": "Question",
+        "name": "¿El juego es gratis?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Sí, es gratis y sin anuncios. No hace falta registrarse ni instalar nada: se juega desde el navegador del celular o la compu." }
+      },
+      {
+        "@type": "Question",
+        "name": "¿Cuántas canciones tiene?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Más de 350 canciones en 11 playlists: rock nacional, cumbia y cuarteto, pop y reggaetón, internacional, clásicos, Disney, fiesta, rock en español, trap urbano, baladas y folklore argentino." }
+      },
+      {
+        "@type": "Question",
+        "name": "¿Puedo jugar con mis propias canciones?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Sí. Podés cargar tus archivos MP3 o M4A, que quedan guardados en tu navegador y suenan incluso sin internet, o pegar links de YouTube." }
+      },
+      {
+        "@type": "Question",
+        "name": "¿Cuántas personas pueden jugar?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Las que quieras: se juega por equipos con un solo dispositivo para todo el grupo. Es ideal para una previa, un asado, un cumpleaños o un viaje." }
+      }
+    ]
   }
   </script>
 </head>
@@ -67,11 +113,12 @@
       </div>
 
       <div class="card">
-        <h3>2 · ¿Quiénes juegan?</h3>
-        <div id="players" class="players"></div>
+        <h3>2 · ¿Qué equipos juegan?</h3>
+        <div id="teams" class="teams"></div>
         <div class="row">
-          <button class="btn ghost mini" onclick="addPlayer()">＋ Agregar jugador</button>
+          <button class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
         </div>
+        <p class="hint" style="margin:12px 0 0">Los nombres quedan guardados: la próxima partida (o si volvés al menú) ya están cargados.</p>
       </div>
 
       <div class="card">
@@ -99,6 +146,52 @@
       <button class="btn mag big" onclick="startGame()">▶ ¡A jugar!</button>
       <div style="height:12px"></div>
       <button class="btn ghost big" onclick="show('s-armar')">🔗 Armar / vincular canciones</button>
+
+    <!-- ===================== CÓMO SE JUEGA / FAQ ===================== -->
+    <section class="card info">
+      <h2>🎤 Cómo se juega</h2>
+      <p><b>En una nota</b> es el clásico juego de la previa: suena un pedacito de una canción,
+        se corta, y hay que <b>seguir cantando la parte que sigue</b>. Esta versión sortea los temas
+        sola y los mantiene tapados, así que <b>nadie sabe qué suena</b> hasta que se revela.</p>
+      <ol>
+        <li>Elegí los <b>géneros</b> (rock nacional, cumbia, pop, folklore, Disney y más).</li>
+        <li>Cargá los <b>equipos</b> con sus nombres.</li>
+        <li>Tocá <b>reproducir 1 segundo</b>: suena y se corta solo.</li>
+        <li>El equipo que grita <b>“¡YO!”</b> primero canta la parte que sigue.</li>
+        <li>Se <b>revela</b> la canción, con su imagen, y el grupo decide si la pegó. +1 punto.</li>
+      </ol>
+      <p>Se juega desde el celular, la compu o la tele: no hay que instalar nada ni crear una cuenta.</p>
+
+      <details class="faq">
+        <summary>¿Es gratis?</summary>
+        <p>Sí, totalmente gratis y sin anuncios. No pide registro ni datos personales.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Cuántas canciones tiene?</summary>
+        <p>Más de 350 canciones repartidas en 11 playlists: rock nacional, cumbia y cuarteto,
+          pop y reggaetón, internacional, clásicos, Disney, fiesta, rock en español, trap urbano,
+          baladas y folklore argentino. Además podés sumar las tuyas.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Se pueden usar mis propias canciones?</summary>
+        <p>Sí. En <b>Armar / vincular canciones</b> podés cargar archivos MP3 o M4A desde tu
+          dispositivo (suenan incluso sin internet) o pegar links de YouTube.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Se repiten las canciones?</summary>
+        <p>No. Dentro de una partida nunca se repiten, y entre partidas se recuerda lo que ya sonó
+          hasta agotar las playlists elegidas. Podés reiniciar ese historial cuando quieras.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Cuántos pueden jugar?</summary>
+        <p>Los que quieras: se juega por equipos, con un solo dispositivo para todo el grupo.
+          Ideal para la previa, un asado, un cumpleaños o un viaje en auto.</p>
+      </details>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn cyan" style="flex:1" onclick="shareGame()">📲 Compartir con tus amigos</button>
+      </div>
+    </section>
     </section>
 
     <!-- ===================== ARMAR PLAYLIST ===================== -->
@@ -166,18 +259,44 @@
         <div id="winner" style="margin:10px 0 20px"></div>
         <div id="final-board" class="board"></div>
         <div style="height:18px"></div>
-        <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos jugadores)</button>
+        <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
         <div style="height:10px"></div>
-        <button class="btn ghost big" onclick="location.reload()">🏠 Menú principal</button>
+        <button class="btn ghost big" onclick="goHome()">🏠 Menú principal</button>
+        <div style="height:10px"></div>
+        <button class="btn cyan big" onclick="shareGame()">📲 Compartir el juego</button>
+      </div>
+
+      <div class="card center" style="border-color:var(--amber)">
+        <p class="hint" style="margin:0 0 12px">¿Se rieron un rato? El juego es gratis y no tiene anuncios: lo sostienen los cafecitos ☕</p>
+        <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" aria-label="Invitame un café en cafecito.app">
+          <img style="height:44px;border-radius:10px"
+               srcset="https://cdn.cafecito.app/imgs/buttons/button_1.png 1x, https://cdn.cafecito.app/imgs/buttons/button_1_2x.png 2x, https://cdn.cafecito.app/imgs/buttons/button_1_3.75x.png 3.75x"
+               src="https://cdn.cafecito.app/imgs/buttons/button_1.png" alt="Invitame un café en cafecito.app" />
+        </a>
       </div>
     </section>
 
     <div class="support">
-      <div class="support-txt">¿Te gusta el juego? Bancá el proyecto ☕</div>
+      <div class="support-title">☕ Bancá el proyecto</div>
+      <p class="support-txt">
+        <b>En una nota</b> lo hago solo, en mis ratos libres, y es <b>gratis y sin un solo anuncio</b>:
+        nada de pop-ups tapando la pantalla ni videos antes de jugar. Eso también significa que
+        el proyecto no genera un peso: el dominio, el hosting y las horas de sumar canciones
+        nuevas salen de mi bolsillo.
+      </p>
+      <ul class="support-list">
+        <li>🎵 <span>Más canciones y géneros nuevos todos los meses</span></li>
+        <li>🚫 <span>Cero anuncios, cero registro, cero datos tuyos</span></li>
+        <li>🌐 <span>Dominio y servidores pagos para que esté siempre online</span></li>
+        <li>🛠️ <span>Modos y mejoras que ya están en camino</span></li>
+      </ul>
+      <p class="support-txt">Si te hizo reír una previa, <b>un cafecito lo mantiene vivo</b>.
+        Con lo que sale un café ya ayudás un montón 💛</p>
       <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" aria-label="Invitame un café en cafecito.app">
         <img srcset="https://cdn.cafecito.app/imgs/buttons/button_1.png 1x, https://cdn.cafecito.app/imgs/buttons/button_1_2x.png 2x, https://cdn.cafecito.app/imgs/buttons/button_1_3.75x.png 3.75x"
              src="https://cdn.cafecito.app/imgs/buttons/button_1.png" alt="Invitame un café en cafecito.app" />
       </a>
+      <p class="support-after">¿No podés colaborar? <b>Compartilo</b>, que también suma un montón 🙌</p>
     </div>
 
     <div class="footer-note">

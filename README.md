@@ -14,6 +14,10 @@ Después se **revela** la canción y el grupo decide si la pegó.
   Baladas y Folklore). Se pueden combinar géneros.
 - Reproductor **oculto**: la canción suena pero no se ve el título hasta revelarla.
 - **Cortar / revelar** con control preciso (pausa y reanuda en el segundo exacto).
+- Al revelar se muestra la **imagen de la canción** (miniatura del video) debajo del título,
+  más un fondo difuminado con la misma imagen. Si no se puede cargar, queda solo el texto.
+- Los **nombres de los equipos se recuerdan**: sobreviven a la revancha, al volver al menú
+  principal y a recargar la página (los puntos siempre arrancan en cero).
 - Puntaje flexible: a **un equipo**, a **todos** o a **nadie** (saltear).
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
@@ -21,6 +25,10 @@ Después se **revela** la canción y el grupo decide si la pegó.
   historial manualmente).
 - **Tus propios audios**: cargá MP3/M4A desde tu compu (se guardan con IndexedDB y
   funcionan **sin internet**), ideal para jugar sin depender de YouTube.
+- **Compartir** con la Web Share API (y copia del link como respaldo).
+- Sección **Cómo se juega / preguntas frecuentes** con datos estructurados `FAQPage`,
+  imagen de OpenGraph en **PNG** (WhatsApp y Facebook no muestran previews en SVG) y
+  `manifest.webmanifest` para instalarla desde el celular.
 - Responsive (pensado también para celular).
 
 ## 🚀 Desarrollo
@@ -42,9 +50,16 @@ npm run preview # sirve el build de dist/ para probarlo
 ## 📁 Estructura
 
 ```
-├── index.html          # markup y contenedores de la app
+├── index.html          # markup, SEO (metadatos + JSON-LD) y contenedores de la app
 ├── public/
-│   └── favicon.svg      # ícono
+│   ├── favicon.svg      # ícono
+│   ├── icon-192.png     # íconos del manifest (generados desde favicon.svg)
+│   ├── icon-512.png
+│   ├── og.svg           # fuente de la imagen para redes
+│   ├── og.png           # imagen para redes (la que leen WhatsApp/Facebook/X)
+│   ├── manifest.webmanifest
+│   ├── robots.txt
+│   └── sitemap.xml
 ├── src/
 │   ├── main.js          # estado, lógica de juego, render y arranque
 │   ├── data.js          # las playlists (título, artista, id de YouTube)

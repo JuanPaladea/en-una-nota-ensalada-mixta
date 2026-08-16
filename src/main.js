@@ -2,6 +2,7 @@ import "./styles.css";
 import { GENRES } from "./data.js";
 import { load, save, songKey, esc, extractVideoId } from "./utils.js";
 import { idbPut, idbGet, idbDel } from "./idb.js";
+import { shareCard } from "./sharecard.js";
 
 /* ============================================================
    ESTADO
@@ -492,6 +493,7 @@ let answeringTeam=-1;   // índice de equipo, 'all' (todos) o -1 (nadie)
 let revealed=false;
 let skipping=false;     // true cuando se saltea la canción sin puntos
 let songNo=1;
+let lastGameSongs=0;    // canciones de la última partida (para la tarjeta que se comparte)
 
 function startGame(){
   if(selectedGenres.size===0){ alert("Elegí al menos un género."); return; }
@@ -760,6 +762,7 @@ function renderBoard(){
 function endGame(reason){
   try{ mediaStop(); }catch(_){}
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
+  lastGameSongs = Math.max(0, songNo - 1);   // canciones que llegaron a terminarse
   const head = document.querySelector("#s-results h2");
   if(head) head.textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
   const sorted = [...teams].sort((a,b)=>b.score-a.score);
@@ -813,6 +816,33 @@ async function shareGame(){
   }
 }
 
+// Comparte una imagen con el resultado de la partida que acaban de jugar.
+// Es distinto de shareGame(): eso manda un aviso del juego, esto manda lo que
+// les pasó a ellos — que es lo que la gente realmente reenvía al grupo.
+let sharingResult = false;
+async function shareResult(btn){
+  if(sharingResult) return;              // doble toque mientras genera la imagen
+  sharingResult = true;
+  const previo = btn ? btn.textContent : null;
+  if(btn){ btn.textContent = "🖼️ Armando la imagen…"; btn.disabled = true; }
+  try{
+    const orden = [...teams].sort((a,b)=> b.score - a.score);
+    const campeon = orden[0];
+    const empate = campeon && orden.filter(t=>t.score===campeon.score).length > 1;
+    const texto = campeon && !empate
+      ? `🏆 Ganó ${campeon.name} con ${campeon.score} punto${campeon.score!==1?"s":""} en “En una nota”. ¿Se animan?`
+      : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
+    const r = await shareCard(teams, lastGameSongs, texto, SHARE_URL);
+    if(r === "descargado") alert("Guardamos la imagen del resultado y copiamos el link 🎶 Mandala al grupo.");
+    else if(r === "error") alert("No pudimos compartir desde acá. Probá con el botón “Compartir el juego”.");
+  }catch(e){
+    alert("No pudimos armar la imagen. Probá con el botón “Compartir el juego”.");
+  }finally{
+    if(btn){ btn.textContent = previo; btn.disabled = false; }
+    sharingResult = false;
+  }
+}
+
 /* ============================================================
    INIT + wiring
    Los onclick/oninput del HTML llaman funciones globales,
@@ -824,7 +854,7 @@ Object.assign(window, {
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
   scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch, goHome,
-  onYouTubeIframeAPIReady, resetHistory, shareGame,
+  onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult,
 });
 
 function boot(){

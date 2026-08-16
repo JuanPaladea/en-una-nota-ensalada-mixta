@@ -25,7 +25,12 @@ Después se **revela** la canción y el grupo decide si la pegó.
   historial manualmente).
 - **Tus propios audios**: cargá MP3/M4A desde tu compu (se guardan con IndexedDB y
   funcionan **sin internet**), ideal para jugar sin depender de YouTube.
+- Al terminar, **imagen del resultado para compartir**: se dibuja en un canvas con el
+  marcador y los nombres de los equipos, y se manda con la Web Share API. Si el navegador
+  no comparte archivos, se descarga y se copia el link.
 - **Compartir** con la Web Share API (y copia del link como respaldo).
+- La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
+  suena al instante en vez de esperar a que bufferee.
 - Sección **Cómo se juega / preguntas frecuentes** con datos estructurados `FAQPage`,
   imagen de OpenGraph en **PNG** (WhatsApp y Facebook no muestran previews en SVG) y
   `manifest.webmanifest` para instalarla desde el celular.
@@ -63,6 +68,7 @@ npm run preview # sirve el build de dist/ para probarlo
 ├── src/
 │   ├── main.js          # estado, lógica de juego, render y arranque
 │   ├── data.js          # las playlists (título, artista, id de YouTube)
+│   ├── sharecard.js     # dibuja y comparte la imagen del resultado
 │   ├── utils.js         # helpers puros (localStorage, escape, parseo de links)
 │   ├── idb.js           # persistencia de audios en IndexedDB
 │   └── styles.css       # estilos

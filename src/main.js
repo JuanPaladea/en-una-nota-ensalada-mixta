@@ -70,8 +70,26 @@ function countLinked(){
 function show(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   document.getElementById(id).classList.add("on");
-  window.scrollTo({top:0,behavior:"smooth"});
+  // El CSS usa esta clase para sacar de la pantalla de juego lo que no se juega:
+  // el bloque de Cafecito y el pie. El logo se queda.
+  document.body.classList.toggle("playing", id==="s-game");
+  scrollTop();
   if(id==="s-armar") renderSongList();
+}
+// El menú es largo y abajo de todo está la sección de Cafecito: si no volvemos
+// arriba a mano, al apretar "¡A jugar!" la pantalla se queda donde estaba y lo
+// primero que se ve es esa sección, con el juego fuera de cuadro. Va sin
+// animación y repetido en el frame siguiente porque al ocultar la pantalla
+// anterior cambia el alto de la página: con "smooth" el navegador del celular
+// cancelaba el scroll a mitad de camino.
+function scrollTop(){
+  const arriba = ()=>{
+    window.scrollTo(0,0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;          // iOS viejo scrollea el body
+  };
+  arriba();
+  requestAnimationFrame(arriba);
 }
 function flash(color){
   const f=document.getElementById("flash");
@@ -680,7 +698,12 @@ function finishRound(){
   renderBoard();
   setTimeout(newSong, 300);
 }
-function scoreTeam(){ if(typeof answeringTeam==='number' && answeringTeam>=0) teams[answeringTeam].score++; flash("var(--ok)"); finishRound(); }
+// Suma el punto al equipo indicado; sin índice, al que arriesgó.
+function scoreTeam(i){
+  const idx = (typeof i==='number') ? i : answeringTeam;
+  if(typeof idx==='number' && idx>=0 && teams[idx]) teams[idx].score++;
+  flash("var(--ok)"); finishRound();
+}
 function scoreAll(){ teams.forEach(p=>p.score++); flash("var(--ok)"); finishRound(); }
 function scoreNone(){ flash("var(--no)"); finishRound(); }
 
@@ -717,7 +740,7 @@ function renderPhase(){
   } else if(phase==='answering'){
     if(skipping){
       t.textContent="⏭ Nadie la pegó";
-      sub.textContent="Punto para nadie";
+      sub.textContent="Punto para nadie · escuchen cómo seguía";
       c.innerHTML=`<button class="btn mag big" onclick="finishRound()">⏭ Siguiente canción</button>`;
     } else if(answeringTeam==='all'){
       t.textContent="🎤 Cantan TODOS";
@@ -733,11 +756,22 @@ function renderPhase(){
         </div>`;
       }
     } else {
-      t.textContent="🎤 Canta "+esc(teams[answeringTeam].name);
+      t.textContent="🎤 Canta "+teams[answeringTeam].name;
       if(!revealed){
-        sub.textContent="Que cante la que sigue… después revelá para comprobar";
+        sub.textContent = teams.length>1
+          ? "Si erra, otro equipo puede tirar otro nombre"
+          : "Que cante la que sigue… después revelá para comprobar";
         c.innerHTML=`<button class="btn mag big" onclick="revealAnswer()">👀 Revelar y comprobar</button>
           <button class="btn ghost" onclick="backToDecide()">↩ Elegí otro equipo</button>`;
+      } else if(teams.length>1){
+        // El punto se define recién acá: arriesgó un equipo, erró, y otro tiró
+        // otro nombre. Con la canción a la vista el grupo ve quién la pegó —
+        // puede no ser el que arriesgó primero — o si no la pegó nadie.
+        sub.textContent="¿Quién se lleva el punto?";
+        c.innerHTML=`<div class="teamgrid">`+
+          teams.map((p,i)=>`<button class="btn lime" onclick="scoreTeam(${i})">${i===answeringTeam?'🎤 ':''}${esc(p.name)} +1</button>`).join("")+
+          `</div>
+          <button class="btn" style="background:var(--no);color:#fff" onclick="scoreNone()">❌ Nadie la pegó</button>`;
       } else {
         sub.textContent="¿La pegó?";
         c.innerHTML=`<div class="score-mark on">

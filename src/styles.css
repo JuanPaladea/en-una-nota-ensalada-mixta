@@ -184,6 +184,11 @@
   .support img{height:46px;width:auto;border-radius:10px;transition:transform .12s}
   .support a:hover img{transform:scale(1.05)}
   .support-after{color:var(--muted);font-size:13px;margin:12px 0 0;line-height:1.6}
+  /* Mientras se juega: el logo y la pastilla se mantienen, pero el bloque de
+     Cafecito y el pie quedarían pegados abajo del tablero en plena partida, y la
+     bajada ("el juego para cantar con amigos…") se lleva 63px que en un celular
+     de 640px de alto dejaban los botones de escuchar de nuevo fuera de cuadro. */
+  body.playing .sub,body.playing .support,body.playing .footer-note{display:none}
 
   /* Cómo se juega / preguntas frecuentes (contenido para buscadores y para el que llega nuevo) */
   .info{margin-top:26px}

@@ -5,12 +5,3 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# El archivo de verificación de Search Console no es contenido de verdad: no
-# tiene título ni texto, así que Google lo rastrea y lo deja en "sin indexar".
-# Con noindex sigue siendo legible para verificar la propiedad (la verificación
-# no mira las directivas de indexación) pero queda excluido a propósito y nunca
-# puede aparecer como resultado de búsqueda.
-[[headers]]
-  for = "/googleb17d49b763ac1c34.html"
-  [headers.values]
-    X-Robots-Tag = "noindex"

@@ -34,6 +34,9 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - Sección **Cómo se juega / preguntas frecuentes** con datos estructurados `FAQPage`,
   imagen de OpenGraph en **PNG** (WhatsApp y Facebook no muestran previews en SVG) y
   `manifest.webmanifest` para instalarla desde el celular.
+- **Comentarios**: formulario al pie (comentario + nombre y mail opcionales) que llega por
+  **Netlify Forms** al mail configurado. Se manda sin recargar la página; si el envío falla
+  (por ejemplo con `npm run dev`, donde no hay Netlify) ofrece mandar el mismo texto por mail.
 - Responsive (pensado también para celular).
 
 ## 🚀 Desarrollo
@@ -80,6 +83,10 @@ npm run preview # sirve el build de dist/ para probarlo
 
 Configurado para Netlify: `netlify.toml` corre `npm run build` y publica `dist/`.
 Sirve como cualquier sitio estático (también en GitHub Pages, Vercel, etc.).
+
+Los comentarios usan **Netlify Forms**: Netlify detecta el `<form data-netlify="true">` en
+el HTML publicado. Para que lleguen al mail hay que activarlo una sola vez en el panel:
+**Forms → Notifications → Email notification** apuntando a la casilla que corresponda.
 
 ## 📝 Notas
 

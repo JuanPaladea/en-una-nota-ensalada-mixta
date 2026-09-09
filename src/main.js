@@ -907,6 +907,64 @@ async function shareResult(btn){
 }
 
 /* ============================================================
+   COMENTARIOS
+   El formulario lo recibe Netlify Forms (el markup está en index.html). Se
+   manda por fetch para no recargar la página ni sacar a nadie del juego; si la
+   respuesta falla — pasa al abrirlo con npm run dev, donde Netlify no existe —
+   se ofrece el mismo comentario armado como mail.
+   ============================================================ */
+const MAIL_CONTACTO = "juanpaladea5@gmail.com";
+
+function mailtoComentario(datos){
+  const nombre = String(datos.get("nombre") || "").trim();
+  const email  = String(datos.get("email")  || "").trim();
+  const cuerpo = [
+    String(datos.get("mensaje") || "").trim(), "",
+    nombre && ("Nombre: " + nombre),
+    email  && ("Mail: "   + email),
+  ].filter(Boolean).join("\n");
+  return "mailto:" + MAIL_CONTACTO
+    + "?subject=" + encodeURIComponent("Comentario · En una nota")
+    + "&body="    + encodeURIComponent(cuerpo);
+}
+
+async function sendFeedback(ev){
+  ev.preventDefault();
+  const form  = ev.target;
+  const btn   = document.getElementById("fb-send");
+  const state = document.getElementById("fb-state");
+  const datos = new FormData(form);
+  if(!String(datos.get("mensaje") || "").trim()) return;
+  if(datos.get("bot-field")) return;            // lo llenó un bot: no mandamos nada
+  state.className = "feedback-state";
+  state.textContent = "Enviando…";
+  if(btn){ btn.disabled = true; }
+  try{
+    const r = await fetch("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(datos).toString(),
+    });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    form.reset();
+    state.className = "feedback-state ok";
+    state.textContent = "¡Gracias! Tu comentario ya me llegó 💛";
+    track("comentario", { estado: "enviado" });
+  }catch(e){
+    state.className = "feedback-state err";
+    state.textContent = "No pudimos enviarlo desde acá. Mandámelo por mail a ";
+    const a = document.createElement("a");
+    a.href = mailtoComentario(datos);
+    a.textContent = MAIL_CONTACTO;
+    state.appendChild(a);
+    state.appendChild(document.createTextNode(" y lo leo igual."));
+    track("comentario", { estado: "error" });
+  }finally{
+    if(btn){ btn.disabled = false; }
+  }
+}
+
+/* ============================================================
    INIT + wiring
    Los onclick/oninput del HTML llaman funciones globales,
    así que exponemos los handlers en window.
@@ -917,7 +975,7 @@ Object.assign(window, {
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
   scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch, goHome,
-  onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult,
+  onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult, sendFeedback,
 });
 
 function boot(){

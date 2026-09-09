@@ -279,27 +279,33 @@
       </div>
     </section>
 
+    <!-- ===================== COMENTARIOS =====================
+         Netlify Forms: el markup viaja en el HTML del deploy y Netlify se
+         encarga de recibirlo. Se manda por fetch para no salir de la página;
+         si falla (por ejemplo sirviendo local con npm run dev) se ofrece
+         mandarlo por mail. -->
+    <div class="feedback">
+      <div class="feedback-title">💬 Dejame un comentario</div>
+      <p class="feedback-txt">¿Falta una canción? ¿Se rompió algo? ¿Se te ocurre un modo nuevo? Escribime, lo leo yo.</p>
+      <form name="comentarios" method="POST" data-netlify="true" netlify-honeypot="bot-field"
+            onsubmit="sendFeedback(event)">
+        <input type="hidden" name="form-name" value="comentarios" />
+        <p class="hp"><label>No completar: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
+        <textarea name="mensaje" id="fb-msg" rows="4" maxlength="2000" required
+                  placeholder="Tu comentario, idea o la canción que falta…"></textarea>
+        <div class="feedback-row">
+          <input type="text" name="nombre" id="fb-nombre" maxlength="60" placeholder="Tu nombre (opcional)" />
+          <input type="email" name="email" id="fb-email" maxlength="120" placeholder="Tu mail (si querés respuesta)" />
+        </div>
+        <button class="btn cyan big" type="submit" id="fb-send">📩 Enviar comentario</button>
+      </form>
+      <p class="feedback-state" id="fb-state" role="status"></p>
+    </div>
+
     <div class="support">
       <div class="support-title">☕ Bancá el proyecto</div>
-      <p class="support-txt">
-        <b>En una nota</b> nació para esas juntadas con amigos en las que alguien pone música
-        y a los dos minutos está cantando toda la mesa. Lo hago solo, en mis ratos libres, y es
-        <b>gratis y sin un solo anuncio</b>: nada de pop-ups tapando la pantalla ni videos
-        antes de jugar.
-      </p>
-      <p class="support-txt">
-        Eso también significa que el proyecto no genera un peso: el dominio, el hosting y las
-        horas de sumar canciones nuevas salen de mi bolsillo.
-      </p>
-      <ul class="support-list">
-        <li>🎵 <span>Más canciones y géneros nuevos todos los meses</span></li>
-        <li>🚫 <span>Cero anuncios, cero registro, cero datos tuyos</span></li>
-        <li>🌐 <span>Dominio y servidores pagos para que esté siempre online</span></li>
-        <li>🛠️ <span>Modos y mejoras que ya están en camino</span></li>
-      </ul>
-      <p class="support-txt">Si alguna vez te salvó una juntada, o terminaron todos cantando
-        a los gritos en una sobremesa, <b>un cafecito lo mantiene vivo</b>.
-        Con lo que sale un café ya ayudás un montón 💛</p>
+      <p class="support-txt">Gratis, sin anuncios y sin registro. Lo hago solo: el dominio, el
+        hosting y las canciones nuevas salen de mi bolsillo, y <b>un cafecito lo mantiene vivo</b> 💛</p>
       <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" aria-label="Invitame un café en cafecito.app">
         <img srcset="https://cdn.cafecito.app/imgs/buttons/button_1.png 1x, https://cdn.cafecito.app/imgs/buttons/button_1_2x.png 2x, https://cdn.cafecito.app/imgs/buttons/button_1_3.75x.png 3.75x"
              src="https://cdn.cafecito.app/imgs/buttons/button_1.png" alt="Invitame un café en cafecito.app" />

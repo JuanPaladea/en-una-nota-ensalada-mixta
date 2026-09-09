@@ -175,23 +175,38 @@
   .medal{font-size:34px}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6}
   /* Bancá el proyecto (Cafecito) */
-  .support{text-align:center;margin-top:30px;background:linear-gradient(180deg,var(--card),var(--card2));
-    border:2px solid var(--amber);border-radius:20px;padding:22px 18px;
+  .support{text-align:center;margin-top:26px;background:linear-gradient(180deg,var(--card),var(--card2));
+    border:2px solid var(--amber);border-radius:18px;padding:16px 16px 14px;
     box-shadow:0 6px 24px rgba(0,0,0,.25)}
-  .support-title{font-size:19px;font-weight:900;color:var(--amber);margin:0 0 10px}
-  .support-txt{color:var(--paper);font-size:14.5px;line-height:1.65;margin:0 auto 8px;max-width:560px;opacity:.92}
+  .support-title{font-size:17px;font-weight:900;color:var(--amber);margin:0 0 8px}
+  .support-txt{color:var(--paper);font-size:14px;line-height:1.55;margin:0 auto 12px;max-width:520px;opacity:.92}
   .support-txt b{color:var(--lime)}
-  .support-list{list-style:none;padding:0;margin:12px auto 16px;max-width:420px;text-align:left;
-    color:var(--muted);font-size:14px;line-height:1.9}
-  .support-list li{display:flex;gap:8px;align-items:flex-start}
-  .support img{height:46px;width:auto;border-radius:10px;transition:transform .12s}
+  .support img{height:40px;width:auto;border-radius:10px;transition:transform .12s}
   .support a:hover img{transform:scale(1.05)}
-  .support-after{color:var(--muted);font-size:13px;margin:12px 0 0;line-height:1.6}
+  .support-after{color:var(--muted);font-size:12.5px;margin:10px 0 0;line-height:1.5}
+
+  /* Comentarios (llegan por Netlify Forms) */
+  .feedback{margin-top:26px;background:linear-gradient(180deg,var(--card),var(--card2));
+    border:1px solid var(--line);border-radius:18px;padding:18px 16px}
+  .feedback-title{font-size:17px;font-weight:900;color:var(--cyan);margin:0 0 6px}
+  .feedback-txt{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 14px}
+  .feedback textarea{width:100%;background:var(--ink);border:2px solid var(--line);color:var(--paper);
+    border-radius:12px;padding:12px;font:inherit;font-size:15px;resize:vertical;min-height:96px}
+  .feedback textarea:focus{outline:none;border-color:var(--magenta)}
+  .feedback-row{display:flex;gap:10px;margin:10px 0 12px;flex-wrap:wrap}
+  .feedback-row input{flex:1 1 190px;min-width:0;background:var(--ink);border:2px solid var(--line);
+    color:var(--paper);border-radius:12px;padding:12px;font:inherit;font-size:15px}
+  .feedback-row input:focus{outline:none;border-color:var(--magenta)}
+  .feedback-state{margin:12px 0 0;font-size:14px;line-height:1.55;color:var(--muted);min-height:1px}
+  .feedback-state.ok{color:var(--lime);font-weight:800}
+  .feedback-state.err{color:var(--no)}
+  .feedback-state a{color:var(--cyan)}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
   /* Mientras se juega: el logo y la pastilla se mantienen, pero el bloque de
      Cafecito y el pie quedarían pegados abajo del tablero en plena partida, y la
      bajada ("el juego para cantar con amigos…") se lleva 63px que en un celular
      de 640px de alto dejaban los botones de escuchar de nuevo fuera de cuadro. */
-  body.playing .sub,body.playing .support,body.playing .footer-note{display:none}
+  body.playing .sub,body.playing .support,body.playing .feedback,body.playing .footer-note{display:none}
 
   /* Cómo se juega / preguntas frecuentes (contenido para buscadores y para el que llega nuevo) */
   .info{margin-top:26px}
@@ -242,6 +257,8 @@
     .song .link-row{flex-wrap:wrap}
     .song .link-row input{flex-basis:100%;order:3}
     .prow input{font-size:16px}       /* evita zoom en iOS al enfocar */
+    .feedback{padding:14px;border-radius:16px}
+    .feedback textarea,.feedback-row input{font-size:16px}
     .footer-note{font-size:11px}
   }
   @media (max-width:360px){

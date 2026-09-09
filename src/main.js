@@ -3,6 +3,7 @@ import { GENRES } from "./data.js";
 import { load, save, songKey, esc, extractVideoId } from "./utils.js";
 import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard } from "./sharecard.js";
+import { track } from "./analytics.js";
 
 /* ============================================================
    ESTADO
@@ -260,6 +261,7 @@ async function onAudioFiles(inputEl){
     added++;
   }
   save(LS_LOCAL, localTracks);
+  if(added) track("audio_propio_cargado", { cantidad: added, fallidos: failed });
   if(!selectedGenres.has("local") && added) selectedGenres.add("local");
   renderLocalList(); renderGenres(); updatePoolWarn();
   if(failed) alert("Se cargaron "+added+" canciones para esta sesión. Nota: no se pudieron guardar de forma permanente en este navegador ("+failed+"), así que quizás debas volver a cargarlas la próxima vez.");
@@ -376,6 +378,7 @@ function onPlayerError(e){
   if(!s || s.local) return;
   if(phase!=='ready' && mediaKind!=='yt') return;
   brokenIds.add(s.id);
+  track("error_youtube", { momento: phase });
   // El video se rompió durante la precarga: todavía no apretaron play, así que
   // cambiamos la canción sin que se note. Antes el video roto aparecía recién
   // frente a todos y el juego tenía que saltar en pleno silencio.
@@ -525,6 +528,13 @@ function startGame(){
   const ms = document.getElementById("opt-maxsongs");
   opts.maxSongs = ms ? parseInt(ms.value,10) : 0;
   played=[]; brokenIds=new Set(); songNo=1;
+  track("partida_iniciada", {
+    generos: [...selectedGenres].join(","),
+    cantidad_generos: selectedGenres.size,
+    equipos: teams.length,
+    canciones_por_partida: opts.maxSongs,
+    canciones_disponibles: pool.length,
+  });
   show("s-game");
   newSong();
 }
@@ -592,6 +602,16 @@ function newSong(){
   renderPhase(); renderBoard();
 }
 
+// Una canción cuenta como escuchada cuando arranca el audio por primera vez en
+// la ronda: apretar "1 segundo más" no la vuelve a contar.
+function trackCancion(modo){
+  track("cancion_sonada", {
+    modo,                                   // corte = 1 segundo, continuo = sin cortar
+    numero: songNo,
+    tipo: currentSong && currentSong.local ? "propia" : "youtube",
+  });
+}
+
 // Reproduce un fragmento de 1 segundo y frena (el corazón del juego).
 function playSnippet(){
   clearSnippetTimer();
@@ -601,7 +621,7 @@ function playSnippet(){
   setCover("🎵 Sonando…");
   renderPhase();
   if(!mediaStarted){
-    if(mediaStart()) mediaStarted=true;
+    if(mediaStart()){ mediaStarted=true; trackCancion("corte"); }
     else { pauseAfterSnippet=false; phase='ready'; renderPhase(); }
   } else mediaResume();
 }
@@ -614,7 +634,7 @@ function playContinuous(){
   setCover("🎵 Sonando… ¡hasta que corten!");
   renderPhase();
   if(!mediaStarted){
-    if(mediaStart()) mediaStarted=true;
+    if(mediaStart()){ mediaStarted=true; trackCancion("continuo"); }
     else { continuousMode=false; phase='decide'; renderPhase(); }
   } else mediaResume();
 }
@@ -797,6 +817,12 @@ function endGame(reason){
   try{ mediaStop(); }catch(_){}
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
   lastGameSongs = Math.max(0, songNo - 1);   // canciones que llegaron a terminarse
+  track("partida_terminada", {
+    motivo: reason || "manual",       // limit = llegó al tope, agotada = se acabó la playlist
+    canciones: lastGameSongs,
+    equipos: teams.length,
+    puntos_ganador: Math.max(...teams.map(p=>p.score), 0),
+  });
   const head = document.querySelector("#s-results h2");
   if(head) head.textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
   const sorted = [...teams].sort((a,b)=>b.score-a.score);
@@ -816,6 +842,7 @@ function endGame(reason){
 }
 
 function rematch(){
+  track("revancha", { canciones: lastGameSongs });
   teams.forEach(p=>p.score=0);
   played=[]; brokenIds=new Set(); songNo=1;
   show("s-game"); newSong();
@@ -838,6 +865,7 @@ function goHome(){
 const SHARE_URL = "https://enunanota.com.ar/";
 const SHARE_TEXT = "🎤 En una nota · Ensalada mixta: suena 1 segundo de una canción y tenés que seguir cantando la que sigue. Gratis, sin instalar nada:";
 async function shareGame(){
+  track("compartir", { que: "link" });
   if(navigator.share){
     try{ await navigator.share({ title:"En una nota · Ensalada mixta", text:SHARE_TEXT, url:SHARE_URL }); return; }
     catch(e){ if(e && e.name === "AbortError") return; }
@@ -867,6 +895,7 @@ async function shareResult(btn){
       ? `🏆 Ganó ${campeon.name} con ${campeon.score} punto${campeon.score!==1?"s":""} en “En una nota”. ¿Se animan?`
       : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
     const r = await shareCard(teams, lastGameSongs, texto, SHARE_URL);
+    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs });
     if(r === "descargado") alert("Guardamos la imagen del resultado y copiamos el link 🎶 Mandala al grupo.");
     else if(r === "error") alert("No pudimos compartir desde acá. Probá con el botón “Compartir el juego”.");
   }catch(e){

@@ -378,7 +378,9 @@ function onPlayerError(e){
   if(!s || s.local) return;
   if(phase!=='ready' && mediaKind!=='yt') return;
   brokenIds.add(s.id);
-  track("error_youtube", { momento: phase });
+  // codigo: 100 = el video ya no existe, 101/150 = no permite embed, 5 = error
+  // del reproductor. Con el video y el título se sabe cuál reemplazar en data.js.
+  track("error_youtube", { momento: phase, codigo: e && e.data, video: s.id, cancion: s.t });
   // El video se rompió durante la precarga: todavía no apretaron play, así que
   // cambiamos la canción sin que se note. Antes el video roto aparecía recién
   // frente a todos y el juego tenía que saltar en pleno silencio.

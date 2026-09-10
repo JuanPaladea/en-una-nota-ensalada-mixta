@@ -148,7 +148,10 @@
 
     <!-- ===================== CÓMO SE JUEGA / FAQ ===================== -->
     <section class="card info">
-      <h2>🎤 Cómo se juega</h2>
+      <!-- Cerrado de entrada: lo abre solo el que tiene la duda. Google indexa
+           igual el texto de un <details> cerrado. -->
+      <details class="howto">
+      <summary><h2>🎤 Cómo se juega</h2></summary>
       <p><b>En una nota</b> es el clásico juego de las juntadas con amigos: suena un pedacito de una canción,
         se corta, y hay que <b>seguir cantando la parte que sigue</b>. Esta versión sortea los temas
         sola y los mantiene tapados, así que <b>nadie sabe qué suena</b> hasta que se revela.</p>
@@ -161,6 +164,7 @@
         <li>Se <b>revela</b> la canción, con su imagen, y el grupo define <b>quién se lleva el punto</b>.</li>
       </ol>
       <p>Se juega desde el celular, la compu o la tele: no hay que instalar nada ni crear una cuenta.</p>
+      </details>
 
       <details class="faq">
         <summary>¿Es gratis?</summary>

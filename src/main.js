@@ -980,6 +980,15 @@ Object.assign(window, {
   onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult, sendFeedback,
 });
 
+// Clics en Cafecito. Analytics ya cuenta los clics a otros sitios, pero no
+// distingue cuál de los dos botones fue ni si fue antes o después de jugar.
+document.addEventListener("click", (ev)=>{
+  const a = ev.target.closest && ev.target.closest("a[data-cafecito]");
+  if(!a) return;
+  const pantalla = document.querySelector(".screen.on");
+  track("cafecito", { desde: a.dataset.cafecito, pantalla: pantalla ? pantalla.id.replace("s-","") : "" });
+});
+
 function boot(){
   // Si es la primera vez (o se borraron los datos), arranca con dos equipos.
   if(teams.length === 0){ addTeam("Equipo 1"); addTeam("Equipo 2"); }

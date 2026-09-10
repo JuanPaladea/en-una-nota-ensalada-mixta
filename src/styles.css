@@ -173,6 +173,14 @@
   .center{text-align:center}
   .big-num{font-size:64px;font-weight:900;line-height:1}
   .medal{font-size:34px}
+  /* Tarjeta del resultado en la pantalla final (la misma imagen que se comparte) */
+  .result-img{display:block;width:100%;max-width:400px;margin:12px auto 0;padding:0;border:0;
+    background:none;cursor:pointer;border-radius:22px;font:inherit}
+  .result-img img{display:block;width:100%;height:auto;border-radius:22px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45);transition:transform .08s}
+  .result-img:active img{transform:scale(.98)}
+  /* .board y .result-img declaran display: sin esto, el atributo hidden no las oculta */
+  [hidden]{display:none!important}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6}
   /* Bancá el proyecto (Cafecito) */
   .support{text-align:center;margin-top:26px;background:linear-gradient(180deg,var(--card),var(--card2));

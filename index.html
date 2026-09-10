@@ -260,10 +260,15 @@
       <div class="card center">
         <div class="medal">🏆</div>
         <h2 style="justify-content:center">¡Terminó el juego!</h2>
+        <!-- La imagen que se comparte, ya armada: tocarla también la comparte -->
+        <button type="button" class="result-img" id="result-img" hidden aria-label="Compartir esta imagen"
+                onclick="shareResult(document.getElementById('share-btn'), 'imagen')">
+          <img alt="Imagen con el resultado de la partida" width="1080" height="1080" />
+        </button>
         <div id="winner" style="margin:10px 0 20px"></div>
         <div id="final-board" class="board"></div>
         <div style="height:18px"></div>
-        <button class="btn cyan big" onclick="shareResult(this)">📲 Compartir el resultado</button>
+        <button class="btn cyan big" id="share-btn" onclick="shareResult(this, 'boton')">📲 Compartir el resultado</button>
         <p class="hint" style="margin:8px 0 0">Manda una imagen con el marcador al grupo</p>
         <div style="height:14px"></div>
         <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos equipos)</button>

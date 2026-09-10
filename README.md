@@ -26,7 +26,8 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - **Tus propios audios**: cargá MP3/M4A desde tu compu (se guardan con IndexedDB y
   funcionan **sin internet**), ideal para jugar sin depender de YouTube.
 - Al terminar, **imagen del resultado para compartir**: se dibuja en un canvas con el
-  marcador y los nombres de los equipos, y se manda con la Web Share API. Si el navegador
+  marcador y los nombres de los equipos, se muestra ya armada en la pantalla final
+  (tocarla la comparte) y se manda con la Web Share API. Si el navegador
   no comparte archivos, se descarga y se copia el link.
 - **Compartir** con la Web Share API (y copia del link como respaldo).
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"

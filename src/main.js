@@ -2,7 +2,7 @@ import "./styles.css";
 import { GENRES } from "./data.js";
 import { load, save, songKey, esc, extractVideoId } from "./utils.js";
 import { idbPut, idbGet, idbDel } from "./idb.js";
-import { shareCard } from "./sharecard.js";
+import { shareCard, drawCard } from "./sharecard.js";
 import { track } from "./analytics.js";
 
 /* ============================================================
@@ -840,7 +840,24 @@ function endGame(reason){
       <span>${medals[i]||'　'} ${esc(p.name)}</span>
       <span class="pts">${p.score}</span>
     </div>`).join("");
+  mostrarTarjeta();
   show("s-results");
+}
+
+// La imagen que se comparte se muestra ya armada en la pantalla final: antes
+// había que tocar "Compartir" para verla, y casi nadie compartía. Reemplaza al
+// marcador en texto, que dice lo mismo; si el canvas falla, queda el texto.
+function mostrarTarjeta(){
+  const box = document.getElementById("result-img");
+  let ok = false;
+  try{
+    box.querySelector("img").src = drawCard(teams, lastGameSongs).toDataURL("image/jpeg", 0.85);
+    ok = true;
+  }catch(e){}
+  box.hidden = !ok;
+  document.getElementById("winner").hidden = ok;
+  document.getElementById("final-board").hidden = ok;
+  document.querySelector("#s-results .medal").hidden = ok;
 }
 
 function rematch(){
@@ -884,7 +901,8 @@ async function shareGame(){
 // Es distinto de shareGame(): eso manda un aviso del juego, esto manda lo que
 // les pasó a ellos — que es lo que la gente realmente reenvía al grupo.
 let sharingResult = false;
-async function shareResult(btn){
+// desde: 'imagen' (tocaron la tarjeta) o 'boton' (el botón de abajo)
+async function shareResult(btn, desde){
   if(sharingResult) return;              // doble toque mientras genera la imagen
   sharingResult = true;
   const previo = btn ? btn.textContent : null;
@@ -897,7 +915,7 @@ async function shareResult(btn){
       ? `🏆 Ganó ${campeon.name} con ${campeon.score} punto${campeon.score!==1?"s":""} en “En una nota”. ¿Se animan?`
       : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
     const r = await shareCard(teams, lastGameSongs, texto, SHARE_URL);
-    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs });
+    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs, desde: desde || "boton" });
     if(r === "descargado") alert("Guardamos la imagen del resultado y copiamos el link 🎶 Mandala al grupo.");
     else if(r === "error") alert("No pudimos compartir desde acá. Probá con el botón “Compartir el juego”.");
   }catch(e){

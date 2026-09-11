@@ -13,11 +13,26 @@ const GA_ID = "G-HM46QH4KBQ";
 const enDesarrollo = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 const activo = Boolean(GA_ID) && !enDesarrollo;
 
+// Las partidas propias en el sitio publicado tampoco tienen que contar. Entrando
+// una vez con ?interno=1 este navegador queda marcado (con ?interno=0 se
+// desmarca) y sus eventos viajan con traffic_type=internal, que el filtro
+// "Internal Traffic" de la propiedad descarta. Va por navegador y no por IP
+// porque la IP de casa cambia y la del celular también.
+const MARCA_INTERNO = "enunanota_interno";
+function esInterno(){
+  try{
+    const q = new URLSearchParams(location.search).get("interno");
+    if(q === "1") localStorage.setItem(MARCA_INTERNO, "1");
+    if(q === "0") localStorage.removeItem(MARCA_INTERNO);
+    return localStorage.getItem(MARCA_INTERNO) === "1";
+  }catch(_){ return false; }
+}
+
 if(activo){
   window.dataLayer = window.dataLayer || [];
   window.gtag = function(){ window.dataLayer.push(arguments); };
   window.gtag("js", new Date());
-  window.gtag("config", GA_ID);
+  window.gtag("config", GA_ID, esInterno() ? { traffic_type: "internal" } : {});
   const s = document.createElement("script");
   s.async = true;
   s.src = "https://www.googletagmanager.com/gtag/js?" + new URLSearchParams({ id: GA_ID });

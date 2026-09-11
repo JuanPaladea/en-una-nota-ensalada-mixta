@@ -65,6 +65,8 @@
   .btn.cyan{background:var(--cyan)}
   .btn.lime{background:var(--lime)}
   .btn.ghost{background:transparent;color:var(--paper);box-shadow:none;border:2px solid var(--line)}
+  /* Enlaces con pinta de botón (el de Cafecito en la pantalla final) */
+  a.btn{display:block;text-align:center;text-decoration:none}
   .btn.ghost:active{transform:none}
   .row{display:flex;gap:10px;flex-wrap:wrap}
   .row.spread{justify-content:space-between;align-items:center}

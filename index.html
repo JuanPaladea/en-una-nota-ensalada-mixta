@@ -2,7 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- viewport-fit=cover: en la partida a pantalla completa se usan los márgenes
+       seguros (muesca y barra de gestos) con env(safe-area-inset-*) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>En una nota · Ensalada mixta — juego para cantar con amigos</title>
   <meta name="description" content="Juego gratis para cantar con amigos: suena un segundo de una canción al azar, se corta y tenés que seguir cantando la que sigue. Más de 350 canciones en 11 géneros (rock, cumbia, pop, folklore y más)." />
   <meta name="keywords" content="en una nota, juego para cantar, adivinar canciones, karaoke, juego con amigos, juntada con amigos, ensalada mixta, música, previa, asado, argentina" />
@@ -224,11 +226,16 @@
     </section>
 
     <!-- ===================== GAME ===================== -->
+    <!-- Se juega como una app: ocupa exactamente la pantalla, sin scroll. Arriba
+         la barra y el marcador (siempre a la vista), al medio la tapa, que se
+         estira o se achica, y abajo los botones, a mano del pulgar. -->
     <section id="s-game" class="screen">
-      <div class="row spread" style="margin-bottom:10px">
+      <div class="game-top row spread">
         <span class="pill" id="round-pill">Canción 1</span>
         <button class="btn ghost mini" onclick="endGame()">Terminar 🏁</button>
       </div>
+
+      <div id="board" class="board scorebar" aria-label="Marcador"></div>
 
       <div class="turn">
         <div class="who" id="phase-title">🎧 Escuchen todos</div>
@@ -247,11 +254,6 @@
       </div>
 
       <div class="controls" id="controls"></div>
-
-      <div class="card" style="margin-top:18px">
-        <h3>Tablero</h3>
-        <div id="board" class="board"></div>
-      </div>
     </section>
 
     <!-- ===================== RESULTS ===================== -->

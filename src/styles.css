@@ -218,6 +218,50 @@
      de 640px de alto dejaban los botones de escuchar de nuevo fuera de cuadro. */
   body.playing .sub,body.playing .support,body.playing .feedback,body.playing .footer-note{display:none}
 
+  /* ---------- Partida como app: pantalla completa, sin scroll ----------
+     Antes la pantalla de juego era una página más: en un celular de 640px con 4
+     equipos el tablero quedaba entero fuera de cuadro, y en una compu de 720px
+     no se veía nunca sin scrollear. Ahora la partida ocupa exactamente el alto
+     visible (dvh descuenta la barra del navegador del celular): barra y marcador
+     arriba, la tapa se estira o se achica en el medio y los botones quedan abajo.
+     El logo grande se oculta mientras se juega. */
+  body.playing{overflow:hidden}
+  body.playing .brand,body.playing .tagline{display:none}
+  body.playing .wrap{display:flex;flex-direction:column;height:100vh;height:100dvh;
+    padding-top:max(12px, env(safe-area-inset-top));
+    padding-bottom:max(12px, env(safe-area-inset-bottom));
+    padding-left:max(16px, env(safe-area-inset-left));
+    padding-right:max(16px, env(safe-area-inset-right))}
+  /* Si con muchos equipos no entra ni con la tapa al mínimo, scrollea solo la partida */
+  #s-game.on{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .game-top{flex:none;margin-bottom:10px}
+  body.playing .turn{flex:none;margin-bottom:10px}
+  body.playing .stage{flex:1 1 0;aspect-ratio:auto;min-height:130px;margin-bottom:12px}
+  body.playing .controls{flex:none}
+
+  /* Marcador: una ficha por equipo, siempre a la vista arriba de todo. Es grilla
+     y no tira horizontal: con 4 equipos en un celular angosto la tira se salía
+     por el costado y el último equipo quedaba oculto. Así se reparten en filas
+     (de a dos en un celular, todas en una fila en la compu) con lugar para
+     nombres de ~12 letras; los más largos se recortan con "…", pero el puntaje
+     se ve siempre. Con fichas más angostas todo quedaba en "Equi…". */
+  .scorebar{flex:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-bottom:12px}
+  .scorebar .brow{min-width:0;gap:6px;padding:7px 10px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
+  .scorebar .brow > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;font-size:14px}
+  .scorebar .brow .pts{flex:none;font-size:18px;line-height:1}
+  .scorebar .brow.cur{outline:none;border-color:var(--lime);background:rgba(166,255,61,.12)}
+
+  /* Pantallas bajas (celular acostado): la tapa y el subtítulo ceden lugar a los botones */
+  @media (max-height:520px){
+    body.playing .turn .lbl{display:none}
+    body.playing .turn .who{font-size:20px}
+    body.playing .stage{min-height:64px}
+    body.playing .game-top,body.playing .scorebar,body.playing .turn{margin-bottom:6px}
+    body.playing .cover .eq{height:30px;margin-bottom:4px}
+    body.playing .controls{gap:8px}
+    body.playing .controls .btn{padding-top:10px;padding-bottom:10px}
+  }
+
   /* Cómo se juega / preguntas frecuentes (contenido para buscadores y para el que llega nuevo) */
   .info{margin-top:26px}
   .info h2{font-size:20px;justify-content:center;margin-bottom:14px}

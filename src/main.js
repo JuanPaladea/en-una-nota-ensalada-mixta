@@ -23,7 +23,7 @@ let selectedGenres = new Set();
 // Equipos: los nombres se guardan en localStorage y sobreviven a la revancha,
 // al volver al menú principal y a recargar la página (los puntos no).
 let teams = loadTeams();                  // [{name, score}]
-let opts = { randomStart:true, noRepeat:true, maxSongs:10 };
+let opts = { noRepeat:true, maxSongs:10 };
 
 let pool = [];        // canciones jugables [{t,a,gid,id,key}]
 let played = [];      // keys ya jugadas
@@ -320,6 +320,18 @@ let preparedFor=null;   // key de la canción que ya está lista en el reproduct
 let startAt=0;          // segundo desde el que arranca la canción actual
 let prebuffering=false; // true mientras bufferea en silencio (muteado y tapado)
 
+// Punto de arranque al azar, siempre desde el minuto 1 en adelante: muchos videos
+// de YouTube tienen intro (hablada, instrumental o silencio) y un fragmento de
+// 1 segundo que cae ahí no suena a nada.
+const MIN_START = 60, START_SPREAD = 60;
+function randomStart(){ return Math.floor(MIN_START + Math.random()*START_SPREAD); }
+// Si la canción es corta y el punto elegido queda muy cerca del final, lo trae
+// para atrás. d = duración en segundos (0 si todavía no se sabe).
+function fitStart(st, d){
+  if(!d || st < d - 30) return st;
+  return Math.floor(d > 90 ? MIN_START + Math.random()*Math.max(0, d - 30 - MIN_START) : d*0.3);
+}
+
 // Reproducción por segundos
 const SNIPPET_MS = 1000;      // cuánto suena cada "1 segundo"
 let snippetTimer=null;        // timeout que corta el fragmento
@@ -359,7 +371,10 @@ function onPlayerState(e){
     if(phase==='ready'){
       try{
         yt.pauseVideo();
-        if(prebuffering) yt.seekTo(startAt, true);
+        if(prebuffering){
+          startAt = fitStart(startAt, yt.getDuration());
+          yt.seekTo(startAt, true);
+        }
       }catch(_){}
       prebuffering=false;
       return;
@@ -409,11 +424,7 @@ function wireAudio(){
   const a=localAudioEl(); if(!a) return;
   a.addEventListener("loadedmetadata", ()=>{
     seekedThisRound=true;
-    if(opts.randomStart){
-      const d=a.duration||0;
-      const st=(d && d>40) ? (d*0.12 + Math.random()*d*0.5) : Math.min(15,(d||0)*0.25);
-      try{ a.currentTime=st; }catch(_){}
-    }
+    try{ a.currentTime=fitStart(randomStart(), a.duration||0); }catch(_){}
   });
   a.addEventListener("playing", ()=>{ eqPlaying(); armSnippet(); });
   a.addEventListener("pause", eqPaused);
@@ -450,7 +461,7 @@ function prepareMedia(s){
   }
   if(!ytReady || !yt) return;   // la API todavía no cargó: se carga al apretar play
   try{ localAudioEl().pause(); }catch(_){}
-  startAt = opts.randomStart ? Math.floor(15 + Math.random()*45) : 0;
+  startAt = randomStart();
   prebuffering=true;
   try{
     yt.mute(); yt.setVolume(0);        // silencio total antes de tocar el video
@@ -486,8 +497,7 @@ function mediaStart(){
     prebuffering=false;   // si todavía bufferea, que siga de largo y suene
     try{ yt.unMute(); yt.setVolume(100); yt.playVideo(); return true; }catch(e){}
   }
-  const start = opts.randomStart ? Math.floor(15 + Math.random()*45) : 0;
-  try{ yt.unMute(); yt.setVolume(100); yt.loadVideoById({videoId:s.id, startSeconds:start}); }
+  try{ yt.unMute(); yt.setVolume(100); yt.loadVideoById({videoId:s.id, startSeconds:randomStart()}); }
   catch(e){ onPlayerError({data:5}); }
   return true;
 }
@@ -525,7 +535,6 @@ function startGame(){
   teams.forEach((p,i)=>{ if(!p.name.trim()) p.name="Equipo "+(i+1); p.score=0; });
   if(teams.length===0){ teams=[{name:"Equipo 1",score:0}]; }
   saveTeams();   // los nombres quedan guardados para la próxima partida
-  opts.randomStart = document.getElementById("opt-randomstart").checked;
   opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
   const ms = document.getElementById("opt-maxsongs");
   opts.maxSongs = ms ? parseInt(ms.value,10) : 0;

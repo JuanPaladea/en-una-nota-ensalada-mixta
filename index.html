@@ -226,16 +226,15 @@
     </section>
 
     <!-- ===================== GAME ===================== -->
-    <!-- Se juega como una app: ocupa exactamente la pantalla, sin scroll. Arriba
-         la barra y el marcador (siempre a la vista), al medio la tapa, que se
-         estira o se achica, y abajo los botones, a mano del pulgar. -->
+    <!-- La partida ocupa exactamente la pantalla, sin scroll: la tapa se estira o
+         se achica según el lugar que dejan el resto. En la compu va como siempre
+         (logo arriba, tablero abajo); en el celular el tablero sube como fichas y
+         los botones quedan abajo, a mano del pulgar (el orden lo cambia el CSS). -->
     <section id="s-game" class="screen">
       <div class="game-top row spread">
         <span class="pill" id="round-pill">Canción 1</span>
         <button class="btn ghost mini" onclick="endGame()">Terminar 🏁</button>
       </div>
-
-      <div id="board" class="board scorebar" aria-label="Marcador"></div>
 
       <div class="turn">
         <div class="who" id="phase-title">🎧 Escuchen todos</div>
@@ -254,6 +253,11 @@
       </div>
 
       <div class="controls" id="controls"></div>
+
+      <div class="card board-card">
+        <h3>Tablero</h3>
+        <div id="board" class="board scorebar" aria-label="Marcador"></div>
+      </div>
     </section>
 
     <!-- ===================== RESULTS ===================== -->

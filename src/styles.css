@@ -222,11 +222,12 @@
      Antes la pantalla de juego era una página más: en un celular de 640px con 4
      equipos el tablero quedaba entero fuera de cuadro, y en una compu de 720px
      no se veía nunca sin scrollear. Ahora la partida ocupa exactamente el alto
-     visible (dvh descuenta la barra del navegador del celular): barra y marcador
-     arriba, la tapa se estira o se achica en el medio y los botones quedan abajo.
-     El logo grande se oculta mientras se juega. */
+     visible (dvh descuenta la barra del navegador del celular) y la tapa se
+     estira o se achica con el lugar que dejan el resto. En la compu se mantiene
+     el armado de siempre: logo arriba y tablero abajo. En el celular el logo se
+     oculta y el tablero sube como fichas (ver más abajo). */
   body.playing{overflow:hidden}
-  body.playing .brand,body.playing .tagline{display:none}
+  body.playing .tagline{margin-bottom:18px}
   body.playing .wrap{display:flex;flex-direction:column;height:100vh;height:100dvh;
     padding-top:max(12px, env(safe-area-inset-top));
     padding-bottom:max(12px, env(safe-area-inset-bottom));
@@ -239,20 +240,53 @@
   body.playing .stage{flex:1 1 0;aspect-ratio:auto;min-height:130px;margin-bottom:12px}
   body.playing .controls{flex:none}
 
-  /* Marcador: una ficha por equipo, siempre a la vista arriba de todo. Es grilla
-     y no tira horizontal: con 4 equipos en un celular angosto la tira se salía
-     por el costado y el último equipo quedaba oculto. Así se reparten en filas
-     (de a dos en un celular, todas en una fila en la compu) con lugar para
-     nombres de ~12 letras; los más largos se recortan con "…", pero el puntaje
-     se ve siempre. Con fichas más angostas todo quedaba en "Equi…". */
-  .scorebar{flex:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-bottom:12px}
-  .scorebar .brow{min-width:0;gap:6px;padding:7px 10px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
-  .scorebar .brow > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;font-size:14px}
-  .scorebar .brow .pts{flex:none;font-size:18px;line-height:1}
-  .scorebar .brow.cur{outline:none;border-color:var(--lime);background:rgba(166,255,61,.12)}
+  /* Tablero en la compu: abajo, como siempre, con los equipos lado a lado. Con 2
+     equipos es una sola fila y no le roba alto a la tapa; con más se reparten en
+     filas. Los nombres largos se recortan con "…", el puntaje se ve siempre. */
+  #s-game .board-card{flex:none;margin:12px 0 0;padding:12px 16px}
+  #s-game .board-card > h3{margin-bottom:8px}
+  .scorebar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+  .scorebar .brow{min-width:0;gap:10px}
+  .scorebar .brow > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scorebar .brow .pts{flex:none}
 
-  /* Pantallas bajas (celular acostado): la tapa y el subtítulo ceden lugar a los botones */
+  /* Tablero en el celular: sin logo, y el tablero sube arriba de todo como fichas
+     compactas, de a dos por fila (con 4 equipos en una tira horizontal el último
+     quedaba oculto, y con fichas más angostas los nombres quedaban en "Equi…").
+     Los botones quedan abajo, a mano del pulgar. */
+  @media (max-width:560px){
+    body.playing .brand,body.playing .tagline{display:none}
+    #s-game .game-top{order:-2}
+    #s-game .board-card{order:-1;margin:0 0 12px;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+    #s-game .board-card > h3{display:none}
+    .scorebar{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
+    .scorebar .brow{gap:6px;padding:7px 10px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
+    .scorebar .brow > span:first-child{font-weight:800;font-size:14px}
+    .scorebar .brow .pts{font-size:18px;line-height:1}
+    .scorebar .brow.cur{outline:none;border-color:var(--lime);background:rgba(166,255,61,.12)}
+  }
+
+  /* Compu: con el logo arriba y el tablero abajo, en una laptop de 650px de alto
+     sobraban hasta 89px al elegir quién arriesga. Se gana lugar sin sacar nada:
+     "Canción 1/10" y "Terminar" van a los costados del título en vez de tener
+     su propia fila, los cuatro botones secundarios van en una sola fila y el
+     logo pega un poco más a la partida. */
+  @media (min-width:561px){
+    body.playing .brand{margin:0 0 10px}
+    body.playing .tagline{margin-bottom:12px}
+    #s-game.on{position:relative}
+    #s-game .game-top{position:absolute;top:0;left:0;right:0;margin:0;align-items:flex-start;pointer-events:none}
+    #s-game .game-top > *{pointer-events:auto}
+    body.playing .turn .who{padding:0 150px}
+    body.playing .stage{min-height:110px}
+    #controls{grid-template-columns:1fr 1fr}
+    #controls > *{grid-column:1/-1}
+    #controls > .row{grid-column:auto}
+  }
+
+  /* Pantallas bajas (celular acostado): el logo, la tapa y el subtítulo ceden lugar a los botones */
   @media (max-height:520px){
+    body.playing .brand,body.playing .tagline{display:none}
     body.playing .turn .lbl{display:none}
     body.playing .turn .who{font-size:20px}
     body.playing .stage{min-height:64px}

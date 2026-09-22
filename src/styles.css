@@ -184,16 +184,6 @@
   /* .board y .result-img declaran display: sin esto, el atributo hidden no las oculta */
   [hidden]{display:none!important}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6}
-  /* Bancá el proyecto (Cafecito) */
-  .support{text-align:center;margin-top:26px;background:linear-gradient(180deg,var(--card),var(--card2));
-    border:2px solid var(--amber);border-radius:18px;padding:16px 16px 14px;
-    box-shadow:0 6px 24px rgba(0,0,0,.25)}
-  .support-title{font-size:17px;font-weight:900;color:var(--amber);margin:0 0 8px}
-  .support-txt{color:var(--paper);font-size:14px;line-height:1.55;margin:0 auto 12px;max-width:520px;opacity:.92}
-  .support-txt b{color:var(--lime)}
-  .support img{height:40px;width:auto;border-radius:10px;transition:transform .12s}
-  .support a:hover img{transform:scale(1.05)}
-  .support-after{color:var(--muted);font-size:12.5px;margin:10px 0 0;line-height:1.5}
 
   /* Comentarios (llegan por Netlify Forms) */
   .feedback{margin-top:26px;background:linear-gradient(180deg,var(--card),var(--card2));
@@ -212,11 +202,11 @@
   .feedback-state.err{color:var(--no)}
   .feedback-state a{color:var(--cyan)}
   .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
-  /* Mientras se juega: el logo y la pastilla se mantienen, pero el bloque de
-     Cafecito y el pie quedarían pegados abajo del tablero en plena partida, y la
+  /* Mientras se juega: el logo y la pastilla se mantienen, pero los comentarios
+     y el pie quedarían pegados abajo del tablero en plena partida, y la
      bajada ("el juego para cantar con amigos…") se lleva 63px que en un celular
      de 640px de alto dejaban los botones de escuchar de nuevo fuera de cuadro. */
-  body.playing .sub,body.playing .support,body.playing .feedback,body.playing .footer-note{display:none}
+  body.playing .sub,body.playing .feedback,body.playing .footer-note{display:none}
 
   /* ---------- Partida como app: pantalla completa, sin scroll ----------
      Antes la pantalla de juego era una página más: en un celular de 640px con 4

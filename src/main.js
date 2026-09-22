@@ -13,10 +13,12 @@ const LS_CUSTOM = "eun_custom_v1";
 const LS_LOCAL = "eun_local_v1";
 const LS_HISTORY = "eun_played_hist_v1";
 const LS_TEAMS = "eun_teams_v1";
+const LS_JUGADO = "eun_jugado_v1";
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
 let playedHistory = load(LS_HISTORY, []); // keys ya sonadas en partidas anteriores (persiste entre partidas)
+let jugado = load(LS_JUGADO, { partidas: 0, canciones: 0 }); // lo jugado en este navegador, para el pedido de Cafecito
 const localUrls = {};                     // id -> objectURL (cache de sesión)
 const memBlobs = {};                      // id -> File (respaldo en memoria si IndexedDB no está disponible)
 let selectedGenres = new Set();
@@ -72,12 +74,12 @@ function show(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   document.getElementById(id).classList.add("on");
   // El CSS usa esta clase para sacar de la pantalla de juego lo que no se juega:
-  // el bloque de Cafecito y el pie. El logo se queda.
+  // los comentarios y el pie. El logo se queda.
   document.body.classList.toggle("playing", id==="s-game");
   scrollTop();
   if(id==="s-armar") renderSongList();
 }
-// El menú es largo y abajo de todo está la sección de Cafecito: si no volvemos
+// El menú es largo y abajo de todo están los comentarios: si no volvemos
 // arriba a mano, al apretar "¡A jugar!" la pantalla se queda donde estaba y lo
 // primero que se ve es esa sección, con el juego fuera de cuadro. Va sin
 // animación y repetido en el frame siguiente porque al ocultar la pantalla
@@ -834,6 +836,10 @@ function endGame(reason){
     equipos: teams.length,
     puntos_ganador: Math.max(...teams.map(p=>p.score), 0),
   });
+  if(lastGameSongs > 0){
+    jugado.partidas++; jugado.canciones += lastGameSongs;
+    try{ save(LS_JUGADO, jugado); }catch(_){}
+  }
   const head = document.querySelector("#s-results h2");
   if(head) head.textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
   const sorted = [...teams].sort((a,b)=>b.score-a.score);
@@ -850,7 +856,23 @@ function endGame(reason){
       <span class="pts">${p.score}</span>
     </div>`).join("");
   mostrarTarjeta();
+  pedirCafecito();
   show("s-results");
+}
+
+// El pedido de Cafecito sale recién desde la segunda partida terminada en este
+// navegador: en la primera todavía están probando, y el cartel fijo al pie casi
+// nadie lo tocaba. Se pide con lo que ya jugaron, que es lo que lo vuelve concreto.
+const PARTIDAS_PARA_PEDIR = 2;
+function pedirCafecito(){
+  const mostrar = jugado.partidas >= PARTIDAS_PARA_PEDIR;
+  document.getElementById("cafecito-final").hidden = !mostrar;
+  if(!mostrar) return;
+  document.getElementById("cafecito-txt").innerHTML =
+    `Ya van <b>${jugado.partidas} partidas</b> y <b>${jugado.canciones} canciones</b> cantadas. ` +
+    `El juego es gratis y sin anuncios: si les sacó unas risas, un cafecito paga las canciones nuevas 💛`;
+  // Contra los clics en "cafecito" da la conversión del pedido.
+  track("cafecito_visto", { partidas: jugado.partidas, canciones: jugado.canciones });
 }
 
 // La imagen que se comparte se muestra ya armada en la pantalla final: antes
@@ -1013,7 +1035,11 @@ document.addEventListener("click", (ev)=>{
   const a = ev.target.closest && ev.target.closest("a[data-cafecito]");
   if(!a) return;
   const pantalla = document.querySelector(".screen.on");
-  track("cafecito", { desde: a.dataset.cafecito, pantalla: pantalla ? pantalla.id.replace("s-","") : "" });
+  track("cafecito", {
+    desde: a.dataset.cafecito,
+    pantalla: pantalla ? pantalla.id.replace("s-","") : "",
+    partidas: jugado.partidas,
+  });
 });
 
 function boot(){

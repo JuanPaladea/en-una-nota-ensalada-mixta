@@ -30,6 +30,9 @@ Después se **revela** la canción y el grupo decide si la pegó.
   (tocarla la comparte) y se manda con la Web Share API. Si el navegador
   no comparte archivos, se descarga y se copia el link.
 - **Compartir** con la Web Share API (y copia del link como respaldo).
+- **Cafecito**: el pedido aparece en la pantalla final recién desde la segunda partida
+  terminada en ese navegador, contando cuántas partidas y canciones llevan (se guarda en
+  localStorage). Se miden las veces que se muestra (`cafecito_visto`) y los clics (`cafecito`).
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.
 - Sección **Cómo se juega / preguntas frecuentes** con datos estructurados `FAQPage`,

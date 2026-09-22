@@ -279,11 +279,14 @@
         <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
         <div style="height:10px"></div>
         <!-- Al terminar es cuando más ganas hay de bancar el juego: el botón va
-             a mano, debajo de Revancha, y no en una tarjeta aparte al fondo. -->
-        <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
-           data-cafecito="final">☕ Invitame un cafecito</a>
-        <p class="hint" style="margin:8px 0 0">¿Se rieron un rato? El juego es gratis y sin anuncios: lo sostienen los cafecitos</p>
-        <div style="height:14px"></div>
+             a mano, debajo de Revancha. Aparece recién desde la segunda partida
+             y con lo que ya jugaron (lo arma pedirCafecito() en main.js). -->
+        <div id="cafecito-final" hidden>
+          <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+             data-cafecito="final">☕ Invitame un cafecito</a>
+          <p class="hint" id="cafecito-txt" style="margin:8px 0 0"></p>
+          <div style="height:14px"></div>
+        </div>
         <button class="btn ghost big" onclick="goHome()">🏠 Menú principal</button>
         <div style="height:10px"></div>
         <button class="btn ghost big" onclick="shareGame()">🔗 Compartir solo el link</button>
@@ -311,17 +314,6 @@
         <button class="btn cyan big" type="submit" id="fb-send">📩 Enviar comentario</button>
       </form>
       <p class="feedback-state" id="fb-state" role="status"></p>
-    </div>
-
-    <div class="support">
-      <div class="support-title">☕ Bancá el proyecto</div>
-      <p class="support-txt">Gratis, sin anuncios y sin registro. Lo hago solo: el dominio, el
-        hosting y las canciones nuevas salen de mi bolsillo, y <b>un cafecito lo mantiene vivo</b> 💛</p>
-      <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" aria-label="Invitame un café en cafecito.app" data-cafecito="pie">
-        <img srcset="https://cdn.cafecito.app/imgs/buttons/button_1.png 1x, https://cdn.cafecito.app/imgs/buttons/button_1_2x.png 2x, https://cdn.cafecito.app/imgs/buttons/button_1_3.75x.png 3.75x"
-             src="https://cdn.cafecito.app/imgs/buttons/button_1.png" alt="Invitame un café en cafecito.app" />
-      </a>
-      <p class="support-after">¿No podés colaborar? <b>Compartilo</b>, que también suma un montón 🙌</p>
     </div>
 
     <div class="footer-note">

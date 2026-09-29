@@ -336,6 +336,8 @@
     .genre .gc{font-size:12px}
     .teamgrid{grid-template-columns:1fr 1fr}
     .teamgrid .btn{font-size:16px;padding:15px 8px}
+    /* con equipos impares, el último va centrado y no pegado a la izquierda */
+    .teamgrid .btn:last-child:nth-child(odd){grid-column:1/-1;justify-self:center;width:calc(50% - 5px)}
     .stage{aspect-ratio:16/9}
     .turn .who{font-size:23px;line-height:1.1}
     .turn .lbl{font-size:12px}

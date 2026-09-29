@@ -25,7 +25,7 @@ let selectedGenres = new Set();
 // Equipos: los nombres se guardan en localStorage y sobreviven a la revancha,
 // al volver al menú principal y a recargar la página (los puntos no).
 let teams = loadTeams();                  // [{name, score}]
-let opts = { noRepeat:true, maxSongs:10 };
+let opts = { noRepeat:true, maxSongs:10, penalty:false }; // penalty: el que arriesga y erra pierde un punto
 
 let pool = [];        // canciones jugables [{t,a,gid,id,key}]
 let played = [];      // keys ya jugadas
@@ -542,6 +542,7 @@ function mediaStop(){
    ============================================================ */
 let phase='ready';        // ready | listening | continuous | decide | answering
 let answeringTeam=-1;   // índice de equipo, 'all' (todos) o -1 (nadie)
+let allHits=new Set();  // con "Para todos": índices de los equipos que la pegaron
 let revealed=false;
 let skipping=false;     // true cuando se saltea la canción sin puntos
 let songNo=1;
@@ -557,12 +558,15 @@ function startGame(){
   opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
   const ms = document.getElementById("opt-maxsongs");
   opts.maxSongs = ms ? parseInt(ms.value,10) : 0;
+  const pen = document.getElementById("opt-penalty");
+  opts.penalty = !!(pen && pen.checked);
   played=[]; brokenIds=new Set(); songNo=1;
   track("partida_iniciada", {
     generos: [...selectedGenres].join(","),
     cantidad_generos: selectedGenres.size,
     equipos: teams.length,
     canciones_por_partida: opts.maxSongs,
+    resta_puntos: opts.penalty,
     canciones_disponibles: pool.length,
   });
   show("s-game");
@@ -695,6 +699,7 @@ function pickTeam(i){
 function pickAll(){
   clearSnippetTimer(); continuousMode=false;
   answeringTeam='all'; skipping=false; phase='answering'; revealed=false;
+  allHits=new Set();
   renderPhase(); renderBoard();
 }
 function backToDecide(){
@@ -752,14 +757,37 @@ function finishRound(){
   renderBoard();
   setTimeout(newSong, 300);
 }
+// Con la opción de restar activa, el que arriesgó y erró pierde un punto
+// (nunca baja de cero).
+function bajar(p){ if(opts.penalty) p.score = Math.max(0, p.score-1); }
+function penalize(){
+  if(typeof answeringTeam==='number' && teams[answeringTeam]) bajar(teams[answeringTeam]);
+}
 // Suma el punto al equipo indicado; sin índice, al que arriesgó.
+// Si se lo lleva otro equipo, es que el que arriesgó erró.
 function scoreTeam(i){
   const idx = (typeof i==='number') ? i : answeringTeam;
+  const robo = idx!==answeringTeam;
+  if(robo) penalize();
   if(typeof idx==='number' && idx>=0 && teams[idx]) teams[idx].score++;
-  flash("var(--ok)"); finishRound();
+  flash(robo ? "var(--amber)" : "var(--ok)"); finishRound();
 }
-function scoreAll(){ teams.forEach(p=>p.score++); flash("var(--ok)"); finishRound(); }
-function scoreNone(){ flash("var(--no)"); finishRound(); }
+// "Para todos": cantan todos a la vez, así que cada equipo puede pegarla o no.
+// Se marcan los que la pegaron (+1); el resto erró y, con la resta activa, pierde uno.
+function toggleHit(i){
+  allHits.has(i) ? allHits.delete(i) : allHits.add(i);
+  renderPhase();
+}
+function scoreHits(){
+  teams.forEach((p,i)=>{ if(allHits.has(i)) p.score++; else bajar(p); });
+  flash(allHits.size ? "var(--ok)" : "var(--no)"); finishRound();
+}
+// Atajo para cuando la pegaron todos: no hace falta marcar equipo por equipo.
+function scoreAllHit(){
+  allHits = new Set(teams.map((_,i)=>i));
+  scoreHits();
+}
+function scoreNone(){ penalize(); flash("var(--no)"); finishRound(); }
 
 function renderPhase(){
   const c=document.getElementById("controls");
@@ -803,11 +831,20 @@ function renderPhase(){
         c.innerHTML=`<button class="btn mag big" onclick="revealAnswer()">👀 Revelar y comprobar</button>
           <button class="btn ghost" onclick="backToDecide()">↩ Volver</button>`;
       } else {
-        sub.textContent="¿La pegaron?";
-        c.innerHTML=`<div class="score-mark on">
-          <button class="btn" style="background:var(--ok);color:#fff" onclick="scoreAll()">✅ +1 a todos</button>
-          <button class="btn" style="background:var(--no);color:#fff" onclick="scoreNone()">❌ Nadie</button>
-        </div>`;
+        sub.textContent = opts.penalty
+          ? "Toquen los equipos que la pegaron · el resto pierde uno"
+          : "Toquen los equipos que la pegaron";
+        const n = allHits.size;
+        const listo = n===0 ? `❌ Nadie la pegó${opts.penalty?' (−1 a todos)':''}`
+          : n===teams.length ? "✅ La pegaron todos (+1)"
+          : `✔ Listo · +1 a ${n===1?'1 equipo':n+' equipos'}${opts.penalty?', −1 al resto':''}`;
+        c.innerHTML=`<div class="teamgrid">`+
+          teams.map((p,i)=>`<button class="btn ${allHits.has(i)?'lime':'ghost'}" onclick="toggleHit(${i})">${allHits.has(i)?'✅ ':''}${esc(p.name)}</button>`).join("")+
+          `</div>
+          <div class="score-mark on" style="${n<teams.length?'':'grid-template-columns:1fr'}">
+            ${n<teams.length?`<button class="btn" style="background:var(--ok);color:#fff" onclick="scoreAllHit()">✅ La pegaron todos</button>`:""}
+            <button class="btn" style="background:${n?'var(--ok)':'var(--no)'};color:#fff" onclick="scoreHits()">${listo}</button>
+          </div>`;
       }
     } else {
       t.textContent="🎤 Canta "+teams[answeringTeam].name;
@@ -821,16 +858,23 @@ function renderPhase(){
         // El punto se define recién acá: arriesgó un equipo, erró, y otro tiró
         // otro nombre. Con la canción a la vista el grupo ve quién la pegó —
         // puede no ser el que arriesgó primero — o si no la pegó nadie.
-        sub.textContent="¿Quién se lleva el punto?";
-        c.innerHTML=`<div class="teamgrid">`+
-          teams.map((p,i)=>`<button class="btn lime" onclick="scoreTeam(${i})">${i===answeringTeam?'🎤 ':''}${esc(p.name)} +1</button>`).join("")+
+        // Acertar y robar van separados: arriba el que arriesgó, abajo los que roban.
+        const quien = teams[answeringTeam].name;
+        sub.textContent = opts.penalty
+          ? "¿La pegó? Si no, pierde uno aunque otro robe"
+          : "¿La pegó? Si no, otro equipo puede robar";
+        c.innerHTML=`<button class="btn big" style="background:var(--ok);color:#fff" onclick="scoreTeam(${answeringTeam})">✅ La pegó ${esc(quien)} (+1)</button>
+          <p class="hint" style="margin:6px 0 0;text-align:center">…o se la robó otro equipo:</p>
+          <div class="teamgrid">`+
+          teams.map((p,i)=> i===answeringTeam ? "" :
+            `<button class="btn amber" onclick="scoreTeam(${i})">⚡ Robó ${esc(p.name)} (+1)</button>`).join("")+
           `</div>
-          <button class="btn" style="background:var(--no);color:#fff" onclick="scoreNone()">❌ Nadie la pegó</button>`;
+          <button class="btn" style="background:var(--no);color:#fff" onclick="scoreNone()">❌ Nadie la pegó${opts.penalty?' (−1 a '+esc(quien)+')':''}</button>`;
       } else {
         sub.textContent="¿La pegó?";
         c.innerHTML=`<div class="score-mark on">
           <button class="btn" style="background:var(--ok);color:#fff" onclick="scoreTeam()">✅ La pegó (+1)</button>
-          <button class="btn" style="background:var(--no);color:#fff" onclick="scoreNone()">❌ Erró</button>
+          <button class="btn" style="background:var(--no);color:#fff" onclick="scoreNone()">❌ Erró${opts.penalty?' (−1)':''}</button>
         </div>`;
       }
     }
@@ -1049,7 +1093,7 @@ Object.assign(window, {
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
-  scoreTeam, scoreAll, scoreNone, finishRound, endGame, rematch, goHome,
+  scoreTeam, toggleHit, scoreHits, scoreAllHit, scoreNone, finishRound, endGame, rematch, goHome,
   onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult, sendFeedback,
 });
 

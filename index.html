@@ -136,6 +136,12 @@
           </select>
         </label>
         <div style="height:12px"></div>
+        <label class="toggle" style="justify-content:space-between">
+          <span>➖ Restar un punto si el que arriesga erra</span>
+          <input type="checkbox" id="opt-penalty">
+        </label>
+        <p class="hint" style="margin-top:6px">Nunca baja de cero.</p>
+        <div style="height:12px"></div>
         <button class="btn ghost mini" onclick="resetHistory()">🔄 Reiniciar historial de canciones ya escuchadas</button>
         <p class="hint" style="margin-top:8px">Las canciones que ya sonaron en partidas anteriores no se repiten hasta agotar la playlist elegida. Usá esto si querés que puedan volver a salir antes.</p>
       </div>
@@ -163,6 +169,7 @@
         <li>El equipo que grita <b>“¡YO!”</b> primero canta la parte que sigue.</li>
         <li>Si <b>erra</b>, otro equipo puede tirar otro nombre y quedarse con el punto.</li>
         <li>Se <b>revela</b> la canción, con su imagen, y el grupo define <b>quién se lleva el punto</b>.</li>
+        <li>Opcional: se puede activar que el que arriesga y <b>erra pierda un punto</b> (nunca baja de cero).</li>
       </ol>
       <p>Se juega desde el celular, la compu o la tele: no hay que instalar nada ni crear una cuenta.</p>
 

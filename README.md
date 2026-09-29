@@ -9,9 +9,10 @@ Después se **revela** la canción y el grupo decide si la pegó.
 
 ## ✨ Características
 
-- **11 playlists** con +350 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
+- **16 playlists** con +500 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
   Pop/Reggaetón, Internacional, Clásicos, Disney, Fiesta, Rock en Español, Trap/Urbano,
-  Baladas y Folklore). Se pueden combinar géneros.
+  Baladas, Folklore, Infantiles, Pop Nacional, Boy Bands y Pop 2000s, Cachengue y RKT y
+  K-Pop). Se pueden combinar géneros.
 - Reproductor **oculto**: la canción suena pero no se ve el título hasta revelarla.
 - **Cortar / revelar** con control preciso (pausa y reanuda en el segundo exacto).
 - Al revelar se muestra la **imagen de la canción** (miniatura del video) debajo del título,

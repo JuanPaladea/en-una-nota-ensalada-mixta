@@ -311,6 +311,19 @@ function removeCustom(idx){
    ============================================================ */
 let yt=null, ytReady=false, seekedThisRound=false;
 let brokenIds=new Set(), skipTries=0;
+// Videos que YouTube no dejó reproducir en este navegador. Casi siempre es por
+// región: andan en Argentina y fallan en Chile o Colombia. brokenIds se vacía
+// en cada partida, así que sin esto el mismo jugador volvía a chocarlos partida
+// tras partida. Vencen a los 30 días por si el video se arregla.
+const LS_ROTOS = "eun_rotos_v1";
+const ROTOS_VENCEN = 30*24*60*60*1000;
+// Solo se recuerdan los errores que no se arreglan reintentando: 100 = el video
+// no existe, 101/150 (y sus variantes 151/152) = no permite embed acá. El 5
+// (error del reproductor) puede ser un corte de red.
+const ERRORES_PERMANENTES = [100, 101, 150, 151, 152];
+let rotos = Object.fromEntries(
+  Object.entries(load(LS_ROTOS, {})).filter(([,cuando])=> Date.now()-cuando < ROTOS_VENCEN)
+);   // { videoId: cuándo falló (ms) }
 let mediaKind=null;   // 'yt' | 'local' — qué medio usa la canción actual
 const localAudioEl = () => document.getElementById("localaudio");
 
@@ -395,6 +408,10 @@ function onPlayerError(e){
   if(!s || s.local) return;
   if(phase!=='ready' && mediaKind!=='yt') return;
   brokenIds.add(s.id);
+  if(ERRORES_PERMANENTES.includes(e && e.data)){
+    rotos[s.id] = Date.now();
+    try{ save(LS_ROTOS, rotos); }catch(_){}
+  }
   // codigo: 100 = el video ya no existe, 101/150 = no permite embed, 5 = error
   // del reproductor. Con el video y el título se sabe cuál reemplazar en data.js.
   track("error_youtube", { momento: phase, codigo: e && e.data, video: s.id, cancion: s.t });
@@ -576,6 +593,10 @@ function pickSong(force){
       playedHistory = playedHistory.filter(k=> !poolKeys.has(k));
     }
   }
+  // Los que ya fallaron en este navegador van últimos: se prueban solo si no
+  // queda otra. Así un bloqueador que rompe todos los videos no deja el juego vacío.
+  const sanos = cands.filter(s=> !rotos[s.id]);
+  if(sanos.length) cands = sanos;
   const s = cands[Math.floor(Math.random()*cands.length)];
   if(!played.includes(s.key)) played.push(s.key);
   if(opts.noRepeat && !playedHistory.includes(s.key)){

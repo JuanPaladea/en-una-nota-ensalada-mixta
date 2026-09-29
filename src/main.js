@@ -860,16 +860,19 @@ function endGame(reason){
   show("s-results");
 }
 
-// El pedido de Cafecito sale recién desde la segunda partida terminada en este
-// navegador: en la primera todavía están probando, y el cartel fijo al pie casi
-// nadie lo tocaba. Se pide con lo que ya jugaron, que es lo que lo vuelve concreto.
-const PARTIDAS_PARA_PEDIR = 2;
+// El pedido de Cafecito sale al terminar cualquier partida con canciones (el
+// cartel fijo al pie casi nadie lo tocaba). Se pide con lo que ya jugaron, que
+// es lo que lo vuelve concreto.
+const PARTIDAS_PARA_PEDIR = 1;
 function pedirCafecito(){
   const mostrar = jugado.partidas >= PARTIDAS_PARA_PEDIR;
   document.getElementById("cafecito-final").hidden = !mostrar;
   if(!mostrar) return;
-  document.getElementById("cafecito-txt").innerHTML =
-    `Ya van <b>${jugado.partidas} partidas</b> y <b>${jugado.canciones} canciones</b> cantadas. ` +
+  const p = jugado.partidas, c = jugado.canciones;
+  const lleva = p === 1
+    ? `Ya jugaron <b>1 partida</b> con <b>${c} ${c===1 ? "canción" : "canciones"}</b>. `
+    : `Ya van <b>${p} partidas</b> y <b>${c} canciones</b> cantadas. `;
+  document.getElementById("cafecito-txt").innerHTML = lleva +
     `El juego es gratis y sin anuncios: si les sacó unas risas, un cafecito paga las canciones nuevas 💛`;
   // Contra los clics en "cafecito" da la conversión del pedido.
   track("cafecito_visto", { partidas: jugado.partidas, canciones: jugado.canciones });

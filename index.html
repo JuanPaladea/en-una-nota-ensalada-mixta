@@ -198,6 +198,20 @@
         <button class="btn cyan" style="flex:1" onclick="shareGame()">📲 Compartir con tus amigos</button>
       </div>
     </section>
+
+    <!-- ===================== CAFECITO ===================== -->
+    <!-- Tarjeta propia al fondo del inicio, aparte de Cómo se juega: a mano para
+         el que ya vuelve a jugar, sin competirle a "¡A jugar!". -->
+    <section class="card support">
+      <h3>☕ Bancá el proyecto</h3>
+      <p class="support-txt"><b>En una nota</b> es gratis, sin anuncios y sin registro, y lo hago solo en mis
+        ratos libres. El dominio, el hosting y el tiempo de armar cada playlist nueva salen de mi bolsillo.</p>
+      <p class="support-txt">Si el juego les alegró alguna juntada, <b>un cafecito ayuda a mantenerlo vivo</b>
+        y a seguir sumando canciones 💛</p>
+      <a class="btn amber" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+         data-cafecito="inicio">☕ Invitame un cafecito</a>
+      <p class="support-after">¿No podés colaborar? <b>Compartilo</b> con tus amigos, que también suma un montón 🙌</p>
+    </section>
     </section>
 
     <!-- ===================== ARMAR PLAYLIST ===================== -->
@@ -280,7 +294,7 @@
         <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
         <div style="height:10px"></div>
         <!-- Al terminar es cuando más ganas hay de bancar el juego: el botón va
-             a mano, debajo de Revancha. Aparece recién desde la segunda partida
+             a mano, debajo de Revancha. Aparece desde la primera partida
              y con lo que ya jugaron (lo arma pedirCafecito() en main.js). -->
         <div id="cafecito-final" hidden>
           <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"

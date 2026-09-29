@@ -65,7 +65,7 @@
   .btn.cyan{background:var(--cyan)}
   .btn.lime{background:var(--lime)}
   .btn.ghost{background:transparent;color:var(--paper);box-shadow:none;border:2px solid var(--line)}
-  /* Enlaces con pinta de botón (el de Cafecito en la pantalla final) */
+  /* Enlaces con pinta de botón (los de Cafecito, en el inicio y en la pantalla final) */
   a.btn{display:block;text-align:center;text-decoration:none}
   .btn.ghost:active{transform:none}
   .row{display:flex;gap:10px;flex-wrap:wrap}
@@ -288,6 +288,12 @@
 
   /* Cómo se juega / preguntas frecuentes (contenido para buscadores y para el que llega nuevo) */
   .info{margin-top:26px}
+  /* Bancá el proyecto (Cafecito, al fondo del inicio) */
+  .support{border:2px solid var(--amber);text-align:center}
+  .support-txt{color:var(--muted);font-size:14.5px;line-height:1.65;margin:0 auto 10px;max-width:560px}
+  .support-txt b,.support-after b{color:var(--paper)}
+  .support .btn{margin-top:14px}
+  .support-after{color:var(--muted);font-size:13px;margin:10px 0 0;line-height:1.5}
   .info h2{font-size:20px;justify-content:center;margin-bottom:14px}
   /* "Cómo se juega" plegado: el título hace de botón, con el mismo ＋/－ de las preguntas */
   .howto>summary{list-style:none;cursor:pointer;user-select:none}

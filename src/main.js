@@ -161,8 +161,11 @@ function renderTeams(){
 }
 // Con amigos o solo. Se recuerda para la próxima vez.
 function setModo(m){
+  const antes = modo;
   modo = m === "solo" ? "solo" : "grupo";
   try{ save(LS_MODO, modo); }catch(_){}
+  // Solo cuando la persona lo cambia: al arrancar se llama con el modo guardado
+  if(modo !== antes) track("modo_elegido", { modo });
   const solo = modo === "solo";
   document.getElementById("modo-grupo").setAttribute("aria-pressed", String(!solo));
   document.getElementById("modo-solo").setAttribute("aria-pressed", String(solo));
@@ -679,9 +682,10 @@ function newSong(){
 
 // Una canción cuenta como escuchada cuando arranca el audio por primera vez en
 // la ronda: apretar "1 segundo más" no la vuelve a contar.
-function trackCancion(modo){
+function trackCancion(modoCorte){
   track("cancion_sonada", {
-    modo,                                   // corte = 1 segundo, continuo = sin cortar
+    modo: modoCorte,                        // corte = 1 segundo, continuo = sin cortar
+    modo_juego: modo,                       // grupo | solo
     numero: songNo,
     tipo: currentSong && currentSong.local ? "propia" : "youtube",
   });
@@ -945,6 +949,7 @@ function resolverSolo(ok){
   track("solo_respuesta", {
     resultado: ok ? "acierto" : (fallidos.length ? "error" : "no_se"),
     segundos, fallidos: fallidos.length, puntos: pts,
+    numero: songNo,
   });
   renderPhase(); renderBoard();
 }
@@ -1152,7 +1157,11 @@ function finSolo(){
   const clave = String(opts.maxSongs);
   const previo = record[clave] || 0;
   nuevoRecord = soloResultados.length > 0 && soloPuntos > previo;
-  if(nuevoRecord){ record[clave] = soloPuntos; try{ save(LS_RECORD, record); }catch(_){} }
+  if(nuevoRecord){
+    record[clave] = soloPuntos;
+    try{ save(LS_RECORD, record); }catch(_){}
+    track("record_nuevo", { puntos: soloPuntos, anterior: previo, canciones_por_partida: opts.maxSongs });
+  }
   const mejor = Math.max(previo, soloPuntos);
   const cuantas = opts.maxSongs ? " con " + opts.maxSongs + " canciones" : "";
   document.getElementById("share-hint").textContent = nuevoRecord

@@ -20,6 +20,12 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - Los **nombres de los equipos se recuerdan**: sobreviven a la revancha, al volver al menú
   principal y a recargar la página (los puntos siempre arrancan en cero).
 - Puntaje flexible: a **un equipo**, a **todos** o a **nadie** (saltear).
+- **Modo solo**: en vez de equipos, se escribe el título con autocompletado (todo el catálogo,
+  sin importar acentos ni signos) y el juego lo comprueba. Cada intento repite desde el mismo
+  punto un segundo más largo (1 s, 2 s… hasta 6) y vale 10, 7, 5, 3, 2 o 1 punto; errar cuenta
+  como un intento. Se guarda el récord por cantidad de canciones y la imagen final muestra un
+  cuadrito por canción (🟩 1 s, 🟨 2–3 s, 🟧 4–6 s, ⬛ no salió), que también va en el texto al
+  compartir. El modo elegido se recuerda.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
   evitan en partidas siguientes hasta agotar la playlist elegida (se puede reiniciar el

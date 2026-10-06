@@ -1,8 +1,8 @@
 import "./styles.css";
 import { GENRES } from "./data.js";
-import { load, save, songKey, esc, extractVideoId } from "./utils.js";
+import { load, save, songKey, esc, extractVideoId, norm } from "./utils.js";
 import { idbPut, idbGet, idbDel } from "./idb.js";
-import { shareCard, drawCard } from "./sharecard.js";
+import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
 
@@ -15,6 +15,8 @@ const LS_LOCAL = "eun_local_v1";
 const LS_HISTORY = "eun_played_hist_v1";
 const LS_TEAMS = "eun_teams_v1";
 const LS_JUGADO = "eun_jugado_v1";
+const LS_MODO = "eun_modo_v1";
+const LS_RECORD = "eun_record_solo_v1";
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
@@ -27,6 +29,9 @@ let selectedGenres = new Set();
 // al volver al menú principal y a recargar la página (los puntos no).
 let teams = loadTeams();                  // [{name, score}]
 let opts = { noRepeat:true, maxSongs:10, penalty:false }; // penalty: el que arriesga y erra pierde un punto
+// 'grupo' = equipos, el grupo juzga · 'solo' = se escribe el título y el juego lo comprueba
+let modo = load(LS_MODO, "grupo") === "solo" ? "solo" : "grupo";
+let record = load(LS_RECORD, {});         // modo solo: { "10": mejor puntaje con 10 canciones, ... }
 
 let pool = [];        // canciones jugables [{t,a,gid,id,key}]
 let played = [];      // keys ya jugadas
@@ -153,6 +158,17 @@ function renderTeams(){
         oninput="setTeamName(${i}, this.value)" maxlength="20">
       ${teams.length>1?`<button class="x" onclick="removeTeam(${i})" title="Quitar">✕</button>`:""}
     </div>`).join("");
+}
+// Con amigos o solo. Se recuerda para la próxima vez.
+function setModo(m){
+  modo = m === "solo" ? "solo" : "grupo";
+  try{ save(LS_MODO, modo); }catch(_){}
+  const solo = modo === "solo";
+  document.getElementById("modo-grupo").setAttribute("aria-pressed", String(!solo));
+  document.getElementById("modo-solo").setAttribute("aria-pressed", String(solo));
+  document.getElementById("teams-box").hidden = solo;
+  document.getElementById("solo-box").hidden = !solo;
+  document.getElementById("opt-penalty-box").hidden = solo;
 }
 function setTeamName(i, val){ if(teams[i]){ teams[i].name = val; saveTeams(); } }
 function removeTeam(i){ teams.splice(i,1); saveTeams(); renderTeams(); }
@@ -351,15 +367,18 @@ function fitStart(st, d){
 // Reproducción por segundos
 const SNIPPET_MS = 1000;      // cuánto suena cada "1 segundo"
 let snippetTimer=null;        // timeout que corta el fragmento
-let pauseAfterSnippet=false;  // true = frenar automáticamente al cumplir SNIPPET_MS
+let pauseAfterSnippet=false;  // true = frenar automáticamente al cumplir snippetMs
+let snippetMs=SNIPPET_MS;     // lo que dura el fragmento actual (en el modo solo crece: 1 s, 2 s, 3 s…)
+let inicioClip=null;          // modo solo: segundo de la canción donde arrancó el primer fragmento
 let mediaStarted=false;       // la canción actual ya arrancó (para reanudar vs cargar)
 let continuousMode=false;     // true = suena sin cortar hasta apretar detener
 function clearSnippetTimer(){ if(snippetTimer){ clearTimeout(snippetTimer); snippetTimer=null; } }
 // Al empezar a sonar (evento del medio), si estamos en modo fragmento, programa el corte.
 function armSnippet(){
   if(!pauseAfterSnippet) return;
+  if(inicioClip===null) inicioClip = mediaTime();   // de acá vuelve a arrancar cada intento
   clearSnippetTimer();
-  snippetTimer = setTimeout(snippetPause, SNIPPET_MS);
+  snippetTimer = setTimeout(snippetPause, snippetMs);
 }
 
 function onYouTubeIframeAPIReady(){
@@ -433,7 +452,7 @@ function onPlayerError(e){
   if(skipTries++ > 12){ setCover("😕 YouTube bloquea estos videos al abrir el archivo directo. Usá la playlist 🎵 “Mis canciones” (suena sin internet).", true); return; }
   const alt = pickSong(true);
   if(!alt){ setCover("😕 No hay canciones reproducibles en estas playlists.", true); return; }
-  currentSong = alt; seekedThisRound=false; mediaStarted=false;
+  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; fallidos=[]; inicioClip=null;
   if(continuousMode) playContinuous(); else playSnippet();
 }
 
@@ -462,7 +481,7 @@ function onLocalError(){
   if(skipTries++ > 12){ setCover("😕 No se pudo reproducir ese archivo. Revisá tus canciones cargadas.", true); return; }
   const alt = pickSong(true);
   if(!alt){ setCover("😕 No hay canciones reproducibles.", true); return; }
-  currentSong = alt; seekedThisRound=false; mediaStarted=false;
+  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; fallidos=[]; inicioClip=null;
   if(continuousMode) playContinuous(); else playSnippet();
 }
 /* ---- Precarga silenciosa ----
@@ -527,6 +546,16 @@ function mediaPause(){
   else if(yt && yt.pauseVideo){ yt.pauseVideo(); }
   eqPaused();
 }
+// En qué segundo de la canción está el medio actual, y saltar a uno.
+function mediaTime(){
+  try{ return mediaKind==='local' ? localAudioEl().currentTime : yt.getCurrentTime(); }catch(_){ return null; }
+}
+function mediaSeek(t){
+  try{
+    if(mediaKind==='local') localAudioEl().currentTime = t;
+    else yt.seekTo(t, true);
+  }catch(_){}
+}
 function mediaResume(){
   if(mediaKind==='local'){ localAudioEl().play().catch(()=>{}); }
   else if(yt && yt.playVideo){ yt.playVideo(); }
@@ -553,9 +582,14 @@ function startGame(){
   if(selectedGenres.size===0){ alert("Elegí al menos un género."); return; }
   buildPool();
   if(pool.length===0){ alert("No hay canciones para jugar. Entrá a 🔗 Armar canciones y agregá algunos links."); return; }
-  teams.forEach((p,i)=>{ if(!p.name.trim()) p.name="Equipo "+(i+1); p.score=0; });
-  if(teams.length===0){ teams=[{name:"Equipo 1",score:0}]; }
-  saveTeams();   // los nombres quedan guardados para la próxima partida
+  if(modo==='solo'){
+    armarCatalogo();
+    resetSolo();
+  } else {
+    teams.forEach((p,i)=>{ if(!p.name.trim()) p.name="Equipo "+(i+1); p.score=0; });
+    if(teams.length===0){ teams=[{name:"Equipo 1",score:0}]; }
+    saveTeams();   // los nombres quedan guardados para la próxima partida
+  }
   opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
   const ms = document.getElementById("opt-maxsongs");
   opts.maxSongs = ms ? parseInt(ms.value,10) : 0;
@@ -563,11 +597,12 @@ function startGame(){
   opts.penalty = !!(pen && pen.checked);
   played=[]; brokenIds=new Set(); songNo=1;
   track("partida_iniciada", {
+    modo,
     generos: [...selectedGenres].join(","),
     cantidad_generos: selectedGenres.size,
-    equipos: teams.length,
+    equipos: modo==='solo' ? 1 : teams.length,
     canciones_por_partida: opts.maxSongs,
-    resta_puntos: opts.penalty,
+    resta_puntos: modo==='grupo' && opts.penalty,
     canciones_disponibles: pool.length,
   });
   show("s-game");
@@ -632,6 +667,7 @@ function newSong(){
   currentSong = s;
   preloadArt(s);
   seekedThisRound=false; revealed=false; answeringTeam=-1; skipping=false; skipTries=0;
+  segundos=0; fallidos=[]; inicioClip=null; soloRes=null; sugerencias=[];
   mediaStarted=false; continuousMode=false; pauseAfterSnippet=false; clearSnippetTimer();
   phase='ready';
   prepareMedia(s);   // se carga mientras leen la pantalla, no cuando aprietan play
@@ -652,17 +688,26 @@ function trackCancion(modo){
 }
 
 // Reproduce un fragmento de 1 segundo y frena (el corazón del juego).
+// En el modo solo cada intento vuelve al mismo punto y suena un segundo más que
+// el anterior (1 s, 2 s, 3 s…): dos fragmentos sueltos de 1 segundo cuesta
+// unirlos en la cabeza. Con amigos sigue de largo desde donde se cortó, porque
+// ahí se canta lo que sigue.
 function playSnippet(){
+  if(modo==='solo' && segundos >= MAX_SEGUNDOS) return;
   clearSnippetTimer();
+  snippetMs = modo==='solo' ? (segundos+1)*SNIPPET_MS : SNIPPET_MS;
   continuousMode=false;
   pauseAfterSnippet=true;
   phase='listening';
   setCover("🎵 Sonando…");
   renderPhase();
   if(!mediaStarted){
-    if(mediaStart()){ mediaStarted=true; trackCancion("corte"); }
+    if(mediaStart()){ mediaStarted=true; segundos++; trackCancion("corte"); }
     else { pauseAfterSnippet=false; phase='ready'; renderPhase(); }
-  } else mediaResume();
+  } else {
+    if(modo==='solo' && inicioClip!==null) mediaSeek(inicioClip);
+    mediaResume(); segundos++;
+  }
 }
 // Reproduce sin cortar hasta que aprieten detener.
 function playContinuous(){
@@ -683,7 +728,7 @@ function snippetPause(){
   pauseAfterSnippet=false;
   mediaPause();
   phase='decide';
-  setCover("✋ ¿Quién arriesga?", true);
+  setCover(modo==='solo' ? "🤔 ¿Cuál es?" : "✋ ¿Quién arriesga?", true);
   renderPhase(); renderBoard();
 }
 function stopPlayback(){
@@ -790,10 +835,167 @@ function scoreAllHit(){
 }
 function scoreNone(){ penalize(); flash("var(--no)"); finishRound(); }
 
+/* ============================================================
+   MODO SOLO
+   No hay grupo que juzgue: se escribe el título (con autocompletado) y el
+   juego lo comprueba. Los puntos dependen de cuántos segundos de canción
+   hicieron falta — fragmentos escuchados, no tiempo de reloj: pensar con el
+   audio en pausa no resta, y una conexión lenta tampoco. Cada intento repite
+   desde el mismo punto un segundo más largo; errar cuenta como pedirlo.
+   ============================================================ */
+const PUNTOS_SOLO = [10, 7, 5, 3, 2, 1];   // con 1 segundo, con 2, … con 6
+const MAX_SEGUNDOS = PUNTOS_SOLO.length;   // errar con el sexto pierde la canción
+let soloPuntos = 0;
+let soloResultados = [];   // [{ok, seg, pts}], una por canción resuelta
+let segundos = 0;          // fragmentos que sonaron de la canción actual
+let fallidos = [];         // títulos que probó y no eran
+let soloRes = null;        // resultado de la canción actual, una vez resuelta
+let nuevoRecord = false;
+let catalogo = [];         // títulos para autocompletar [{t, a, nt, na}]
+let sugerencias = [], sugSel = 0;
+
+// Lo que vale acertar con lo que ya sonó (antes de sonar nada, lo máximo).
+const valeAhora = ()=> PUNTOS_SOLO[Math.max(0, segundos-1)];
+const valeConUnoMas = ()=> PUNTOS_SOLO[Math.min(segundos, MAX_SEGUNDOS-1)];
+
+function resetSolo(){ soloPuntos = 0; soloResultados = []; nuevoRecord = false; }
+
+// Se autocompleta con todo el catálogo, no solo con los géneros elegidos: si
+// no, jugando con una playlist chica la lista de opciones ya era media pista.
+function armarCatalogo(){
+  const vistos = new Set();
+  catalogo = [];
+  allSongs().forEach(s=>{
+    const nt = norm(s.t), na = norm(s.a);
+    if(!nt || vistos.has(nt+"|"+na)) return;
+    vistos.add(nt+"|"+na);
+    catalogo.push({ t:s.t, a:s.a, nt, na });
+  });
+}
+// Primero los títulos que empiezan con lo escrito, después los que lo tienen
+// al principio de una palabra, en el medio, y al final los que coinciden
+// palabra por palabra contando el artista ("persiana soda").
+function buscarTitulos(q){
+  const n = norm(q);
+  if(n.length < 2) return [];
+  const palabras = n.split(" ");
+  const hits = [];
+  for(const s of catalogo){
+    const rank = s.nt.startsWith(n) ? 0
+      : (" "+s.nt).includes(" "+n) ? 1
+      : s.nt.includes(n) ? 2
+      : palabras.every(p=> (s.nt+" "+s.na).includes(p)) ? 3 : -1;
+    if(rank >= 0) hits.push([rank, s]);
+  }
+  hits.sort((a,b)=> a[0]-b[0] || a[1].t.localeCompare(b[1].t));
+  return hits.slice(0, 4).map(h=> h[1]);
+}
+function renderSugerencias(q){
+  const el = document.getElementById("guess-list");
+  if(!el) return;
+  if(!sugerencias.length){
+    el.innerHTML = norm(q).length >= 2
+      ? `<p class="hint sug-nada">No está en la lista: probá con otra palabra o con el artista</p>` : "";
+    return;
+  }
+  // mousedown con preventDefault: en la compu el foco se queda en el campo
+  el.innerHTML = sugerencias.map((s,i)=>`
+    <button type="button" class="sug ${i===sugSel?'on':''}" role="option" aria-selected="${i===sugSel}"
+      onmousedown="event.preventDefault()" onclick="guessSong(${i})">
+      <b>${esc(s.t)}</b><span>${esc(s.a)}</span>
+    </button>`).join("");
+}
+function onGuessInput(){
+  const q = document.getElementById("guess-in").value;
+  sugerencias = buscarTitulos(q); sugSel = 0;
+  renderSugerencias(q);
+}
+function onGuessKey(ev){
+  if(ev.key==="ArrowDown" || ev.key==="ArrowUp"){
+    if(!sugerencias.length) return;
+    ev.preventDefault();
+    sugSel = (sugSel + (ev.key==="ArrowDown" ? 1 : -1) + sugerencias.length) % sugerencias.length;
+    renderSugerencias(ev.target.value);
+  } else if(ev.key==="Enter"){
+    ev.preventDefault();
+    if(sugerencias.length) guessSong(sugSel);
+  }
+}
+// Cuenta el título, no el artista: la misma canción puede estar cargada con el
+// artista escrito distinto en dos playlists.
+function guessSong(i){
+  const s = sugerencias[i];
+  if(!s || modo!=='solo' || phase!=='decide') return;
+  if(s.nt === norm(currentSong.t)){ resolverSolo(true); return; }
+  fallidos.push(s.t);
+  if(segundos >= MAX_SEGUNDOS){ resolverSolo(false); return; }
+  flash("var(--no)");
+  playSnippet();
+}
+function noSe(){ if(modo==='solo' && phase==='decide') resolverSolo(false); }
+function resolverSolo(ok){
+  clearSnippetTimer();
+  const pts = ok ? valeAhora() : 0;
+  soloRes = { ok, seg: segundos, pts };
+  soloPuntos += pts;
+  soloResultados.push(soloRes);
+  phase='answering'; revealed=true;
+  revealCover(); mediaResume();   // se escucha cómo seguía
+  flash(ok ? "var(--ok)" : "var(--no)");
+  track("solo_respuesta", {
+    resultado: ok ? "acierto" : (fallidos.length ? "error" : "no_se"),
+    segundos, fallidos: fallidos.length, puntos: pts,
+  });
+  renderPhase(); renderBoard();
+}
+function renderSolo(c, t, sub){
+  const pts = (n)=> n + " punto" + (n!==1 ? "s" : "");
+  if(phase==='ready'){
+    t.textContent="🎧 Escuchá";
+    sub.textContent="Si la sacás con 1 segundo, " + pts(PUNTOS_SOLO[0]);
+    c.innerHTML=`<button class="btn cyan big" onclick="playSnippet()">▶ Reproducir 1 segundo</button>`;
+  } else if(phase==='listening'){
+    t.textContent="🎵 Sonando…";
+    sub.textContent = segundos > 1 ? "Desde el mismo punto, " + segundos + " segundos" : "Escuchá bien…";
+    c.innerHTML=`<button class="btn amber big" onclick="stopPlayback()">✋ Cortar ya</button>`;
+  } else if(phase==='decide'){
+    t.textContent="🤔 ¿Qué canción es?";
+    const ultimo = fallidos[fallidos.length-1];
+    sub.textContent = (ultimo ? "No era “" + ultimo + "” · " : "") +
+      "Ahora vale " + pts(valeAhora()) + " · intento " + segundos + " de " + MAX_SEGUNDOS;
+    const hayMas = segundos < MAX_SEGUNDOS;
+    // La lista va arriba del campo: en el celular, abajo la tapa el teclado.
+    c.innerHTML=`<div class="guess">
+        <div id="guess-list" class="sugs" role="listbox" aria-label="Canciones que coinciden"></div>
+        <input type="text" id="guess-in" placeholder="Escribí el título…" autocomplete="off"
+          autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="Título de la canción"
+          oninput="onGuessInput()" onkeydown="onGuessKey(event)">
+      </div>
+      <div class="solo-acc">
+        <button class="btn amber" onclick="playSnippet()" ${hayMas?'':'disabled'}>${hayMas ? '▶ Escuchar '+(segundos+1)+' segundos · vale '+valeConUnoMas() : 'Ya no quedan intentos'}</button>
+        <button class="btn ghost" onclick="noSe()">🏳️ No sé · ver cuál era</button>
+      </div>`;
+    sugerencias = [];
+    // En la compu se escribe directo. En el celular no: el teclado taparía
+    // "Escuchar 2 segundos" justo cuando quizás lo quiere tocar.
+    if(window.matchMedia && matchMedia("(pointer:fine)").matches) document.getElementById("guess-in").focus();
+  } else if(phase==='answering' && soloRes){
+    if(soloRes.ok){
+      t.textContent="✅ ¡La sacaste!";
+      sub.textContent="+" + pts(soloRes.pts) + " · con " + soloRes.seg + " segundo" + (soloRes.seg!==1?"s":"");
+    } else {
+      t.textContent="❌ Era esta";
+      sub.textContent="0 puntos · escuchá cómo seguía";
+    }
+    c.innerHTML=`<button class="btn mag big" onclick="finishRound()">⏭ Siguiente canción</button>`;
+  }
+}
+
 function renderPhase(){
   const c=document.getElementById("controls");
   const t=document.getElementById("phase-title");
   const sub=document.getElementById("phase-sub");
+  if(modo==='solo'){ renderSolo(c, t, sub); return; }
   if(phase==='ready'){
     t.textContent="🎧 Escuchen todos";
     sub.textContent="Suena 1 segundo y se corta. Después, ¿quién arriesga?";
@@ -883,6 +1085,16 @@ function renderPhase(){
 }
 
 function renderBoard(){
+  if(modo==='solo'){
+    // las últimas canciones como cuadritos de color, para ver cómo viene
+    const tira = soloResultados.slice(-8).map(r=> soloTramo(r).emoji).join("");
+    document.getElementById("board").innerHTML = `
+      <div class="brow">
+        <span>🎧 Tus puntos ${tira ? `<span class="tira">${tira}</span>` : ""}</span>
+        <span class="pts">${soloPuntos}</span>
+      </div>`;
+    return;
+  }
   const cur = (i)=> answeringTeam==='all' || i===answeringTeam;
   const board = teams.map((p,i)=>`
     <div class="brow ${cur(i)?'cur':''}">
@@ -895,12 +1107,15 @@ function renderBoard(){
 function endGame(reason){
   try{ mediaStop(); }catch(_){}
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
-  lastGameSongs = Math.max(0, songNo - 1);   // canciones que llegaron a terminarse
+  // canciones que llegaron a terminarse. En solo cuentan las resueltas: si la sacó
+  // y tocó Terminar sin pasar a la siguiente, esa también va (está en la tarjeta).
+  lastGameSongs = modo==='solo' ? soloResultados.length : Math.max(0, songNo - 1);
   track("partida_terminada", {
+    modo,
     motivo: reason || "manual",       // limit = llegó al tope, agotada = se acabó la playlist
     canciones: lastGameSongs,
-    equipos: teams.length,
-    puntos_ganador: Math.max(...teams.map(p=>p.score), 0),
+    equipos: modo==='solo' ? 1 : teams.length,
+    puntos_ganador: modo==='solo' ? soloPuntos : Math.max(...teams.map(p=>p.score), 0),
   });
   if(lastGameSongs > 0){
     jugado.partidas++; jugado.canciones += lastGameSongs;
@@ -908,6 +1123,15 @@ function endGame(reason){
   }
   const head = document.querySelector("#s-results h2");
   if(head) head.textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
+  const solo = modo==='solo';
+  document.getElementById("rematch-btn").textContent = solo ? "🔁 Jugar otra vez" : "🔁 Revancha (mismos equipos)";
+  if(solo) finSolo(); else finGrupo();
+  mostrarTarjeta();
+  pedirCafecito();
+  show("s-results");
+}
+function finGrupo(){
+  document.getElementById("share-hint").textContent = "Manda una imagen con el marcador al grupo";
   const sorted = [...teams].sort((a,b)=>b.score-a.score);
   const top = sorted[0];
   const winners = sorted.filter(p=>p.score===top.score);
@@ -921,9 +1145,26 @@ function endGame(reason){
       <span>${medals[i]||'　'} ${esc(p.name)}</span>
       <span class="pts">${p.score}</span>
     </div>`).join("");
-  mostrarTarjeta();
-  pedirCafecito();
-  show("s-results");
+}
+// El récord se guarda por cantidad de canciones: 40 puntos en 5 canciones no
+// se compara con 40 en 20.
+function finSolo(){
+  const clave = String(opts.maxSongs);
+  const previo = record[clave] || 0;
+  nuevoRecord = soloResultados.length > 0 && soloPuntos > previo;
+  if(nuevoRecord){ record[clave] = soloPuntos; try{ save(LS_RECORD, record); }catch(_){} }
+  const mejor = Math.max(previo, soloPuntos);
+  const cuantas = opts.maxSongs ? " con " + opts.maxSongs + " canciones" : "";
+  document.getElementById("share-hint").textContent = nuevoRecord
+    ? "🏅 ¡Nuevo récord" + cuantas + "! Mandá la imagen y desafiá a alguien"
+    : "Tu récord" + cuantas + ": " + mejor + " puntos · mandá la imagen y desafiá a alguien";
+  // Respaldo en texto por si no se puede dibujar la imagen
+  const posibles = soloResultados.length * PUNTOS_SOLO[0];
+  document.getElementById("winner").innerHTML = `
+    <div style="font-size:22px;font-weight:900">🎧 Hiciste <b style="color:var(--lime)">${soloPuntos} punto${soloPuntos!==1?'s':''}</b></div>
+    <div class="pill" style="margin-top:8px">de ${posibles} posibles${nuevoRecord ? " · 🏅 ¡nuevo récord!" : ""}</div>`;
+  document.getElementById("final-board").innerHTML =
+    `<div class="tira-fin">${soloResultados.map(r=> soloTramo(r).emoji).join("")}</div>`;
 }
 
 // El pedido de Cafecito sale al terminar cualquier partida con canciones (el
@@ -935,11 +1176,13 @@ function pedirCafecito(){
   document.getElementById("cafecito-final").hidden = !mostrar;
   if(!mostrar) return;
   const p = jugado.partidas, c = jugado.canciones;
+  // jugado suma las partidas de los dos modos; el texto le habla a quien jugó esta
+  const solo = modo==='solo';
   const lleva = p === 1
-    ? `Ya jugaron <b>1 partida</b> con <b>${c} ${c===1 ? "canción" : "canciones"}</b>. `
-    : `Ya van <b>${p} partidas</b> y <b>${c} canciones</b> cantadas. `;
+    ? `Ya ${solo ? "jugaste" : "jugaron"} <b>1 partida</b> con <b>${c} ${c===1 ? "canción" : "canciones"}</b>. `
+    : `Ya van <b>${p} partidas</b> y <b>${c} canciones</b>${solo ? "" : " cantadas"}. `;
   document.getElementById("cafecito-txt").innerHTML = lleva +
-    `El juego es gratis y sin anuncios: si les sacó unas risas, un cafecito paga las canciones nuevas 💛`;
+    `El juego es gratis y sin anuncios: si ${solo ? "te divirtió" : "les sacó unas risas"}, un cafecito paga las canciones nuevas 💛`;
   // Contra los clics en "cafecito" da la conversión del pedido.
   track("cafecito_visto", { partidas: jugado.partidas, canciones: jugado.canciones });
 }
@@ -947,11 +1190,16 @@ function pedirCafecito(){
 // La imagen que se comparte se muestra ya armada en la pantalla final: antes
 // había que tocar "Compartir" para verla, y casi nadie compartía. Reemplaza al
 // marcador en texto, que dice lo mismo; si el canvas falla, queda el texto.
+function dibujarTarjeta(){
+  return modo==='solo'
+    ? drawSoloCard(soloPuntos, soloResultados.length * PUNTOS_SOLO[0], soloResultados, nuevoRecord)
+    : drawCard(teams, lastGameSongs);
+}
 function mostrarTarjeta(){
   const box = document.getElementById("result-img");
   let ok = false;
   try{
-    box.querySelector("img").src = drawCard(teams, lastGameSongs).toDataURL("image/jpeg", 0.85);
+    box.querySelector("img").src = dibujarTarjeta().toDataURL("image/jpeg", 0.85);
     ok = true;
   }catch(e){}
   box.hidden = !ok;
@@ -961,8 +1209,9 @@ function mostrarTarjeta(){
 }
 
 function rematch(){
-  track("revancha", { canciones: lastGameSongs });
+  track("revancha", { canciones: lastGameSongs, modo });
   teams.forEach(p=>p.score=0);
+  resetSolo();
   played=[]; brokenIds=new Set(); songNo=1;
   show("s-game"); newSong();
 }
@@ -972,6 +1221,7 @@ function goHome(){
   try{ mediaStop(); }catch(_){}
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
   teams.forEach(p=>p.score=0);
+  resetSolo();
   played=[]; brokenIds=new Set(); songNo=1;
   currentSong=null; phase='ready'; answeringTeam=-1; revealed=false;
   renderTeams(); renderGenres(); updatePoolWarn();
@@ -995,14 +1245,23 @@ async function shareResult(btn, desde){
   const previo = btn ? btn.textContent : null;
   if(btn){ btn.textContent = "🖼️ Armando la imagen…"; btn.disabled = true; }
   try{
-    const orden = [...teams].sort((a,b)=> b.score - a.score);
-    const campeon = orden[0];
-    const empate = campeon && orden.filter(t=>t.score===campeon.score).length > 1;
-    const texto = campeon && !empate
-      ? `🏆 Ganó ${campeon.name} con ${campeon.score} punto${campeon.score!==1?"s":""} en “En una nota”. ¿Se animan?`
-      : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
-    const r = await shareCard(teams, lastGameSongs, texto, SHARE_URL);
-    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs, desde: desde || "boton" });
+    let texto;
+    if(modo==='solo'){
+      // Los cuadritos también van en el texto, como Wordle: se ven aunque no se abra la imagen
+      const tira = soloResultados.slice(0, 30).map(r=> soloTramo(r).emoji).join("");
+      texto = `🎧 Hice ${soloPuntos} punto${soloPuntos!==1?"s":""} adivinando canciones en “En una nota”
+${tira}
+¿Me superás?`;
+    } else {
+      const orden = [...teams].sort((a,b)=> b.score - a.score);
+      const campeon = orden[0];
+      const empate = campeon && orden.filter(t=>t.score===campeon.score).length > 1;
+      texto = campeon && !empate
+        ? `🏆 Ganó ${campeon.name} con ${campeon.score} punto${campeon.score!==1?"s":""} en “En una nota”. ¿Se animan?`
+        : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
+    }
+    const r = await shareCard(dibujarTarjeta(), texto, SHARE_URL);
+    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs, desde: desde || "boton", modo });
     if(r === "descargado") alert("Guardamos la imagen del resultado y copiamos el link 🎶 Mandala al grupo.");
     else if(r === "error") alert("No pudimos compartir desde acá. Probá con el botón “Compartir el juego”.");
   }catch(e){
@@ -1077,12 +1336,13 @@ async function sendFeedback(ev){
    así que exponemos los handlers en window.
    ============================================================ */
 Object.assign(window, {
-  show, toggleGenre, addTeam, removeTeam, setTeamName, setLink,
+  show, toggleGenre, setModo, addTeam, removeTeam, setTeamName, setLink,
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
   scoreTeam, toggleHit, scoreHits, scoreAllHit, scoreNone, finishRound, endGame, rematch, goHome,
   onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult, sendFeedback,
+  onGuessInput, onGuessKey, guessSong, noSe,
 });
 
 // Clics en Cafecito. Analytics ya cuenta los clics a otros sitios, pero no
@@ -1102,6 +1362,7 @@ function boot(){
   // Si es la primera vez (o se borraron los datos), arranca con dos equipos.
   if(teams.length === 0){ addTeam("Equipo 1"); addTeam("Equipo 2"); }
   else renderTeams();
+  setModo(modo);
   wireAudio();
   renderGenres();
   renderLocalList();

@@ -92,6 +92,13 @@
   input:focus{outline:none;border-color:var(--magenta)}
   .x{background:transparent;border:none;color:var(--no);font-size:22px;cursor:pointer;padding:0 6px}
 
+  /* Con amigos / Solo */
+  .modos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .modo{border:2px solid var(--line);background:rgba(255,255,255,.03);color:var(--paper);border-radius:14px;
+    padding:13px 10px;font:inherit;font-weight:800;font-size:16px;cursor:pointer;transition:.15s}
+  .modo[aria-pressed="true"]{border-color:var(--cyan);background:rgba(37,224,214,.12);
+    box-shadow:0 0 0 3px rgba(37,224,214,.15) inset}
+
   .toggle{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;cursor:pointer;user-select:none}
   .toggle input{width:20px;height:20px;accent-color:var(--magenta)}
   select{background:var(--ink);border:2px solid var(--line);color:var(--paper);border-radius:10px;
@@ -139,6 +146,23 @@
   .controls{display:grid;gap:10px}
   .teamgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:6px}
   .teamgrid .btn{padding:16px 12px;font-size:17px}
+  /* Modo solo: escribir el título. Las sugerencias van arriba del campo
+     porque en el celular el teclado tapa lo que queda abajo. */
+  .guess{display:flex;flex-direction:column;gap:6px}
+  .guess input[type=text]{flex:none;width:100%;font-size:17px;padding:14px}
+  .sugs{display:flex;flex-direction:column;gap:5px}
+  .sug{display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;text-align:left;
+    background:var(--card2);border:2px solid var(--line);border-radius:12px;padding:10px 12px;
+    color:var(--paper);font:inherit;font-size:15px;cursor:pointer}
+  .sug b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sug span{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:var(--muted);font-size:13px}
+  .sug.on,.sug:hover{border-color:var(--cyan);background:rgba(37,224,214,.12)}
+  .sug-nada{margin:0;text-align:center}
+  .solo-acc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tira{margin-left:6px;letter-spacing:1px}
+  .tira-fin{font-size:26px;letter-spacing:3px;line-height:1.4;word-break:break-all}
+
   .score-mark{display:none;gap:10px}
   .score-mark.on{display:grid;grid-template-columns:1fr 1fr}
 
@@ -333,6 +357,7 @@
     .genre .gc{font-size:12px}
     .teamgrid{grid-template-columns:1fr 1fr}
     .teamgrid .btn{font-size:16px;padding:15px 8px}
+    .solo-acc .btn{font-size:14px;padding:13px 8px}
     /* con equipos impares, el último va centrado y no pegado a la izquierda */
     .teamgrid .btn:last-child:nth-child(odd){grid-column:1/-1;justify-self:center;width:calc(50% - 5px)}
     .stage{aspect-ratio:16/9}

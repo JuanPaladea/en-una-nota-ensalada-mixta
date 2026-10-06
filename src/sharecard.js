@@ -141,14 +141,18 @@ function drawTablero(ctx, orden, yIni, alto, sep){
   }
 }
 
-function drawPie(ctx, canciones){
+// "canciones" pierde el acento en plural: no sirve agregarle una "es" a "canción"
+function cancionesTxt(n, cola){
+  return n === 1 ? `1 canción ${cola}` : `${n} canciones ${cola}s`;
+}
+
+// linea: el texto chico arriba de la dirección ("10 canciones cantadas"), o nada
+function drawPie(ctx, linea){
   ctx.textAlign = "center";
-  if(canciones){
+  if(linea){
     ctx.font = `700 28px ${FONT}`;
     ctx.fillStyle = C.muted;
-    // "canciones" pierde el acento en plural: no sirve agregarle una "es" a "canción"
-    const txt = canciones === 1 ? "1 canción cantada" : `${canciones} canciones cantadas`;
-    ctx.fillText(txt, W/2, H-132);
+    ctx.fillText(linea, W/2, H-132);
   }
   ctx.font = `900 40px ${FONT}`;
   glow(ctx, "rgba(37,224,214,.5)", 20);
@@ -182,7 +186,95 @@ export function drawCard(teams, canciones){
     const yTablero = drawGanador(ctx, orden, yIni);
     drawTablero(ctx, orden, yTablero + 28, alto, sep);
   }
-  drawPie(ctx, canciones);
+  drawPie(ctx, canciones ? cancionesTxt(canciones, "cantada") : "");
+  return cv;
+}
+
+/* ---- Modo solo ----
+   En vez de un tablero, el puntaje grande y una fila de cuadritos por canción
+   (como Wordle): el color dice con cuántos segundos la sacó. */
+const SOLO_COLS = 10, SOLO_MAX = 30;   // más de 3 filas no entran: se resumen
+
+// Color e inscripción de cada cuadrito. Lo usa también el texto que se comparte.
+export function soloTramo(r){
+  if(!r.ok) return { color:"#3a2a55", txt:"✕", emoji:"⬛" };
+  if(r.seg === 1) return { color:C.lime, txt:"1s", emoji:"🟩" };
+  if(r.seg <= 3) return { color:C.amber, txt:r.seg+"s", emoji:"🟨" };
+  return { color:"#ff8a3d", txt:r.seg+"s", emoji:"🟧" };
+}
+
+const SOLO_GAP = 14;
+// lado del cuadrito: grandes si son pocos, más chicos para que entren 10 por fila
+function ladoCuadrito(n){
+  const cols = Math.min(SOLO_COLS, n);
+  return Math.min(96, Math.floor((W - 180 - (cols-1)*SOLO_GAP) / cols));
+}
+
+function drawCuadritos(ctx, resultados, y){
+  const visibles = resultados.slice(0, SOLO_MAX);
+  const gap = SOLO_GAP;
+  const lado = ladoCuadrito(visibles.length);
+  visibles.forEach((r,i)=>{
+    const fila = Math.floor(i / SOLO_COLS);
+    const enFila = Math.min(SOLO_COLS, visibles.length - fila*SOLO_COLS);
+    const x0 = (W - (enFila*lado + (enFila-1)*gap)) / 2;   // cada fila centrada
+    const x = x0 + (i % SOLO_COLS)*(lado+gap);
+    const yy = y + fila*(lado+gap);
+    const t = soloTramo(r);
+    ctx.fillStyle = t.color;
+    roundRect(ctx, x, yy, lado, lado, 14); ctx.fill();
+    ctx.textAlign = "center";
+    ctx.font = `900 ${Math.round(lado*0.36)}px ${FONT}`;
+    ctx.fillStyle = r.ok ? C.ink : C.muted;
+    ctx.fillText(t.txt, x+lado/2, yy+lado/2+lado*0.13);
+  });
+  const filas = Math.ceil(visibles.length / SOLO_COLS);
+  const fin = y + filas*(lado+gap) - gap;
+  if(resultados.length > visibles.length){
+    ctx.font = `700 26px ${FONT}`;
+    ctx.fillStyle = C.muted;
+    ctx.fillText(`y ${resultados.length - visibles.length} más`, W/2, fin + 40);
+  }
+}
+
+// puntos: total; posibles: el máximo que se podía hacer;
+// resultados: [{ok, seg, pts}] por canción; record: true si es récord nuevo
+export function drawSoloCard(puntos, posibles, resultados, record){
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  ctx.textBaseline = "alphabetic";
+  drawFondo(ctx);
+  drawEncabezado(ctx);
+
+  const n = resultados.length;
+  const vis = Math.min(n, SOLO_MAX);
+  const lado = vis ? ladoCuadrito(vis) : 0;
+  const altoCuadritos = vis ? Math.ceil(vis/SOLO_COLS)*(lado+SOLO_GAP) - SOLO_GAP + (n > vis ? 44 : 0) : 0;
+  const altoPuntos = 40 + 150 + 50 + (record ? 56 : 0);
+  const total = altoPuntos + (vis ? 44 + altoCuadritos : 0);
+  const y = TOPE + Math.max(0, (H - TOPE - PIE - total)/2);
+
+  ctx.textAlign = "center";
+  ctx.font = `700 34px ${FONT}`;
+  ctx.fillStyle = C.muted;
+  ctx.fillText("HICE", W/2, y+34);
+  ctx.font = `900 150px ${FONT}`;
+  glow(ctx, "rgba(166,255,61,.45)", 26);
+  ctx.fillStyle = C.lime;
+  ctx.fillText(String(puntos), W/2, y+184);
+  noGlow(ctx);
+  ctx.font = `700 34px ${FONT}`;
+  ctx.fillStyle = C.amber;
+  ctx.fillText(`punto${puntos!==1?"s":""}${posibles ? ` de ${posibles} posibles` : ""}`, W/2, y+234);
+  if(record){
+    ctx.font = `900 34px ${FONT}`;
+    ctx.fillStyle = C.magenta;
+    ctx.fillText("🏅 ¡NUEVO RÉCORD!", W/2, y+290);
+  }
+  if(vis) drawCuadritos(ctx, resultados, y + altoPuntos + 44);
+
+  drawPie(ctx, n ? `${n} ${n===1 ? "canción" : "canciones"} · jugando solo` : "");
   return cv;
 }
 
@@ -192,12 +284,12 @@ function toBlob(cv){
   return new Promise(res => cv.toBlob(res, "image/jpeg", 0.92));
 }
 
-/* Comparte la tarjeta. Devuelve qué pasó, para poder avisar bien:
-   'compartido' | 'cancelado' | 'descargado' | 'error' */
-export async function shareCard(teams, canciones, texto, url){
+/* Comparte la tarjeta ya dibujada (drawCard o drawSoloCard). Devuelve qué pasó,
+   para poder avisar bien: 'compartido' | 'cancelado' | 'descargado' | 'error' */
+export async function shareCard(cv, texto, url){
   let file = null;
   try{
-    const blob = await toBlob(drawCard(teams, canciones));
+    const blob = await toBlob(cv);
     if(blob) file = new File([blob], "en-una-nota.jpg", {type:"image/jpeg"});
   }catch(e){ file = null; }
 

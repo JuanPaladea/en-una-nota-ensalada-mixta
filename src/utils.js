@@ -20,3 +20,10 @@ export function extractVideoId(url){
   const m = url.match(/(?:youtu\.be\/|v=|\/embed\/|\/shorts\/)([\w-]{11})/);
   return m ? m[1] : null;
 }
+
+// Para comparar y buscar títulos: sin mayúsculas, acentos ni signos.
+// "¿Qué ves?" y "que ves" quedan iguales.
+export function norm(s){
+  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").trim();
+}

@@ -80,11 +80,21 @@
       </div>
 
       <div class="card">
-        <h3>2 · ¿Qué equipos juegan?</h3>
-        <div id="teams" class="teams"></div>
-        <div class="row">
-          <button class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
+        <h3>2 · ¿Quiénes juegan?</h3>
+        <div class="modos" role="group" aria-label="Modo de juego">
+          <button type="button" class="modo" id="modo-grupo" onclick="setModo('grupo')">👥 Con amigos</button>
+          <button type="button" class="modo" id="modo-solo" onclick="setModo('solo')">🎧 Solo</button>
         </div>
+        <div id="teams-box">
+          <div id="teams" class="teams"></div>
+          <div class="row">
+            <button class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
+          </div>
+        </div>
+        <!-- Solo no hay grupo que juzgue: se escribe el título y el juego lo comprueba -->
+        <p class="hint" id="solo-box" style="margin:0" hidden>Suena 1 segundo y escribís el título. Si la sacás con
+          <b>1 segundo, 10 puntos</b>. Si no, se repite desde el mismo punto pero más largo (2 segundos, 3…
+          hasta 6) y vale menos, hasta 1 punto. Errar también suma un segundo.</p>
       </div>
 
       <div class="card">
@@ -100,12 +110,14 @@
             <option value="0">Sin límite</option>
           </select>
         </label>
-        <div style="height:12px"></div>
-        <label class="toggle" style="justify-content:space-between">
-          <span>➖ Restar un punto si el que arriesga erra</span>
-          <input type="checkbox" id="opt-penalty">
-        </label>
-        <p class="hint" style="margin-top:6px">Nunca baja de cero.</p>
+        <div id="opt-penalty-box">
+          <div style="height:12px"></div>
+          <label class="toggle" style="justify-content:space-between">
+            <span>➖ Restar un punto si el que arriesga erra</span>
+            <input type="checkbox" id="opt-penalty">
+          </label>
+          <p class="hint" style="margin-top:6px">Nunca baja de cero.</p>
+        </div>
         <div style="height:12px"></div>
         <button class="btn ghost mini" onclick="resetHistory()">🔄 Reiniciar historial de canciones ya escuchadas</button>
         <p class="hint" style="margin-top:8px">Las canciones que ya sonaron en partidas anteriores no se repiten hasta agotar la playlist elegida. Usá esto si querés que puedan volver a salir antes.</p>
@@ -215,9 +227,9 @@
         <div id="final-board" class="board"></div>
         <div style="height:18px"></div>
         <button class="btn cyan big" id="share-btn" onclick="shareResult(this, 'boton')">📲 Compartir el resultado</button>
-        <p class="hint" style="margin:8px 0 0">Manda una imagen con el marcador al grupo</p>
+        <p class="hint" id="share-hint" style="margin:8px 0 0">Manda una imagen con el marcador al grupo</p>
         <div style="height:14px"></div>
-        <button class="btn mag big" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
+        <button class="btn mag big" id="rematch-btn" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
         <div style="height:10px"></div>
         <!-- Al terminar es cuando más ganas hay de bancar el juego: el botón va
              a mano, debajo de Revancha. Aparece desde la primera partida

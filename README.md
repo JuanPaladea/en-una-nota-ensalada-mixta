@@ -20,7 +20,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - Los **nombres de los equipos se recuerdan**: sobreviven a la revancha, al volver al menú
   principal y a recargar la página (los puntos siempre arrancan en cero).
 - Puntaje flexible: a **un equipo**, a **todos** o a **nadie** (saltear).
-- **Modo solo**: en vez de equipos, se escribe el título con autocompletado (todo el catálogo,
+- **Modo un jugador**: en vez de equipos, se escribe el título con autocompletado (todo el catálogo,
   sin importar acentos ni signos) y el juego lo comprueba. Cada intento repite desde el mismo
   punto un segundo más largo (1 s, 2 s… hasta 6) y vale 10, 7, 5, 3, 2 o 1 punto; errar cuenta
   como un intento. Se guarda el récord por cantidad de canciones y la imagen final muestra un

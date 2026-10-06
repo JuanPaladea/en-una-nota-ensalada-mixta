@@ -83,7 +83,7 @@
         <h3>2 · ¿Quiénes juegan?</h3>
         <div class="modos" role="group" aria-label="Modo de juego">
           <button type="button" class="modo" id="modo-grupo" onclick="setModo('grupo')">👥 Con amigos</button>
-          <button type="button" class="modo" id="modo-solo" onclick="setModo('solo')">🎧 Solo</button>
+          <button type="button" class="modo" id="modo-solo" onclick="setModo('solo')">🎧 Un jugador</button>
         </div>
         <div id="teams-box">
           <div id="teams" class="teams"></div>
@@ -91,7 +91,7 @@
             <button class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
           </div>
         </div>
-        <!-- Solo no hay grupo que juzgue: se escribe el título y el juego lo comprueba -->
+        <!-- Con un jugador no hay grupo que juzgue: se escribe el título y el juego lo comprueba -->
         <p class="hint" id="solo-box" style="margin:0" hidden>Suena 1 segundo y escribís el título. Si la sacás con
           <b>1 segundo, 10 puntos</b>. Si no, se repite desde el mismo punto pero más largo (2 segundos, 3…
           hasta 6) y vale menos, hasta 1 punto. Errar también suma un segundo.</p>

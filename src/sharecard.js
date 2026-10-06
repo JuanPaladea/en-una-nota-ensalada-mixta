@@ -274,7 +274,7 @@ export function drawSoloCard(puntos, posibles, resultados, record){
   }
   if(vis) drawCuadritos(ctx, resultados, y + altoPuntos + 44);
 
-  drawPie(ctx, n ? `${n} ${n===1 ? "canción" : "canciones"} · jugando solo` : "");
+  drawPie(ctx, n ? `${n} ${n===1 ? "canción" : "canciones"} · un jugador` : "");
   return cv;
 }
 

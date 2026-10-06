@@ -92,7 +92,7 @@
   input:focus{outline:none;border-color:var(--magenta)}
   .x{background:transparent;border:none;color:var(--no);font-size:22px;cursor:pointer;padding:0 6px}
 
-  /* Con amigos / Solo */
+  /* Con amigos / Un jugador */
   .modos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   .modo{border:2px solid var(--line);background:rgba(255,255,255,.03);color:var(--paper);border-radius:14px;
     padding:13px 10px;font:inherit;font-weight:800;font-size:16px;cursor:pointer;transition:.15s}

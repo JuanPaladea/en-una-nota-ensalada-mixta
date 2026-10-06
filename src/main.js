@@ -4,6 +4,7 @@ import { load, save, songKey, esc, extractVideoId } from "./utils.js";
 import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard } from "./sharecard.js";
 import { track } from "./analytics.js";
+import { SHARE_URL, shareGame } from "./share.js";
 
 /* ============================================================
    ESTADO
@@ -979,22 +980,9 @@ function goHome(){
 
 /* ============================================================
    COMPARTIR
+   El link del juego (shareGame) está en share.js, que también usa la página
+   de Cómo se juega.
    ============================================================ */
-const SHARE_URL = "https://enunanota.com.ar/";
-const SHARE_TEXT = "🎤 En una nota · Ensalada mixta: suena 1 segundo de una canción y tenés que seguir cantando la que sigue. Gratis, sin instalar nada:";
-async function shareGame(){
-  track("compartir", { que: "link" });
-  if(navigator.share){
-    try{ await navigator.share({ title:"En una nota · Ensalada mixta", text:SHARE_TEXT, url:SHARE_URL }); return; }
-    catch(e){ if(e && e.name === "AbortError") return; }
-  }
-  try{
-    await navigator.clipboard.writeText(SHARE_TEXT + " " + SHARE_URL);
-    alert("¡Link copiado! Pegalo en el grupo y jueguen todos 🎶");
-  }catch(e){
-    prompt("Copiá el link y compartilo:", SHARE_URL);
-  }
-}
 
 // Comparte una imagen con el resultado de la partida que acaban de jugar.
 // Es distinto de shareGame(): eso manda un aviso del juego, esto manda lo que

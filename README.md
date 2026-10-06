@@ -37,7 +37,8 @@ Después se **revela** la canción y el grupo decide si la pegó.
   muestra el pedido final (`cafecito_visto`) y los clics (`cafecito`, con `desde`: `final` o `inicio`).
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.
-- Sección **Cómo se juega / preguntas frecuentes** con datos estructurados `FAQPage`,
+- Página aparte **Cómo se juega** (`/como-se-juega/`, con un botón desde el inicio): las
+  reglas a la vista y las preguntas frecuentes plegadas, con datos estructurados `FAQPage`;
   imagen de OpenGraph en **PNG** (WhatsApp y Facebook no muestran previews en SVG) y
   `manifest.webmanifest` para instalarla desde el celular.
 - **Comentarios**: formulario al pie (comentario + nombre y mail opcionales) que llega por
@@ -65,6 +66,8 @@ npm run preview # sirve el build de dist/ para probarlo
 
 ```
 ├── index.html          # markup, SEO (metadatos + JSON-LD) y contenedores de la app
+├── como-se-juega/
+│   └── index.html      # página de Cómo se juega + preguntas frecuentes (FAQPage)
 ├── public/
 │   ├── favicon.svg      # ícono
 │   ├── icon-192.png     # íconos del manifest (generados desde favicon.svg)
@@ -78,6 +81,8 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── main.js          # estado, lógica de juego, render y arranque
 │   ├── data.js          # las playlists (título, artista, id de YouTube)
 │   ├── sharecard.js     # dibuja y comparte la imagen del resultado
+│   ├── share.js         # compartir el link del juego (lo usan las dos páginas)
+│   ├── como-se-juega.js # arranque de la página de Cómo se juega
 │   ├── utils.js         # helpers puros (localStorage, escape, parseo de links)
 │   ├── idb.js           # persistencia de audios en IndexedDB
 │   └── styles.css       # estilos

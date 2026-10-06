@@ -286,22 +286,19 @@
     body.playing .controls .btn{padding-top:10px;padding-bottom:10px}
   }
 
-  /* Cómo se juega / preguntas frecuentes (contenido para buscadores y para el que llega nuevo) */
-  .info{margin-top:26px}
+  /* Cómo se juega / preguntas frecuentes (página aparte, para buscadores y para el que llega nuevo) */
+  .info{margin-top:26px;margin-bottom:18px}
   /* Bancá el proyecto (Cafecito, al fondo del inicio) */
   .support{border:2px solid var(--amber);text-align:center}
   .support-txt{color:var(--muted);font-size:14.5px;line-height:1.65;margin:0 auto 10px;max-width:560px}
   .support-txt b,.support-after b{color:var(--paper)}
   .support .btn{margin-top:14px}
   .support-after{color:var(--muted);font-size:13px;margin:10px 0 0;line-height:1.5}
-  .info h2{font-size:20px;justify-content:center;margin-bottom:14px}
-  /* "Cómo se juega" plegado: el título hace de botón, con el mismo ＋/－ de las preguntas */
-  .howto>summary{list-style:none;cursor:pointer;user-select:none}
-  .howto>summary::-webkit-details-marker{display:none}
-  .howto>summary h2{margin-bottom:0}
-  .howto>summary h2::after{content:'＋';color:var(--amber);font-weight:900}
-  .howto[open]>summary h2{margin-bottom:14px}
-  .howto[open]>summary h2::after{content:'－'}
+  /* En la página de Cómo se juega: el título de la página y el de las preguntas */
+  .info h1{font-size:24px;margin:0 0 14px;text-align:center}
+  .info h2{font-size:20px;justify-content:center;margin:22px 0 6px}
+  /* Ahí el logo es un link que vuelve al juego */
+  a.brand{color:inherit;text-decoration:none}
   .info p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 12px}
   .info ol{color:var(--muted);font-size:14.5px;line-height:1.8;padding-left:20px;margin:0 0 8px}
   .info li b,.info p b{color:var(--paper)}

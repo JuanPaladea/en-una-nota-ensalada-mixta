@@ -6,5 +6,12 @@ export default defineConfig({
   build: {
     target: "es2018",
     outDir: "dist",
+    // dos páginas: el juego y Cómo se juega (que se publica en /como-se-juega/)
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        "como-se-juega": "como-se-juega/index.html",
+      },
+    },
   },
 });

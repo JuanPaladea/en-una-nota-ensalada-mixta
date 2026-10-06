@@ -59,41 +59,6 @@
     ]
   }
   </script>
-
-  <!-- Preguntas frecuentes: habilita el resultado enriquecido de Google -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "¿Cómo se juega a En una nota?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Se eligen los géneros y los equipos. La app sortea una canción tapada y suena un segundo. El equipo que grita “¡YO!” primero tiene que seguir cantando la parte que sigue. Si erra, otro equipo puede tirar otro nombre. Al revelar la canción el grupo define quién se lleva el punto, que vale 1." }
-      },
-      {
-        "@type": "Question",
-        "name": "¿El juego es gratis?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Sí, es gratis y sin anuncios. No hace falta registrarse ni instalar nada: se juega desde el navegador del celular o la compu." }
-      },
-      {
-        "@type": "Question",
-        "name": "¿Cuántas canciones tiene?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Más de 500 canciones en 16 playlists: rock nacional, cumbia y cuarteto, pop y reggaetón, internacional, clásicos, Disney, fiesta, rock en español, trap urbano, baladas, folklore argentino, infantiles, pop nacional, boy bands y pop 2000s, cachengue y RKT, y K-pop." }
-      },
-      {
-        "@type": "Question",
-        "name": "¿Puedo jugar con mis propias canciones?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Sí. Podés cargar tus archivos MP3 o M4A, que quedan guardados en tu navegador y suenan incluso sin internet, o pegar links de YouTube." }
-      },
-      {
-        "@type": "Question",
-        "name": "¿Cuántas personas pueden jugar?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Las que quieras: se juega por equipos con un solo dispositivo para todo el grupo. Es ideal para una juntada con amigos, un asado, un cumpleaños o un viaje." }
-      }
-    ]
-  }
-  </script>
 </head>
 <body>
   <div class="wrap">
@@ -152,59 +117,13 @@
       <div style="height:12px"></div>
       <button class="btn ghost big" onclick="show('s-armar')">🔗 Armar / vincular canciones</button>
 
-    <!-- ===================== CÓMO SE JUEGA / FAQ ===================== -->
-    <section class="card info">
-      <!-- Todo el bloque (instrucciones + preguntas) va plegado de entrada: lo abre
-           solo el que tiene la duda. Google indexa igual el texto de un
-           <details> cerrado, incluso anidado. -->
-      <details class="howto">
-      <summary><h2>🎤 Cómo se juega</h2></summary>
-      <p><b>En una nota</b> es el clásico juego de las juntadas con amigos: suena un pedacito de una canción,
-        se corta, y hay que <b>seguir cantando la parte que sigue</b>. Esta versión sortea los temas
-        sola y los mantiene tapados, así que <b>nadie sabe qué suena</b> hasta que se revela.</p>
-      <ol>
-        <li>Elegí los <b>géneros</b> (rock nacional, cumbia, pop, folklore, RKT, K-pop, infantiles y más).</li>
-        <li>Cargá los <b>equipos</b> con sus nombres.</li>
-        <li>Tocá <b>reproducir 1 segundo</b>: suena y se corta solo.</li>
-        <li>El equipo que grita <b>“¡YO!”</b> primero canta la parte que sigue.</li>
-        <li>Si <b>erra</b>, otro equipo puede tirar otro nombre y quedarse con el punto.</li>
-        <li>Se <b>revela</b> la canción, con su imagen, y el grupo define <b>quién se lleva el punto</b>.</li>
-        <li>Opcional: se puede activar que el que arriesga y <b>erra pierda un punto</b> (nunca baja de cero).</li>
-      </ol>
-      <p>Se juega desde el celular, la compu o la tele: no hay que instalar nada ni crear una cuenta.</p>
+      <div style="height:12px"></div>
+      <!-- Las reglas y las preguntas frecuentes tienen su propia página -->
+      <a class="btn ghost big" href="como-se-juega/">🎤 Cómo se juega</a>
 
-      <details class="faq">
-        <summary>¿Es gratis?</summary>
-        <p>Sí, totalmente gratis y sin anuncios. No pide registro ni datos personales.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Cuántas canciones tiene?</summary>
-        <p>Más de 500 canciones repartidas en 16 playlists: rock nacional, cumbia y cuarteto,
-          pop y reggaetón, internacional, clásicos, Disney, fiesta, rock en español, trap urbano,
-          baladas, folklore argentino, infantiles, pop nacional, boy bands y pop 2000s,
-          cachengue y RKT, y K-pop. Además podés sumar las tuyas.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Se pueden usar mis propias canciones?</summary>
-        <p>Sí. En <b>Armar / vincular canciones</b> podés cargar archivos MP3 o M4A desde tu
-          dispositivo (suenan incluso sin internet) o pegar links de YouTube.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Se repiten las canciones?</summary>
-        <p>No. Dentro de una partida nunca se repiten, y entre partidas se recuerda lo que ya sonó
-          hasta agotar las playlists elegidas. Podés reiniciar ese historial cuando quieras.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Cuántos pueden jugar?</summary>
-        <p>Los que quieras: se juega por equipos, con un solo dispositivo para todo el grupo.
-          Ideal para una juntada con amigos, un asado, un cumpleaños o un viaje en auto.</p>
-      </details>
-      </details>
-
-      <div class="row" style="margin-top:16px">
-        <button class="btn cyan" style="flex:1" onclick="shareGame()">📲 Compartir con tus amigos</button>
-      </div>
-    </section>
+    <div class="info">
+      <button class="btn cyan big" onclick="shareGame()">📲 Compartir con tus amigos</button>
+    </div>
 
     <!-- ===================== CAFECITO ===================== -->
     <!-- Tarjeta propia al fondo del inicio, aparte de Cómo se juega: a mano para

@@ -165,7 +165,7 @@ function setModo(m){
   modo = m === "solo" ? "solo" : "grupo";
   try{ save(LS_MODO, modo); }catch(_){}
   // Solo cuando la persona lo cambia: al arrancar se llama con el modo guardado
-  if(modo !== antes) track("modo_elegido", { modo });
+  if(modo !== antes) track("modo_elegido", { modo_juego: modo });
   const solo = modo === "solo";
   document.getElementById("modo-grupo").setAttribute("aria-pressed", String(!solo));
   document.getElementById("modo-solo").setAttribute("aria-pressed", String(solo));
@@ -600,7 +600,7 @@ function startGame(){
   opts.penalty = !!(pen && pen.checked);
   played=[]; brokenIds=new Set(); songNo=1;
   track("partida_iniciada", {
-    modo,
+    modo_juego: modo,
     generos: [...selectedGenres].join(","),
     cantidad_generos: selectedGenres.size,
     equipos: modo==='solo' ? 1 : teams.length,
@@ -946,9 +946,11 @@ function resolverSolo(ok){
   phase='answering'; revealed=true;
   revealCover(); mediaResume();   // se escucha cómo seguía
   flash(ok ? "var(--ok)" : "var(--no)");
+  // En Analytics "resultado" ya es lo que pasó al compartir y "fallidos" los
+  // audios que no se pudieron guardar: acá van con otros nombres.
   track("solo_respuesta", {
-    resultado: ok ? "acierto" : (fallidos.length ? "error" : "no_se"),
-    segundos, fallidos: fallidos.length, puntos: pts,
+    respuesta: ok ? "acierto" : (fallidos.length ? "error" : "no_se"),
+    segundos, errados: fallidos.length, puntos: pts,
     numero: songNo,
   });
   renderPhase(); renderBoard();
@@ -1116,7 +1118,7 @@ function endGame(reason){
   // y tocó Terminar sin pasar a la siguiente, esa también va (está en la tarjeta).
   lastGameSongs = modo==='solo' ? soloResultados.length : Math.max(0, songNo - 1);
   track("partida_terminada", {
-    modo,
+    modo_juego: modo,
     motivo: reason || "manual",       // limit = llegó al tope, agotada = se acabó la playlist
     canciones: lastGameSongs,
     equipos: modo==='solo' ? 1 : teams.length,
@@ -1218,7 +1220,7 @@ function mostrarTarjeta(){
 }
 
 function rematch(){
-  track("revancha", { canciones: lastGameSongs, modo });
+  track("revancha", { canciones: lastGameSongs, modo_juego: modo });
   teams.forEach(p=>p.score=0);
   resetSolo();
   played=[]; brokenIds=new Set(); songNo=1;
@@ -1270,7 +1272,7 @@ ${tira}
         : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
     }
     const r = await shareCard(dibujarTarjeta(), texto, SHARE_URL);
-    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs, desde: desde || "boton", modo });
+    track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs, desde: desde || "boton", modo_juego: modo });
     if(r === "descargado") alert("Guardamos la imagen del resultado y copiamos el link 🎶 Mandala al grupo.");
     else if(r === "error") alert("No pudimos compartir desde acá. Probá con el botón “Compartir el juego”.");
   }catch(e){

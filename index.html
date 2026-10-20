@@ -97,9 +97,9 @@
     <!-- ===================== INICIO ===================== -->
     <!-- Una pregunta y un atajo: cómo juegan hoy y repetir la última. -->
     <section id="s-inicio" class="screen on">
+      <p class="hola"><small id="hola">El juego para cantar con amigos</small>¿Cómo juegan hoy?</p>
       <div class="inicio">
         <div class="inicio-main">
-          <p class="hola"><small id="hola">El juego para cantar con amigos</small>¿Cómo juegan hoy?</p>
           <div class="modes">
             <button type="button" class="mode mode-grupo" onclick="elegirModo('grupo')">
               <span class="mode-ic" aria-hidden="true">👥</span>
@@ -120,19 +120,37 @@
             <li><b>2 · ¡YO!</b>El primero que grita sigue cantando la parte que sigue.</li>
             <li><b>3 · Se revela</b>Aparece la canción y el grupo decide si la pegó.</li>
           </ol>
-        </div>
-        <div class="inicio-side">
-          <div id="repetir"></div>
-          <div id="record-card"></div>
           <div class="accesos">
             <a class="acceso" href="como-se-juega/"><span aria-hidden="true">🎤</span>Cómo se juega</a>
             <button type="button" class="acceso" onclick="show('s-armar')"><span aria-hidden="true">📂</span>Mis canciones</button>
             <button type="button" class="acceso" onclick="shareGame()"><span aria-hidden="true">📲</span>Compartir</button>
           </div>
         </div>
+        <div class="inicio-side">
+          <div id="repetir"></div>
+          <div id="record-card"></div>
+          <!-- ===================== CAFECITO =====================
+               Tarjeta propia en el inicio, con para qué es: a mano para el que
+               ya vuelve a jugar, sin competirle a las dos de arriba. -->
+          <section class="cafecito" aria-labelledby="cafe-inicio">
+            <div class="cafe-top">
+              <span class="cafe-ic" aria-hidden="true">☕</span>
+              <div><h3 id="cafe-inicio">Bancá el proyecto</h3><p class="cafe-sub">Gratis, sin anuncios y sin registrarse</p></div>
+            </div>
+            <p class="cafe-txt">Lo hago solo, en mis ratos libres. El dominio, el hosting y el tiempo de armar cada
+              playlist nueva salen de mi bolsillo. Si el juego les alegró alguna juntada, <b>un cafecito ayuda a
+              mantenerlo vivo</b> y a seguir sumando canciones 💛</p>
+            <ul class="cafe-usos" aria-label="En qué se usa">
+              <li><span aria-hidden="true">🎵</span>Playlists nuevas</li>
+              <li><span aria-hidden="true">🌐</span>Dominio y hosting</li>
+              <li><span aria-hidden="true">🚫</span>Cero anuncios</li>
+            </ul>
+            <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+               data-cafecito="inicio">☕ Invitame un cafecito</a>
+            <p class="cafe-after">¿No podés colaborar? <button type="button" class="linkish" onclick="shareGame()">Compartilo</button> con tus amigos, también suma 🙌</p>
+          </section>
+        </div>
       </div>
-      <p class="cafe-linea">Gratis y sin anuncios ·
-        <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" data-cafecito="inicio">Invitame un cafecito ☕</a></p>
     </section>
 
     <!-- ===================== ARMAR PARTIDA ===================== -->
@@ -234,6 +252,16 @@
         <div class="rk-side">
           <!-- Tu fila: fija abajo en el celular, aunque estés lejos del podio -->
           <div id="rk-yo"></div>
+          <div class="rk-reglas">
+            <div class="eyebrow">Cómo se suman los puntos</div>
+            <div class="ladder" aria-hidden="true">
+              <div><b>10</b><span>1 s</span></div><div><b>7</b><span>2 s</span></div><div><b>5</b><span>3 s</span></div>
+              <div><b>3</b><span>4 s</span></div><div><b>2</b><span>5 s</span></div><div><b>1</b><span>6 s</span></div>
+            </div>
+            <p>Cuanto menos tenés que escuchar, más vale. Cada canción deja un cuadrito:
+              <span class="sq g"></span> 1 s, <span class="sq y"></span> 2–3 s, <span class="sq o"></span> 4–6 s y
+              <span class="sq k"></span> no salió.</p>
+          </div>
           <p class="hint rk-nota">A igual puntaje queda arriba el que lo hizo primero. En el ranking se ve solo un nombre corto.</p>
           <button type="button" class="btn ghost big rk-jugar" onclick="elegirModo('solo')">🎧 Jugar un jugador</button>
         </div>
@@ -248,6 +276,23 @@
           <div id="cuenta-perfil"></div>
           <!-- Lo de este navegador, cuando no hay sesión (src/main.js) -->
           <div id="cuenta-local"></div>
+          <section class="cafecito" aria-labelledby="cafe-cuenta">
+            <div class="cafe-top">
+              <span class="cafe-ic" aria-hidden="true">☕</span>
+              <div><h3 id="cafe-cuenta">Bancá el proyecto</h3><p class="cafe-sub">Gratis, sin anuncios y sin registrarse</p></div>
+            </div>
+            <p class="cafe-txt">Lo hago solo, en mis ratos libres. El dominio, el hosting y el tiempo de armar cada
+              playlist nueva salen de mi bolsillo. Si el juego les alegró alguna juntada, <b>un cafecito ayuda a
+              mantenerlo vivo</b> y a seguir sumando canciones 💛</p>
+            <ul class="cafe-usos" aria-label="En qué se usa">
+              <li><span aria-hidden="true">🎵</span>Playlists nuevas</li>
+              <li><span aria-hidden="true">🌐</span>Dominio y hosting</li>
+              <li><span aria-hidden="true">🚫</span>Cero anuncios</li>
+            </ul>
+            <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+               data-cafecito="cuenta">☕ Invitame un cafecito</a>
+            <p class="cafe-after">¿No podés colaborar? <button type="button" class="linkish" onclick="shareGame()">Compartilo</button> con tus amigos, también suma 🙌</p>
+          </section>
         </div>
         <div class="cuenta-col">
           <div class="lbl">Mis canciones</div>
@@ -292,17 +337,6 @@
               </div>
             </details>
             <a class="list-row" href="privacidad/"><span>Privacidad<small>Qué se guarda y dónde</small></span><span class="ch" aria-hidden="true">›</span></a>
-          </div>
-
-          <!-- ===================== CAFECITO ===================== -->
-          <div class="cafe-card">
-            <div class="grow">
-              <div class="eyebrow">Bancá el proyecto</div>
-              <p><b>En una nota</b> es gratis, sin anuncios y lo hago solo en mis ratos libres. Si les alegró
-                alguna juntada, un cafecito paga el dominio y las playlists nuevas 💛</p>
-            </div>
-            <a class="btn amber mini" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
-               data-cafecito="cuenta">☕ Cafecito</a>
           </div>
 
           <div id="cuenta-salir"></div>
@@ -383,15 +417,19 @@
             <button type="button" class="btn mag" id="rematch-btn" onclick="rematch()">🔁 Revancha</button>
             <button type="button" class="btn ghost" onclick="goHome()">Volver al inicio</button>
           </div>
-          <button type="button" class="linkish" onclick="shareGame()">🔗 Compartir solo el link del juego</button>
-          <!-- Al terminar es cuando más ganas hay de bancar el juego: aparece desde
-               la primera partida y con lo que ya jugaron (lo arma pedirCafecito()
-               en main.js). -->
-          <div id="cafecito-final" class="cafe-card" hidden>
-            <p class="grow" id="cafecito-txt"></p>
-            <a class="btn amber mini" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+          <!-- Al terminar es cuando más ganas hay de bancar el juego: va a mano,
+               debajo de Revancha. Aparece desde la primera partida y con lo que ya
+               jugaron (lo arma pedirCafecito() en main.js). -->
+          <section id="cafecito-final" class="cafecito" aria-labelledby="cafe-final" hidden>
+            <div class="cafe-top">
+              <span class="cafe-ic" aria-hidden="true">☕</span>
+              <div><h3 id="cafe-final">Bancá el proyecto</h3><p class="cafe-sub">Gratis, sin anuncios y sin registrarse</p></div>
+            </div>
+            <p class="cafe-txt" id="cafecito-txt"></p>
+            <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
                data-cafecito="final">☕ Invitame un cafecito</a>
-          </div>
+          </section>
+          <button type="button" class="linkish" onclick="shareGame()">🔗 Compartir solo el link del juego</button>
         </div>
       </div>
     </section>

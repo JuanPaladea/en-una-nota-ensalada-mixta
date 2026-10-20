@@ -57,7 +57,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - **Compartir** con la Web Share API (y copia del link como respaldo).
 - **Cafecito**: el pedido aparece en la pantalla final desde la primera partida
   terminada en ese navegador, contando cuántas partidas y canciones llevan (se guarda en
-  localStorage). Además hay una tarjeta fija al fondo del inicio que explica para qué es. Se miden las veces que se
+  localStorage). Además hay una tarjeta en el inicio y en Mi cuenta que explica para qué es (playlists nuevas, dominio y hosting, cero anuncios). Se miden las veces que se
   muestra el pedido final (`cafecito_visto`) y los clics (`cafecito`, con `desde`: `final`, `inicio` o `cuenta`).
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.

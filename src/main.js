@@ -1415,7 +1415,16 @@ function renderBoard(){
   document.getElementById("board").innerHTML = teams.map((p,i)=>`
     <div class="chip ${cur(i)?'cur':''} ${lider && p.score===max ? 'lead' : ''}">
       <b>${p.score}</b><span>${cur(i)?'🎤 ':''}${esc(p.name)}</span>
-    </div>`).join("");
+    </div>`).join("") +
+    // En la compu el marcador va al costado y abajo sobra lugar: el
+    // recordatorio de cómo se anota (el CSS lo muestra solo ahí)
+    `<div class="score-ayuda">
+      <div class="eyebrow">Cómo se anota</div>
+      <div>✋ El primero que grita <b>¡YO!</b> arriesga</div>
+      <div>🎤 Canta <b>la que sigue</b> y después se revela</div>
+      <div>⚡ Si erra, otro equipo puede <b>robar</b></div>
+      ${opts.penalty ? `<div>➖ Errar <b>resta un punto</b></div>` : ""}
+    </div>`;
 }
 
 function endGame(reason){

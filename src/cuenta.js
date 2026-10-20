@@ -13,6 +13,7 @@
 import { esc } from "./utils.js";
 import { soloTramo } from "./sharecard.js";
 import { track, propiedadesUsuario } from "./analytics.js";
+import { contarVideos, favoritosHtml } from "./favoritos.js";
 
 const SUPABASE_URL = "https://cebmgdrrfagsbrfyeqqm.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GK8qADTCcOrWDGWit99ubQ_P6d52nWh";
@@ -202,7 +203,7 @@ function renderSalir(){
    sale de las partidas propias (las reglas de la base no dejan leer otras)
    y los puestos de ranking_solo().
    ============================================================ */
-let misPartidas = null;        // cache: [{ canciones, segundos, puntos, jugada }], más nuevas primero
+let misPartidas = null;        // cache: [{ canciones, segundos, puntos, jugada, videos }], más nuevas primero
 let puestos = {};              // cache: { "canciones/período": fila de ranking_solo con es_mio, o null }
 function olvidarCache(){ misPartidas = null; puestos = {}; }
 
@@ -210,7 +211,7 @@ async function cargarMisPartidas(){
   if(misPartidas) return misPartidas;
   const sb = await cliente();
   const { data, error } = await sb.from("partidas_solo")
-    .select("canciones, segundos, puntos, jugada")
+    .select("canciones, segundos, puntos, jugada, videos")
     .order("jugada", { ascending: false }).limit(500);
   if(error) throw error;
   misPartidas = data || [];
@@ -284,6 +285,7 @@ export async function renderMiCuenta(){
         <div class="tile"><b>${canciones}</b><span>canciones</span></div>
         <div class="tile"><b>${promedio ? promedio.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " s" : "—"}</b><span>promedio para sacarla</span></div>
       </div>
+      ${favoritosHtml(contarVideos(partidas.flatMap(p=> p.videos || [])), "tus partidas de Un jugador")}
       <div class="lbl">Tus récords</div>
       <div class="rec">${OPCIONES_CANCIONES.map(n=> `<div class="${mejores[n] ? "" : "none"}" data-rec="${n}">
           ${n ? n + " canciones" : "Sin límite"}<b>${mejores[n] || "—"}</b><span class="pos">${mejores[n] ? "…" : ""}</span></div>`).join("")}</div>

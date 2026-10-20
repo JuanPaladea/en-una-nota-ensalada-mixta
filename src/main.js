@@ -6,6 +6,7 @@ import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track, trackAlSalir } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
+import { nombreGenero, favoritosHtml } from "./favoritos.js";
 import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verRanking, usuarioActual, miPuesto, renderMiCuenta, cuentasActivas } from "./cuenta.js";
 
 /* ============================================================
@@ -21,12 +22,14 @@ const LS_MODO = "eun_modo_v1";
 const LS_RECORD = "eun_record_solo_v1";
 const LS_ULTIMA = "eun_ultima_v1";
 const LS_PENALTY = "eun_resta_v1";
+const LS_POR_GENERO = "eun_por_genero_v1";
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];   // canciones por partida; 0 = sin límite
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
 let playedHistory = load(LS_HISTORY, []); // keys ya sonadas en partidas anteriores (persiste entre partidas)
 let jugado = load(LS_JUGADO, { partidas: 0, canciones: 0 }); // lo jugado en este navegador, para el pedido de Cafecito
+let porGenero = load(LS_POR_GENERO, null) || porGeneroDelHistorial();  // { idGénero: canciones que sonaron }, para los géneros favoritos
 const localUrls = {};                     // id -> objectURL (cache de sesión)
 const memBlobs = {};                      // id -> File (respaldo en memoria si IndexedDB no está disponible)
 let selectedGenres = new Set();
@@ -169,12 +172,6 @@ function generosDeUltima(){
   const validos = new Set(GENRES.map(g=> g.id));
   return ultima.generos.filter(id=> validos.has(id) || (id==="local" && localTracks.length));
 }
-// "Rock Nacional 🇦🇷" → "Rock Nacional": en una línea corta los emojis sobran
-function nombreGenero(id){
-  if(id==="local") return "Mis canciones";
-  const g = GENRES.find(x=> x.id===id);
-  return g ? g.name.replace(/[^\p{L}\p{N})]+$/u, "") : id;
-}
 function renderRepetir(){
   const el = document.getElementById("repetir");
   const gens = generosDeUltima();
@@ -256,6 +253,7 @@ function renderCuentaLocal(){
         <div class="tile"><b>${jugado.canciones}</b><span>canciones</span></div>
         <div class="tile"><b>${mejor || "—"}</b><span>mejor récord</span></div>
       </div>
+      ${favoritosHtml(porGenero, "este navegador")}
       <div class="lbl">Tus récords de Un jugador</div>
       <div class="rec">${OPCIONES_CANCIONES.map(n=>{
         const pts = record[String(n)] || 0;
@@ -857,6 +855,19 @@ function pickSong(force){
   }
   return s;
 }
+// La primera vez arranca con las canciones que ya sonaron en este navegador
+// (las claves del historial son "género::título")
+function porGeneroDelHistorial(){
+  const conteo = {};
+  playedHistory.forEach(k=>{ const gid = String(k).split("::")[0]; conteo[gid] = (conteo[gid] || 0) + 1; });
+  return conteo;
+}
+// Una canción más de ese género sonó en este navegador (con amigos o solo)
+function sumarGenero(gid){
+  if(!GENRES.some(g=> g.id===gid)) return;
+  porGenero[gid] = (porGenero[gid] || 0) + 1;
+  try{ save(LS_POR_GENERO, porGenero); }catch(_){}
+}
 function resetHistory(){
   track("historial_reiniciado", { canciones: playedHistory.length });
   playedHistory = [];
@@ -919,6 +930,7 @@ function playSnippet(){
   if(!mediaStarted){
     if(mediaStart()){
       mediaStarted=true; segundos++; trackCancion("corte");
+      sumarGenero(currentSong.gid);
       // Para el ranking: los audios y links propios no están en el catálogo
       if(modo==='solo') soloSono(currentSong.id, currentSong.local || currentSong.id!==currentSong.yt);
     }

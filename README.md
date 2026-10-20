@@ -43,7 +43,10 @@ Después se **revela** la canción y el grupo decide si la pegó.
   catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
   sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
   entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se cambia en Mi cuenta;
-  el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
+  el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta.
+  En Mi cuenta salen tus **géneros favoritos**: los tres que más sonaron en tus partidas, con su
+  porcentaje (`src/favoritos.js`). Con cuenta se cuentan los videos de tus partidas de Un jugador;
+  sin cuenta, las canciones que sonaron en este navegador en los dos modos. Sin configurar,
   el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se

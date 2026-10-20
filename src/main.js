@@ -800,6 +800,17 @@ function revealAnswer(){
   renderPhase();
 }
 
+// ¿Es la última de la partida? Mismo criterio que newSong usa para terminarla.
+function esUltima(){
+  if(opts.maxSongs && songNo >= opts.maxSongs) return true;
+  return opts.noRepeat && !pool.some(s=> !brokenIds.has(s.id) && !played.includes(s.key));
+}
+function btnSiguiente(){
+  return esUltima()
+    ? `<button class="btn mag big" onclick="finishRound()">🏁 Terminar partida</button>`
+    : `<button class="btn mag big" onclick="finishRound()">⏭ Siguiente canción</button>`;
+}
+
 // fin de la canción actual → siguiente (o fin de partida)
 function finishRound(){
   mediaStop();
@@ -994,7 +1005,7 @@ function renderSolo(c, t, sub){
       t.textContent="❌ Era esta";
       sub.textContent="0 puntos · escuchá cómo seguía";
     }
-    c.innerHTML=`<button class="btn mag big" onclick="finishRound()">⏭ Siguiente canción</button>`;
+    c.innerHTML=btnSiguiente();
   }
 }
 
@@ -1033,7 +1044,7 @@ function renderPhase(){
     if(skipping){
       t.textContent="⏭ Nadie la pegó";
       sub.textContent="Punto para nadie · escuchen cómo seguía";
-      c.innerHTML=`<button class="btn mag big" onclick="finishRound()">⏭ Siguiente canción</button>`;
+      c.innerHTML=btnSiguiente();
     } else if(answeringTeam==='all'){
       t.textContent="🎤 Cantan TODOS";
       if(!revealed){

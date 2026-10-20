@@ -1582,22 +1582,8 @@ ${tira}
    El formulario lo recibe Netlify Forms (el markup está en index.html). Se
    manda por fetch para no recargar la página ni sacar a nadie del juego; si la
    respuesta falla — pasa al abrirlo con npm run dev, donde Netlify no existe —
-   se ofrece el mismo comentario armado como mail.
+   el texto queda escrito para volver a intentar. No hay otro canal de contacto.
    ============================================================ */
-const MAIL_CONTACTO = "juanpaladea5@gmail.com";
-
-function mailtoComentario(datos){
-  const nombre = String(datos.get("nombre") || "").trim();
-  const email  = String(datos.get("email")  || "").trim();
-  const cuerpo = [
-    String(datos.get("mensaje") || "").trim(), "",
-    nombre && ("Nombre: " + nombre),
-    email  && ("Mail: "   + email),
-  ].filter(Boolean).join("\n");
-  return "mailto:" + MAIL_CONTACTO
-    + "?subject=" + encodeURIComponent("Comentario · En una nota")
-    + "&body="    + encodeURIComponent(cuerpo);
-}
 
 async function sendFeedback(ev){
   ev.preventDefault();
@@ -1623,12 +1609,7 @@ async function sendFeedback(ev){
     track("comentario", { estado: "enviado" });
   }catch(e){
     state.className = "feedback-state err";
-    state.textContent = "No pudimos enviarlo desde acá. Mandámelo por mail a ";
-    const a = document.createElement("a");
-    a.href = mailtoComentario(datos);
-    a.textContent = MAIL_CONTACTO;
-    state.appendChild(a);
-    state.appendChild(document.createTextNode(" y lo leo igual."));
+    state.textContent = "No pudimos enviarlo. Revisá tu conexión y probá de nuevo en un rato: lo que escribiste sigue ahí.";
     track("comentario", { estado: "error" });
   }finally{
     if(btn){ btn.disabled = false; }
@@ -1678,12 +1659,20 @@ function boot(){
     if(pantalla==="s-inicio") renderInicio();
     if(pantalla==="s-cuenta") renderCuentaLocal();
   }});
-  // Las páginas de ayuda enlazan a ../#ranking y ../#cuenta: se abre esa
-  // sección y el #… se saca de la barra (no queda en un link compartido)
-  const desde = { "#ranking":"ranking", "#cuenta":"cuenta" }[location.hash];
+  // Las páginas de ayuda enlazan a ../#ranking, ../#cuenta y ../#comentarios:
+  // se abre esa sección y el #… se saca de la barra (no queda en un link compartido)
+  const hash = location.hash;
+  const desde = { "#ranking":"ranking", "#cuenta":"cuenta", "#comentarios":"cuenta" }[hash];
   if(desde){
     history.replaceState(history.state, "", location.pathname + location.search);
     irA(desde);
+  }
+  // El formulario está en Mi cuenta: se abre y se baja hasta él después del
+  // scroll arriba que hace show()
+  if(hash === "#comentarios"){
+    document.getElementById("comentarios").open = true;
+    requestAnimationFrame(()=> requestAnimationFrame(()=>
+      document.getElementById("comentarios").scrollIntoView({ block:"start" })));
   }
 }
 boot();

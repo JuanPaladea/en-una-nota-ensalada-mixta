@@ -22,7 +22,7 @@ create policy "renombrar mi perfil" on public.perfiles
 revoke insert, update, delete on public.perfiles from anon, authenticated;
 grant update (nombre) on public.perfiles to authenticated;
 
--- "Juan Paladea" → "Juan P."; sin nombre en Google, la parte del mail antes de la @.
+-- "Ana García" → "Ana G."; sin nombre en Google, la parte del mail antes de la @.
 create function public.crear_perfil() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare

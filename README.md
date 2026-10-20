@@ -41,7 +41,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
   se va anotando en la base mientras se juega y la base comprueba cada paso (que el video sea del
   catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
   sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
-  entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se cambia en Mi cuenta;
+  entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Ana G.") que se cambia en Mi cuenta;
   el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
   el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.

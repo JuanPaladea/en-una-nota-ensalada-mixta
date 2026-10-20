@@ -157,7 +157,7 @@ const LOGO_G = `<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="tru
 function botonGoogle(desde, texto){
   return `<button type="button" class="btn google" onclick="entrarConGoogle('${desde}')">${LOGO_G}<span>${texto}</span></button>`;
 }
-// "Juan P." → "JP"
+// "Ana G." → "AG"
 function iniciales(nombre){
   const p = String(nombre).replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/).filter(Boolean);
   return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase();

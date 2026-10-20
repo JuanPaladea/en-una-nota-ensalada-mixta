@@ -171,7 +171,6 @@
   .lbl-info{letter-spacing:0;text-transform:none;color:var(--muted);font-weight:700;font-size:13px;margin-left:4px}
   .lbl-acc{background:none;border:0;color:var(--cyan);font:inherit;font-weight:800;letter-spacing:0;text-transform:none;
     font-size:13.5px;cursor:pointer;padding:0;white-space:nowrap}
-  .lbl-accs{display:flex;gap:14px}
 
   .pill{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.08);border-radius:999px;padding:6px 12px;
     font-size:13px;color:var(--muted);font-weight:800;white-space:nowrap}
@@ -274,7 +273,6 @@
   .genre .tick{position:absolute;right:-7px;top:-7px;width:22px;height:22px;border-radius:50%;
     background:var(--magenta);color:#fff;font-size:11px;display:none;place-items:center;font-weight:900;box-shadow:0 0 0 3px var(--bg)}
   .genre.sel .tick{display:grid}
-  .genre .fav-marca{color:var(--amber)}
   .genre.local{border-color:rgba(166,255,61,.55)}
   .genre.local.sel{border-color:var(--lime);background:rgba(166,255,61,.12)}
   .genre.local .tick{background:var(--lime);color:var(--ink)}
@@ -633,14 +631,15 @@
   .login-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;max-width:42ch}
   .login-card .btn.google{padding:12px 18px}
   .cargando{color:var(--muted);font-size:14px;margin:4px 0 0}
-  /* Géneros favoritos: fichas chicas que se prenden en amarillo */
-  .favs{display:flex;flex-wrap:wrap;gap:6px}
-  .fav{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:7px 12px;
-    background:none;color:var(--muted);font:inherit;font-weight:800;font-size:13.5px;cursor:pointer;transition:border-color .12s,background .12s,color .12s}
-  .fav:hover{border-color:#6a49a3}
-  .fav[aria-pressed="true"]{border-color:var(--amber);background:rgba(255,203,46,.12);color:var(--paper)}
-  .fav-hint{margin:10px 0 18px}
-  .prof + #cuenta-favs > .lbl:first-child{margin-top:0}
+  /* Géneros favoritos: los que más sonaron, con su parte del total */
+  .favs{display:grid;gap:10px;border-radius:16px;border:1px solid var(--line);background:var(--card);padding:12px 14px}
+  .fav-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:5px 10px}
+  .fav-row .em{grid-row:span 2;font-size:22px;line-height:1;text-align:center}
+  .fav-row .gn{font-weight:800;font-size:14.5px;min-width:0}
+  .fav-row b{font-family:var(--f-display);font-size:18px;color:var(--amber);line-height:1}
+  .fav-bar{grid-column:2 / 4;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .fav-bar span{display:block;height:100%;border-radius:3px;background:var(--amber)}
+  .fav-hint{margin:8px 0 0}
   /* Listas planas, separadas por líneas */
   .list{display:grid;border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--card)}
   .list-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:0;border-top:1px solid var(--line);

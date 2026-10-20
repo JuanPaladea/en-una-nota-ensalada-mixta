@@ -1,5 +1,8 @@
 -- Géneros favoritos en el perfil.
 --
+-- Ya no se usa: los favoritos salen de las partidas jugadas (src/favoritos.js).
+-- Queda la columna, vacía, hasta borrarla con una migración nueva.
+--
 -- Los ids de los géneros de src/data.js ("rock", "cumbia"…) que la persona
 -- marcó en Mi cuenta. Al armar una partida se eligen con un toque. Se guardan
 -- en la cuenta para tenerlos en cualquier dispositivo; sin cuenta quedan solo

@@ -76,14 +76,10 @@ function allSongs(){
   localTracks.forEach(s=> base.push({t:s.t,a:s.a||"Archivo local",gid:"local",yt:null,local:true,id:s.id}));
   return base;
 }
-// ID efectivo: el que puso el usuario (localStorage) manda sobre el precargado
-function effId(gid, t, yt){ return links[songKey(gid,t)] || yt || null; }
-function countLinked(){
-  let n=0;
-  GENRES.forEach(g=> g.songs.forEach(([t,a,yt])=>{ if(effId(g.id,t,yt)) n++; }));
-  customSongs.forEach(s=>{ if(effId(s.gid||"custom", s.t, null)) n++; });
-  return n;
-}
+// Las playlists precargadas no se tocan: el link que pegó el usuario solo vale
+// para sus canciones propias (un link viejo sobre una precargada se ignora).
+function customId(s){ return links[songKey(s.gid||"custom", s.t)] || null; }
+function countLinked(){ return customSongs.filter(customId).length; }
 
 /* ============================================================
    NAVEGACIÓN / UTILIDADES DE UI
@@ -260,13 +256,13 @@ function renderCuentaLocal(){
         return `<div class="${pts ? "" : "none"}">${n ? n + " canciones" : "Sin límite"}<b>${pts || "—"}</b></div>`;
       }).join("")}</div>`;
   }
-  const propios = Object.keys(links).length + customSongs.length;
+  const propios = customSongs.length;
   document.getElementById("cuenta-canciones").innerHTML = `
     <button type="button" class="list-row" onclick="show('s-armar')">
       <span>${localTracks.length ? plural(localTracks.length, "audio", "audios") + " de tu compu" : "Todavía no cargaste audios"}<small>Suenan sin internet</small></span>
       <span class="act">Cargar</span></button>
     <button type="button" class="list-row" onclick="show('s-armar')">
-      <span>${propios ? plural(propios, "link propio", "links propios") : "Ningún link propio"} de YouTube<small>Canciones nuevas o reemplazos de las precargadas</small></span>
+      <span>${propios ? plural(propios, "canción propia", "canciones propias") : "Ninguna canción propia"} de YouTube<small>Las que no están en las playlists</small></span>
       <span class="act">Vincular</span></button>`;
   const ya = playedHistory.length;
   document.getElementById("pref-hist").textContent = ya
@@ -390,7 +386,7 @@ function buildPool(){
     if(!inSel) return;
     const key = songKey(s.gid, s.t);
     if(s.local){ pool.push({...s, key}); return; }   // audio local: ya trae id
-    const id = links[key] || s.yt;                    // usuario o precargado
+    const id = s.yt || links[key];                    // precargado, o el link de una propia
     if(id) pool.push({...s, id, key});
   });
 }
@@ -421,55 +417,31 @@ function updatePoolWarn(){
 /* ============================================================
    ARMAR PLAYLIST
    ============================================================ */
-function songRow(s){
-  const key = songKey(s.gid, s.t);
-  const override = links[key];              // link propio del usuario
-  const id = override || s.yt;              // efectivo
-  const preloaded = !override && s.yt;      // usa el precargado, sin tocar
+function songRow(s, idx){
+  const id = customId(s);
   const q = encodeURIComponent(s.t + " " + s.a);
-  const badgeTxt = override ? "✔ tu link" : (s.yt ? "✔ precargada" : "sin link");
   return `<div class="song">
     <div class="top">
       <div>
         <div class="tt">${esc(s.t)}</div>
         <div class="aa">${esc(s.a)}</div>
       </div>
-      <span class="badge ${id?'linked':'empty'}">${badgeTxt}</span>
+      <span class="badge ${id?'linked':'empty'}">${id ? "✔ tu link" : "sin link"}</span>
     </div>
     <div class="link-row">
       <a class="btn amber mini" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">🔎 Buscar</a>
-      <input type="url" placeholder="${preloaded?'Precargada · pegá otro link para cambiarla':'Pegá el link de YouTube…'}"
-        value="${override?('https://youtu.be/'+override):''}"
-        oninput="setLink('${key}', this.value, this, '${s.yt||''}')">
-      ${s.custom!==undefined?`<button class="x" onclick="removeCustom(${s.custom})">✕</button>`:""}
+      <input type="url" placeholder="Pegá el link de YouTube…"
+        value="${id?('https://youtu.be/'+id):''}"
+        oninput="setLink('${songKey(s.gid||"custom", s.t)}', this.value, this)">
+      <button class="x" onclick="removeCustom(${idx})">✕</button>
     </div>
   </div>`;
 }
 function renderSongList(){
-  let html = "";
-  let linkedCount = 0;
-  GENRES.forEach(g=>{
-    const rows = g.songs.map(([t,a,yt])=>{
-      if(effId(g.id,t,yt)) linkedCount++;
-      return songRow({t,a,yt:yt||null,gid:g.id});
-    }).join("");
-    html += `<details class="gsec" open>
-      <summary><span class="gsum-name">${g.em} ${esc(g.name)}</span></summary>
-      <div class="gbody">${rows}</div>
-    </details>`;
-  });
-  if(customSongs.length){
-    const rows = customSongs.map((s,idx)=>{
-      if(effId(s.gid||"custom", s.t, null)) linkedCount++;
-      return songRow({t:s.t,a:s.a,yt:null,gid:s.gid||"custom",custom:idx});
-    }).join("");
-    html += `<details class="gsec" open>
-      <summary><span class="gsum-name">➕ Propias (YouTube)</span><span class="gcount">${customSongs.length}</span></summary>
-      <div class="gbody">${rows}</div>
-    </details>`;
-  }
-  document.getElementById("songlist").innerHTML = html;
-  document.getElementById("link-count").textContent = linkedCount + " con audio";
+  document.getElementById("songlist").innerHTML = customSongs.length
+    ? customSongs.map(songRow).join("")
+    : `<p class="hint" style="margin:0">Todavía no agregaste ninguna. Las de las playlists ya vienen listas y no se pueden cambiar.</p>`;
+  document.getElementById("link-count").textContent = countLinked() + " con audio";
   renderLocalList();
 }
 function renderLocalList(){
@@ -515,17 +487,16 @@ async function removeLocal(idx){
   save(LS_LOCAL, localTracks);
   renderLocalList(); renderGenres(); updatePoolWarn();
 }
-function setLink(key, val, inputEl, builtinYt){
+function setLink(key, val, inputEl){
   const id = extractVideoId(val);
   if(id){ links[key]=id; inputEl.style.borderColor="var(--ok)"; }
   else if(val.trim()===""){ delete links[key]; inputEl.style.borderColor=""; }
   else { inputEl.style.borderColor="var(--no)"; return; }
   save(LS_LINKS, links);
-  document.getElementById("link-count").textContent = countLinked() + " vinculadas";
-  const eff = id || builtinYt || null;
+  document.getElementById("link-count").textContent = countLinked() + " con audio";
   const badge = inputEl.closest(".song").querySelector(".badge");
-  badge.className = "badge " + (eff ? "linked" : "empty");
-  badge.textContent = id ? "✔ tu link" : (builtinYt ? "✔ precargada" : "sin link");
+  badge.className = "badge " + (id ? "linked" : "empty");
+  badge.textContent = id ? "✔ tu link" : "sin link";
 }
 function addCustomSong(){
   const t = prompt("Título de la canción:");

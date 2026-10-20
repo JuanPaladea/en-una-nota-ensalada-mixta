@@ -1095,6 +1095,7 @@ let sugerencias = [], sugSel = 0;
 // Lo que vale acertar con lo que ya sonó (antes de sonar nada, lo máximo).
 const valeAhora = ()=> PUNTOS_SOLO[Math.max(0, segundos-1)];
 const valeConUnoMas = ()=> PUNTOS_SOLO[Math.min(segundos, MAX_SEGUNDOS-1)];
+const segSonando = ()=> Math.round(snippetMs/SNIPPET_MS);   // segundos del fragmento que está sonando
 
 function resetSolo(){ soloPuntos = 0; soloResultados = []; nuevoRecord = false; }
 
@@ -1229,7 +1230,10 @@ function renderSolo(c, t, sub){
     c.innerHTML=`<button class="btn cyan big" onclick="playSnippet()">▶ Reproducir 1 segundo</button>`;
   } else if(phase==='listening'){
     t.textContent="🎵 Sonando…";
-    sub.textContent = segundos > 1 ? "Desde el mismo punto, " + segundos + " segundos" : "Escuchá bien…";
+    // Se pinta antes de que playSnippet sume el intento: lo que suena sale del
+    // largo del fragmento, no de "segundos" (iba un número atrasado).
+    const n = segSonando();
+    sub.textContent = n > 1 ? "Desde el mismo punto, " + n + " segundos" : "Escuchá bien…";
     c.innerHTML=`<button class="btn amber big" onclick="stopPlayback()">✋ Cortar ya</button>`;
   } else if(phase==='decide'){
     t.textContent="🤔 ¿Qué canción es?";
@@ -1271,7 +1275,7 @@ function renderLadder(){
   const ver = modo==='solo' && phase!=='answering';
   el.hidden = !ver;
   if(!ver) return;
-  const ahora = Math.max(0, segundos-1);
+  const ahora = phase==='listening' ? segSonando()-1 : Math.max(0, segundos-1);
   el.innerHTML = PUNTOS_SOLO.map((p,i)=>
     `<div class="${i<ahora ? 'used' : i===ahora ? 'now' : ''}"><b>${p}</b><span>${i+1} s</span></div>`).join("");
 }

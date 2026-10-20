@@ -6,7 +6,7 @@ import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
-import { iniciarCuentas, rankingFinal } from "./cuenta.js";
+import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio } from "./cuenta.js";
 
 /* ============================================================
    ESTADO
@@ -601,6 +601,7 @@ function startGame(){
   const pen = document.getElementById("opt-penalty");
   opts.penalty = !!(pen && pen.checked);
   played=[]; brokenIds=new Set(); songNo=1;
+  if(modo==='solo') soloEmpezar(opts.maxSongs);
   track("partida_iniciada", {
     modo_juego: modo,
     generos: [...selectedGenres].join(","),
@@ -708,7 +709,11 @@ function playSnippet(){
   setCover("🎵 Sonando…");
   renderPhase();
   if(!mediaStarted){
-    if(mediaStart()){ mediaStarted=true; segundos++; trackCancion("corte"); }
+    if(mediaStart()){
+      mediaStarted=true; segundos++; trackCancion("corte");
+      // Para el ranking: los audios y links propios no están en el catálogo
+      if(modo==='solo') soloSono(currentSong.id, currentSong.local || currentSong.id!==currentSong.yt);
+    }
     else { pauseAfterSnippet=false; phase='ready'; renderPhase(); }
   } else {
     if(modo==='solo' && inicioClip!==null) mediaSeek(inicioClip);
@@ -987,6 +992,7 @@ function resolverSolo(ok){
   soloRes = { ok, seg: segundos, pts };
   soloPuntos += pts;
   soloResultados.push(soloRes);
+  soloResolvio(ok ? segundos : 0, ok ? norm(currentSong.t) : null);
   phase='answering'; revealed=true;
   revealCover(); mediaResume();   // se escucha cómo seguía
   flash(ok ? "var(--ok)" : "var(--no)");
@@ -1221,8 +1227,8 @@ function finSolo(){
     <div class="pill" style="margin-top:8px">de ${posibles} posibles${nuevoRecord ? " · 🏅 ¡nuevo récord!" : ""}</div>`;
   document.getElementById("final-board").innerHTML =
     `<div class="tira-fin">${soloResultados.map(r=> soloTramo(r).emoji).join("")}</div>`;
-  // Con cuenta se guarda en el ranking: los segundos de cada canción, 0 si no salió
-  rankingFinal(opts.maxSongs, soloResultados.map(r=> r.ok ? r.seg : 0));
+  // Con cuenta se guarda en el ranking (la base ya fue anotando cada canción)
+  rankingFinal(soloResultados.length);
 }
 
 // El pedido de Cafecito sale al terminar cualquier partida con canciones (el
@@ -1271,6 +1277,7 @@ function rematch(){
   teams.forEach(p=>p.score=0);
   resetSolo();
   played=[]; brokenIds=new Set(); songNo=1;
+  if(modo==='solo') soloEmpezar(opts.maxSongs);
   show("s-game"); newSong();
 }
 

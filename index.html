@@ -162,7 +162,10 @@
       <div class="armar">
         <div class="armar-gen">
           <div class="lbl"><span>Géneros <span class="lbl-info" id="gen-info"></span></span>
-            <button type="button" class="lbl-acc" id="gen-todos" onclick="toggleTodos()">Elegir todos</button></div>
+            <span class="lbl-accs">
+              <button type="button" class="lbl-acc" id="gen-favs" onclick="elegirFavoritos()" hidden>★ Favoritos</button>
+              <button type="button" class="lbl-acc" id="gen-todos" onclick="toggleTodos()">Elegir todos</button>
+            </span></div>
           <div id="genres" class="genres"></div>
           <p class="hint" style="margin:10px 0 0">Se mezclan todas las canciones de los géneros elegidos.</p>
         </div>

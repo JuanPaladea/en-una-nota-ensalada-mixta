@@ -44,6 +44,11 @@ Después se **revela** la canción y el grupo decide si la pegó.
   entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se cambia en Mi cuenta;
   el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
   el juego queda igual que antes.
+- **Géneros favoritos**: se marcan en Mi cuenta (debajo del nombre, o arriba de todo sin sesión). En Armar
+  partida van primero con una ★, el botón **★ Favoritos** los elige de un toque y, si no hay una partida
+  anterior, arrancan elegidos. Quedan en el navegador y, con cuenta, también en el perfil (columna
+  `perfiles.generos`), así aparecen en cualquier dispositivo; al entrar por primera vez se suben los
+  que ya estaban marcados.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
   evitan en partidas siguientes hasta agotar la playlist elegida (se puede reiniciar el

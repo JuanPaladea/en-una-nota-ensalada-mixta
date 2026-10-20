@@ -6,7 +6,7 @@ import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
-import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verRanking, usuarioActual, miPuesto, renderMiCuenta, cuentasActivas } from "./cuenta.js";
+import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verRanking, usuarioActual, miPuesto, renderMiCuenta, cuentasActivas, guardarFavoritos } from "./cuenta.js";
 
 /* ============================================================
    ESTADO
@@ -21,6 +21,7 @@ const LS_MODO = "eun_modo_v1";
 const LS_RECORD = "eun_record_solo_v1";
 const LS_ULTIMA = "eun_ultima_v1";
 const LS_PENALTY = "eun_resta_v1";
+const LS_FAVORITOS = "eun_favoritos_v1";
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];   // canciones por partida; 0 = sin límite
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
@@ -44,6 +45,9 @@ let opts = {
 // 'grupo' = equipos, el grupo juzga · 'solo' = se escribe el título y el juego lo comprueba
 let modo = load(LS_MODO, "grupo") === "solo" ? "solo" : "grupo";
 let record = load(LS_RECORD, {});         // modo solo: { "10": mejor puntaje con 10 canciones, ... }
+// Géneros favoritos: se marcan en Mi cuenta y al armar la partida se eligen de
+// un toque. Con cuenta también quedan en el perfil (cuenta.js).
+let favoritos = soloGenerosValidos(load(LS_FAVORITOS, []));   // [ids de GENRES]
 
 let pool = [];        // canciones jugables [{t,a,gid,id,key}]
 let played = [];      // keys ya jugadas
@@ -109,7 +113,8 @@ function show(id){
   if(id==="s-inicio") renderInicio();
   if(id==="s-setup") renderSetup();
   if(id==="s-armar") renderSongList();
-  if(id==="s-cuenta"){ renderCuentaLocal(); renderMiCuenta(); }
+  // renderMiCuenta primero: arma el perfil donde van los favoritos
+  if(id==="s-cuenta"){ renderMiCuenta(); renderCuentaLocal(); }
 }
 // Las secciones de arriba / de la barra de abajo
 function irA(seccion){
@@ -244,7 +249,9 @@ function renderCuentaLocal(){
   if(usuarioActual()){ box.innerHTML = ""; }
   else {
     const mejor = Math.max(0, ...Object.values(record).map(Number).filter(Number.isFinite));
-    box.innerHTML = `<div class="lbl">En este navegador</div>
+    // Sin sesión los favoritos van acá; con sesión, en el perfil que arma cuenta.js
+    box.innerHTML = `<div id="cuenta-favs"></div>
+      <div class="lbl">En este navegador</div>
       <div class="tiles">
         <div class="tile"><b>${jugado.partidas}</b><span>partidas</span></div>
         <div class="tile"><b>${jugado.canciones}</b><span>canciones</span></div>
@@ -269,6 +276,47 @@ function renderCuentaLocal(){
     ? `${plural(ya, "ya sonó", "ya sonaron")} y no se repiten hasta agotar la playlist`
     : "Todavía no sonó ninguna";
   syncPenalty();
+  renderFavoritos();
+}
+
+/* ============================================================
+   GÉNEROS FAVORITOS
+   ============================================================ */
+// Los ids que todavía existen, sin repetir ("Mis canciones" no cuenta: depende
+// de los audios de cada navegador)
+function soloGenerosValidos(ids){
+  if(!Array.isArray(ids)) return [];
+  return GENRES.map(g=> g.id).filter(id=> ids.includes(id));
+}
+function renderFavoritos(){
+  const el = document.getElementById("cuenta-favs");
+  if(!el) return;
+  const n = favoritos.length;
+  el.innerHTML = `<div class="lbl"><span>Géneros favoritos <span class="lbl-info">${n ? "· " + plural(n, "elegido", "elegidos") : ""}</span></span></div>
+    <div class="favs">${GENRES.map(g=>{
+      const fav = favoritos.includes(g.id);
+      return `<button type="button" class="fav" aria-pressed="${fav}" onclick="toggleFavorito('${g.id}')">
+        <span aria-hidden="true">${g.em}</span>${esc(nombreGenero(g.id))}</button>`;
+    }).join("")}</div>
+    <p class="hint fav-hint">${n ? "Al armar una partida los elegís con un toque" : "Marcá los que más te gustan y al armar una partida los elegís con un toque"}${usuarioActual() ? " · quedan en tu cuenta" : ""}.</p>`;
+}
+function setFavoritos(ids){
+  favoritos = soloGenerosValidos(ids);
+  try{ save(LS_FAVORITOS, favoritos); }catch(_){}
+}
+function toggleFavorito(id){
+  const fav = favoritos.includes(id);
+  setFavoritos(fav ? favoritos.filter(x=> x !== id) : favoritos.concat(id));
+  guardarFavoritos(favoritos);
+  track("favorito", { genero: id, accion: fav ? "sacar" : "sumar", cantidad: favoritos.length });
+  renderFavoritos();
+}
+// Armar partida: elige exactamente los favoritos
+function elegirFavoritos(){
+  if(!favoritos.length) return;
+  selectedGenres = new Set(favoritos);
+  track("elegir_favoritos", { cantidad: favoritos.length });
+  renderGenres(); updatePoolWarn();
 }
 
 /* ============================================================
@@ -276,8 +324,9 @@ function renderCuentaLocal(){
    ============================================================ */
 function elegirModo(m){
   setModo(m);
-  // Arranca con los géneros de la última partida, si había
+  // Arranca con los géneros de la última partida o, si no había, con los favoritos
   if(selectedGenres.size===0) generosDeUltima().forEach(id=> selectedGenres.add(id));
+  if(selectedGenres.size===0) favoritos.forEach(id=> selectedGenres.add(id));
   show("s-setup");
 }
 function renderSetup(){
@@ -294,8 +343,11 @@ function renderGenres(){
     </button>`;
   };
   // Playlist de audios locales (siempre visible; destaca porque suena seguro)
-  // Sin la cantidad de canciones de cada género: solo el nombre
-  el.innerHTML = GENRES.map(g=> ficha(g.id, g.em, nombreGenero(g.id), "")).join("") +
+  // Sin la cantidad de canciones de cada género: solo el nombre. Los
+  // favoritos van primero y con su marca.
+  const orden = GENRES.filter(g=> favoritos.includes(g.id)).concat(GENRES.filter(g=> !favoritos.includes(g.id)));
+  el.innerHTML = orden.map(g=> ficha(g.id, g.em, nombreGenero(g.id),
+      favoritos.includes(g.id) ? `<span class="fav-marca">★ Favorito</span>` : "")).join("") +
     ficha("local", "🎵", "Mis canciones", localTracks.length
       ? `<b style="color:var(--lime)">suena seguro</b>` : "Cargá tus audios", "local");
 }
@@ -400,6 +452,9 @@ function updatePoolWarn(){
   document.getElementById("gen-info").textContent = n ? "· " + plural(n, "elegido", "elegidos") : "";
   document.getElementById("gen-todos").textContent =
     todosLosGeneros().every(id=> selectedGenres.has(id)) ? "Ninguno" : "Elegir todos";
+  // "★ Favoritos" solo si hay y no son justo los elegidos
+  document.getElementById("gen-favs").hidden = !favoritos.length
+    || (favoritos.length === n && favoritos.every(id=> selectedGenres.has(id)));
   el.innerHTML = "";
   if(n===0){ info.textContent = "Elegí al menos un género"; return; }
   if(pool.length===0){
@@ -1642,6 +1697,7 @@ async function sendFeedback(ev){
    ============================================================ */
 Object.assign(window, {
   show, irA, volver, elegirModo, repetirUltima, toggleTodos, setMaxSongs, setPenalty,
+  toggleFavorito, elegirFavoritos,
   toggleGenre, setModo, addTeam, removeTeam, setTeamName, setLink,
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
   startGame, playSnippet, playContinuous, stopPlayback,
@@ -1677,6 +1733,14 @@ function boot(){
   iniciarCuentas({ show, alCambiar: ()=>{
     if(pantalla==="s-inicio") renderInicio();
     if(pantalla==="s-cuenta") renderCuentaLocal();
+  }, favoritos: {
+    leer: ()=> favoritos,
+    // Los de la cuenta reemplazan a los de este navegador
+    tomar: (ids)=>{
+      setFavoritos(ids);
+      renderFavoritos();
+      if(pantalla==="s-setup"){ renderGenres(); updatePoolWarn(); }
+    },
   }});
   // Las páginas de ayuda enlazan a ../#ranking y ../#cuenta: se abre esa
   // sección y el #… se saca de la barra (no queda en un link compartido)

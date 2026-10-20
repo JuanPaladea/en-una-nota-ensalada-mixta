@@ -60,10 +60,13 @@ function limpiarUrl(){
    SESIÓN
    ============================================================ */
 let alCambiar = ()=>{};      // main.js: rehace el saludo del inicio y Mi cuenta
+// main.js: los géneros favoritos de este navegador ({ leer, tomar })
+let favoritos = { leer: ()=> [], tomar: ()=>{} };
 
 export async function iniciarCuentas(opciones){
   mostrar = opciones.show;
   alCambiar = opciones.alCambiar || alCambiar;
+  favoritos = opciones.favoritos || favoritos;
   if(!cuentasActivas) return;
   document.getElementById("tab-ranking").hidden = false;
   renderCuenta();
@@ -96,8 +99,12 @@ async function tomarSesion(sesion){
   }
   if(usuario && usuario.id === id) return;
   const sb = await cliente();
-  const { data } = await sb.from("perfiles").select("nombre").eq("id", id).maybeSingle();
-  usuario = { id, nombre: data ? data.nombre : "Jugador" };
+  const { data } = await sb.from("perfiles").select("nombre, generos").eq("id", id).maybeSingle();
+  const suyos = data && Array.isArray(data.generos) ? data.generos : [];
+  usuario = { id, nombre: data ? data.nombre : "Jugador", generos: suyos };
+  // Mandan los de la cuenta; si todavía no tiene, se le pasan los de este navegador
+  if(suyos.length) favoritos.tomar(suyos);
+  else if(data && favoritos.leer().length) guardarFavoritos(favoritos.leer());
   olvidarCache();
   renderCuenta();
 }
@@ -151,6 +158,22 @@ async function guardarNombre(ev){
   usuario.nombre = nuevo;
   track("cuenta", { accion: "renombrar" });
   renderCuenta();
+}
+
+// Géneros favoritos: los marca main.js en Mi cuenta y acá van a la cuenta. Van
+// en fila, uno detrás del otro, y cada uno manda lo último que se marcó: así
+// el que llega último a la base es siempre el más nuevo.
+let colaFavoritos = Promise.resolve();
+export function guardarFavoritos(ids){
+  if(!usuario) return;
+  const u = usuario;
+  u.generos = ids.slice(0, 30);
+  colaFavoritos = colaFavoritos.then(async ()=>{
+    if(usuario !== u) return;
+    const sb = await cliente();
+    const { error } = await sb.from("perfiles").update({ generos: u.generos }).eq("id", u.id);
+    if(error) console.warn("[cuenta]", error);
+  }).catch(e=> console.warn("[cuenta]", e));
 }
 
 const LOGO_G = `<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
@@ -248,6 +271,7 @@ export async function renderMiCuenta(){
         <small>Así te ven en el ranking · entraste con Google</small>
       </div>
     </div>
+    <div id="cuenta-favs"></div>
     <div id="cuenta-datos"><p class="cargando">Cargando tus partidas…</p></div>`;
   try{
     const partidas = await cargarMisPartidas();

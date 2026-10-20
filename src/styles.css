@@ -1,35 +1,57 @@
+/* Letras propias, servidas desde el sitio: la de antes (Trebuchet MS) no viene
+   en Android y en la mayoría de los celulares se veía la genérica del sistema.
+   Baloo 2 para títulos y números, Nunito para el texto y los botones. */
+@import "@fontsource-variable/nunito/wght.css";
+@import "@fontsource-variable/baloo-2/wght.css";
+
 :root{
     --bg:#140a24; --bg2:#1e1140;
     --magenta:#ff2e88; --amber:#ffcb2e; --cyan:#25e0d6; --lime:#a6ff3d;
     --ink:#0c0618; --paper:#fff7ec; --muted:#b9a7d6;
     --card:#241443; --card2:#2e1a54; --line:#4a2f7a;
     --ok:#2fd06a; --no:#ff4d5e;
+    /* los cuadritos de Un jugador: los mismos colores que la imagen que se comparte */
+    --sq-g:var(--lime); --sq-y:var(--amber); --sq-o:#ff8a3d; --sq-k:#3a2a55;
     --sh:0 10px 0 rgba(0,0,0,.35);
+    --sh-sm:0 5px 0 rgba(0,0,0,.35);
+    --f-display:"Baloo 2 Variable","Trebuchet MS",system-ui,sans-serif;
+    --f-body:"Nunito Variable","Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    --tabs-h:0px;          /* alto de la barra de abajo del celular (0 en la compu) */
+    color-scheme:dark;
     font-synthesis:none;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
+  html,body{margin:0}
+  html{height:100%}
+  body{min-height:100%}
   body{
     background:
       radial-gradient(1200px 700px at 80% -10%, #35205e 0, transparent 60%),
       radial-gradient(900px 600px at -10% 110%, #2a1650 0, transparent 55%),
       var(--bg);
+    background-attachment:fixed;
     color:var(--paper);
-    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    font-family:var(--f-body);
     -webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:920px;margin:0 auto;padding:22px 16px 80px}
+  .wrap.app{max-width:1160px;padding-top:20px;
+    padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right));
+    padding-bottom:calc(48px + var(--tabs-h) + env(safe-area-inset-bottom))}
   .screen{display:none;animation:pop .25s ease}
   .screen.on{display:block}
   @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){ .screen{animation:none} }
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .grow{flex:1;min-width:0}
 
-  /* Header / logo */
+  /* Header / logo de las páginas de texto (Cómo se juega, Privacidad) */
   /* Es el <h1> de la página: neutralizamos el tamaño y el peso que trae por
      defecto para que el logo se siga viendo igual que cuando era un <div>. */
   .brand{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0 22px;text-align:center;flex-wrap:wrap;
     font-size:inherit;font-weight:inherit}
   .logo{
-    font-weight:900;font-size:clamp(30px,7vw,58px);line-height:.95;letter-spacing:-1px;
+    font-family:var(--f-display);font-weight:800;font-size:clamp(30px,7vw,58px);line-height:.95;letter-spacing:-1px;
     transform:rotate(-2deg);
   }
   .logo .en{color:var(--cyan)}
@@ -49,14 +71,76 @@
 
   h2{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
   .hint{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .eyebrow{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
 
   .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);
     border-radius:20px;padding:18px;margin:0 0 18px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
   .card > h3{margin:0 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:1.5px;color:var(--amber)}
 
+  /* ---------- Barra de arriba y secciones ----------
+     En la compu: logo, secciones y cuenta en una franja fija arriba. En el
+     celular la franja queda solo con el logo (y no se pega al scrollear) y las
+     secciones bajan a una barra fija abajo, al alcance del pulgar. */
+  .topnav{position:sticky;top:0;z-index:20;background:rgba(20,10,36,.84);
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid rgba(74,47,122,.55);
+    padding-top:env(safe-area-inset-top)}
+  .topnav-in{max-width:1160px;margin:0 auto;display:flex;align-items:center;gap:14px;height:66px;
+    padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right))}
+  .topnav .brand{display:block;margin:0;flex:none}
+  .topnav .brand a{display:flex;align-items:center;gap:9px;color:inherit;text-decoration:none}
+  .topnav .note{width:36px;height:36px;font-size:18px;box-shadow:var(--sh-sm)}
+  .topnav .logo{font-size:27px;letter-spacing:-.3px;line-height:1}
+  .topnav .tagline{margin:0;font-size:12px;padding:2px 10px;box-shadow:0 4px 0 rgba(0,0,0,.35);flex:none}
+  .tabs{display:flex;gap:4px;margin-left:auto}
+  .tab{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--muted);font:inherit;
+    font-weight:800;font-size:15px;padding:10px 14px;border-radius:12px;cursor:pointer;transition:color .12s,background .12s}
+  .tab svg{width:20px;height:20px;flex:none}
+  .tab:hover{color:var(--paper);background:rgba(255,255,255,.05)}
+  .tab[aria-current="page"]{color:var(--paper);background:rgba(255,255,255,.08)}
+  .tab[data-tab="jugar"][aria-current="page"] svg{color:var(--magenta)}
+  .tab[data-tab="ranking"][aria-current="page"] svg{color:var(--amber)}
+  .tab[data-tab="cuenta"][aria-current="page"] svg{color:var(--cyan)}
+  .nav-cuenta{flex:none;display:flex;align-items:center}
+  .btn.google{background:#fff;color:#1f1f1f;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    padding:10px 16px;font-size:15px;border-radius:12px}
+  .btn.google svg{flex:none}
+  .nav-cuenta .btn.google{padding:8px 12px;font-size:14px;box-shadow:none}
+  .av{width:40px;height:40px;border-radius:50%;background:var(--magenta);color:#fff;display:grid;place-items:center;
+    font-weight:900;font-size:14px;border:2px solid var(--paper);flex:none;font-family:var(--f-body);line-height:1}
+  button.av{cursor:pointer;padding:0}
+  .av.lg{width:62px;height:62px;font-size:21px;border-width:3px}
+  /* la compu no tiene barra abajo: durante la partida no se ve nada de arriba */
+  body.playing .topnav{display:none}
+
+  @media (max-width:860px){
+    :root{--tabs-h:62px}
+    .topnav{position:static;background:none;border:0;-webkit-backdrop-filter:none;backdrop-filter:none}
+    .topnav-in{height:auto;padding-top:12px;padding-bottom:2px;gap:10px}
+    .topnav .note{width:32px;height:32px;font-size:16px}
+    .topnav .logo{font-size:23px}
+    .topnav .tagline{font-size:11px;padding:2px 8px}
+    .nav-cuenta{margin-left:auto}
+    .nav-cuenta .btn.google{padding:7px 10px;font-size:13px}
+    .av{width:36px;height:36px;font-size:13px}
+    .av.lg{width:58px;height:58px;font-size:20px}
+    .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;
+      gap:0;background:rgba(20,10,36,.97);border-top:1px solid var(--line);
+      padding:5px max(6px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left))}
+    .tab{flex-direction:column;gap:1px;font-size:11.5px;padding:5px 4px 3px;border-radius:10px}
+    .tab svg{width:22px;height:22px}
+    .tab:hover,.tab[aria-current="page"]{background:none}
+    .tab::after{content:"";width:18px;height:3px;border-radius:2px;margin-top:2px;background:transparent}
+    .tab[aria-current="page"]::after{background:currentColor}
+    /* Armar partida, el resultado y la partida van sin la barra de abajo */
+    body.sin-tabs{--tabs-h:0px}
+    body.sin-tabs .tabs{display:none}
+  }
+  /* la pastilla se va cuando no entra al lado del logo */
+  @media (max-width:400px),(min-width:861px) and (max-width:1020px){ .topnav .tagline{display:none} }
+
   /* Buttons */
   .btn{border:none;border-radius:16px;padding:14px 20px;font-weight:800;font-size:16px;cursor:pointer;
-    font-family:inherit;transition:transform .05s, filter .15s;box-shadow:var(--sh);color:var(--ink)}
+    font-family:inherit;transition:transform .05s, filter .15s;box-shadow:var(--sh);color:var(--ink);line-height:1.2}
   .btn:active{transform:translateY(4px);box-shadow:0 4px 0 rgba(0,0,0,.35)}
   .btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
   .btn.big{padding:18px 26px;font-size:19px;width:100%}
@@ -65,77 +149,211 @@
   .btn.cyan{background:var(--cyan)}
   .btn.lime{background:var(--lime)}
   .btn.ghost{background:transparent;color:var(--paper);box-shadow:none;border:2px solid var(--line)}
+  .btn.ghost:hover{border-color:#6a49a3}
   /* Enlaces con pinta de botón (los de Cafecito, en el inicio y en la pantalla final) */
   a.btn{display:block;text-align:center;text-decoration:none}
   .btn.ghost:active{transform:none}
   .row{display:flex;gap:10px;flex-wrap:wrap}
   .row.spread{justify-content:space-between;align-items:center}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .linkish{background:none;border:none;color:var(--muted);cursor:pointer;font:inherit;font-size:14px;font-weight:700;padding:6px 4px}
+  .linkish:hover{color:var(--paper)}
 
-  /* Genre chips */
-  .genres{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-  .genre{position:relative;border:2px solid var(--line);border-radius:16px;padding:16px;cursor:pointer;
-    background:rgba(255,255,255,.03);transition:.15s;text-align:left}
-  .genre .em{font-size:26px}
-  .genre .gn{font-weight:800;margin:6px 0 2px;font-size:17px}
-  .genre .gc{color:var(--muted);font-size:13px}
-  .genre.sel{border-color:var(--cyan);background:rgba(37,224,214,.12);box-shadow:0 0 0 3px rgba(37,224,214,.15) inset}
-  .genre .tick{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;
-    background:var(--cyan);color:var(--ink);display:none;place-items:center;font-weight:900}
+  /* Encabezado de las pantallas internas (Armar partida, Mis canciones…) */
+  .hdr{display:flex;align-items:center;gap:12px;margin:0 0 18px}
+  .hdr-t{display:block;font-family:var(--f-display);font-weight:800;font-size:28px;line-height:1.05;margin:0}
+  .hdr-t small{display:block;font-family:var(--f-body);font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:2px}
+  .back{width:42px;height:42px;border-radius:13px;border:1.5px solid var(--line);background:none;color:var(--paper);
+    font-size:26px;font-weight:900;display:grid;place-items:center;cursor:pointer;flex:none;line-height:1;padding:0 0 3px}
+  .back:hover{border-color:#6a49a3}
+  .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:900;font-size:12px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin:22px 0 9px}
+  .armar-gen > .lbl:first-child,.armar-opc > .lbl:first-child{margin-top:0}
+  .lbl-info{letter-spacing:0;text-transform:none;color:var(--muted);font-weight:700;font-size:13px;margin-left:4px}
+  .lbl-acc{background:none;border:0;color:var(--cyan);font:inherit;font-weight:800;letter-spacing:0;text-transform:none;
+    font-size:13.5px;cursor:pointer;padding:0;white-space:nowrap}
+
+  .pill{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.08);border-radius:999px;padding:6px 12px;
+    font-size:13px;color:var(--muted);font-weight:800;white-space:nowrap}
+  .pill.amber{background:rgba(255,203,46,.14);color:var(--amber);border:1px solid rgba(255,203,46,.35)}
+  .pill.lime{background:rgba(166,255,61,.13);color:var(--lime);border:1px solid rgba(166,255,61,.35)}
+  .pill.cyan{background:rgba(37,224,214,.12);color:var(--cyan);border:1px solid rgba(37,224,214,.35)}
+
+  /* ---------- INICIO ---------- */
+  .hola{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,6.5vw,46px);line-height:1.02;margin:0 0 18px;letter-spacing:-.3px}
+  .hola small{display:block;font-family:var(--f-body);font-weight:700;font-size:14.5px;color:var(--muted);margin-bottom:4px;letter-spacing:0}
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mode{border:0;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:5px;text-align:left;cursor:pointer;
+    font:inherit;box-shadow:var(--sh);min-height:178px;color:var(--ink);transition:transform .08s,filter .15s}
+  .mode:hover{filter:brightness(1.05)}
+  .mode:active{transform:translateY(4px);box-shadow:0 6px 0 rgba(0,0,0,.35)}
+  .mode-grupo{background:var(--magenta);color:#fff}
+  .mode-solo{background:var(--cyan)}
+  .mode-ic{font-size:30px;line-height:1}
+  .mode-t{font-family:var(--f-display);font-weight:800;font-size:24px;line-height:1;margin-top:8px}
+  .mode-d{font-size:13.5px;font-weight:700;opacity:.9;line-height:1.3}
+  .mode-go{margin-top:auto;padding-top:10px;font-weight:900;font-size:14px}
+  .inicio-side{display:grid;gap:12px;margin-top:14px}
+  .inicio-side > div:empty{display:none}
+  /* Tarjetas: solo para lo que se toca (repetir la última, tu récord) */
+  .tarjeta{width:100%;background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:18px;
+    padding:13px 14px;display:flex;align-items:center;gap:12px;color:var(--paper);font:inherit;text-align:left}
+  button.tarjeta{cursor:pointer}
+  button.tarjeta:hover{border-color:#6a49a3}
+  .tarjeta .eyebrow,.tarjeta .big-pts,.tarjeta-t,.tarjeta-d{display:block}
+  .tarjeta-t{font-weight:900;font-size:15px;line-height:1.25;margin-top:2px}
+  .tarjeta-d{color:var(--muted);font-size:12.5px;font-weight:700}
+  .play-dot{width:44px;height:44px;border-radius:50%;background:var(--lime);color:var(--ink);display:grid;place-items:center;
+    font-weight:900;font-size:16px;box-shadow:var(--sh-sm);flex:none;padding-left:3px}
+  .big-pts{font-family:var(--f-display);font-weight:800;font-size:28px;line-height:1}
+  .big-pts small{font-size:14px;color:var(--muted)}
+  .accesos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .acceso{border:1.5px solid var(--line);border-radius:14px;padding:11px 4px;text-align:center;font-weight:800;font-size:12.5px;
+    display:grid;gap:3px;justify-items:center;color:var(--paper);background:none;text-decoration:none;cursor:pointer;font-family:inherit;line-height:1.2}
+  .acceso span{font-size:21px}
+  .acceso:hover{border-color:#6a49a3;background:rgba(255,255,255,.03)}
+  .cafe-linea{text-align:center;color:var(--muted);font-size:13.5px;border-top:1px dashed var(--line);padding-top:14px;margin:24px 0 0}
+  .cafe-linea a{color:var(--amber);font-weight:800}
+  .pasos{display:none;list-style:none;padding:0;margin:22px 0 0;grid-template-columns:repeat(3,1fr);gap:12px}
+  .pasos li{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:rgba(255,255,255,.02);color:var(--muted);font-size:14px;line-height:1.45}
+  .pasos b{display:block;font-family:var(--f-display);font-size:20px;color:var(--paper);margin-bottom:2px}
+  @media (min-width:960px){
+    /* el título va de lado a lado y las dos columnas arrancan a la misma altura */
+    .inicio{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);column-gap:32px;align-items:start;
+      grid-template-areas:"hola hola" "modes side" "pasos side"}
+    .inicio-main{display:contents}
+    .hola{grid-area:hola}
+    .modes{grid-area:modes}
+    .pasos{grid-area:pasos}
+    .inicio-side{grid-area:side;margin-top:0}
+    .modes{gap:16px}
+    .mode{min-height:280px;padding:24px;border-radius:26px}
+    .mode-ic{font-size:46px}
+    .mode-t{font-size:34px;margin-top:14px}
+    .mode-d{font-size:15.5px}
+    .mode-go{font-size:15.5px}
+    .pasos{display:grid}
+    .cafe-linea{margin-top:32px}
+  }
+
+  /* ---------- ARMAR PARTIDA ---------- */
+  .genres{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .genre{position:relative;display:flex;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:14px;
+    padding:10px 34px 10px 11px;cursor:pointer;background:rgba(255,255,255,.03);text-align:left;color:var(--paper);
+    font:inherit;transition:border-color .12s,background .12s;min-width:0}
+  .genre:hover{border-color:#6a49a3}
+  .genre .em{font-size:22px;flex:none;line-height:1}
+  .genre .gn{font-weight:800;font-size:14px;line-height:1.15;min-width:0}
+  .genre .gc{display:block;color:var(--muted);font-size:12px;font-weight:700;margin-top:1px}
+  .genre.sel{border-color:var(--magenta);background:rgba(255,46,136,.14)}
+  .genre .tick{position:absolute;right:9px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;
+    background:var(--magenta);color:#fff;font-size:11px;display:none;place-items:center;font-weight:900}
   .genre.sel .tick{display:grid}
-
-  /* Equipos */
-  .teams{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .genre.local{border-color:rgba(166,255,61,.55)}
+  .genre.local.sel{border-color:var(--lime);background:rgba(166,255,61,.12)}
+  .genre.local .tick{background:var(--lime);color:var(--ink)}
+  .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ink);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-weight:900;font-size:14.5px;padding:9px 4px;border-radius:10px;cursor:pointer;white-space:nowrap}
+  .seg button:hover{color:var(--paper)}
+  .seg button[aria-pressed="true"]{background:var(--amber);color:var(--ink)}
+  .seg-modo button[aria-pressed="true"]{background:var(--cyan)}
+  .teams{display:flex;flex-direction:column;gap:7px;margin-bottom:10px}
   .prow{display:flex;gap:8px;align-items:center}
   .prow .dot{width:14px;height:14px;border-radius:50%;flex:none}
-  input[type=text],input[type=url]{flex:1;background:var(--ink);border:2px solid var(--line);color:var(--paper);
+  .prow input[type=text]{padding:10px 12px}
+  input[type=text],input[type=url],input[type=email]{flex:1;background:var(--ink);border:2px solid var(--line);color:var(--paper);
     border-radius:12px;padding:12px 14px;font-family:inherit;font-size:15px;min-width:0}
-  input:focus{outline:none;border-color:var(--magenta)}
+  input:focus,textarea:focus{outline:none;border-color:var(--magenta)}
   .x{background:transparent;border:none;color:var(--no);font-size:22px;cursor:pointer;padding:0 6px}
+  .tog{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:700;font-size:14.5px;cursor:pointer;margin-top:20px;user-select:none}
+  .tog small,.list-row small{display:block;color:var(--muted);font-weight:600;font-size:12.5px}
+  /* Interruptor: es un checkbox de verdad, con pinta de llave */
+  input.switch{appearance:none;-webkit-appearance:none;width:46px;height:27px;border-radius:999px;background:var(--line);position:relative;
+    flex:none;cursor:pointer;transition:background .15s;margin:0}
+  input.switch::after{content:"";position:absolute;width:21px;height:21px;border-radius:50%;background:var(--paper);top:3px;left:3px;transition:left .15s}
+  input.switch:checked{background:var(--lime)}
+  input.switch:checked::after{left:22px;background:var(--ink)}
+  input.switch:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .aviso{border:1.5px solid var(--no);border-radius:16px;padding:12px 14px;margin-top:18px;font-size:14px;line-height:1.45;background:rgba(255,77,94,.08)}
+  .dock{margin-top:22px;display:grid;gap:7px}
+  .dock-info{margin:0;text-align:center;color:var(--muted);font-size:13px;font-weight:700;min-height:1.2em}
+  @media (max-width:959px){ .armar-opc{margin-top:26px} }
+  @media (max-width:860px){
+    /* "¡A jugar!" fijo abajo: con 17 géneros y las opciones no entra todo en una pantalla */
+    #s-setup{padding-bottom:96px}
+    #s-setup .dock{position:fixed;left:0;right:0;bottom:0;z-index:25;margin:0;gap:5px;
+      padding:18px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background:linear-gradient(180deg,rgba(20,10,36,0),var(--bg) 30%)}
+    #s-setup .dock .btn.big{padding:15px 16px}
+  }
+  @media (min-width:960px){
+    .armar{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:30px;align-items:start}
+    .genres{grid-template-columns:repeat(3,1fr);gap:10px}
+    .genre{padding:13px 36px 13px 13px}
+    .genre .em{font-size:26px}
+    .genre .gn{font-size:15px}
+    .armar-opc{position:sticky;top:86px;background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);
+      border-radius:22px;padding:20px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+  }
 
-  /* Con amigos / Un jugador */
-  .modos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-  .modo{border:2px solid var(--line);background:rgba(255,255,255,.03);color:var(--paper);border-radius:14px;
-    padding:13px 10px;font:inherit;font-weight:800;font-size:16px;cursor:pointer;transition:.15s}
-  .modo[aria-pressed="true"]{border-color:var(--cyan);background:rgba(37,224,214,.12);
-    box-shadow:0 0 0 3px rgba(37,224,214,.15) inset}
+  /* Un jugador: cuánto vale acertar con 1 s, 2 s… */
+  .ladder{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+  .ladder div{border-radius:11px;background:var(--card);border:1.5px solid var(--line);text-align:center;padding:5px 0 4px;display:grid}
+  .ladder b{font-family:var(--f-display);font-size:19px;line-height:1.05}
+  .ladder span{font-size:11px;font-weight:800;color:var(--muted)}
+  .ladder .used{opacity:.4}
+  .ladder .used b{text-decoration:line-through}
+  .ladder .now{border-color:var(--amber);background:rgba(255,203,46,.16)}
+  .ladder .now b{color:var(--amber)}
 
-  /* Cuenta con Google y ranking (src/cuenta.js) */
-  .cuenta-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
-    border:1px dashed var(--line);border-radius:16px;padding:10px 12px;margin-bottom:18px;font-size:14px}
-  .cuenta-txt{color:var(--muted);flex:1 1 200px}
-  .btn.google{background:#fff;color:#1f1f1f;display:inline-flex;align-items:center;justify-content:center;gap:10px;
-    padding:10px 16px;font-size:15px;border-radius:12px}
-  .ranking-final{margin-bottom:14px}
-  .ranking-final .btn.google{width:100%;padding:14px 16px}
-  .linkish{background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:2px 4px}
-  .rk-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:16px}
-  .rk-tab{border:2px solid var(--line);background:rgba(255,255,255,.03);color:var(--paper);border-radius:12px;
-    padding:10px 4px;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
-  .rk-tab[aria-pressed="true"]{border-color:var(--cyan);background:rgba(37,224,214,.12)}
-  .rk-n{display:inline-block;min-width:1.6em;color:var(--muted)}
-  .rk-salto{text-align:center;color:var(--muted);line-height:1}
-  .rk-fecha{color:var(--muted);display:inline-block;min-width:4.2em}
-  .brow small{color:var(--muted);font-weight:400}
+  /* Cuadritos de Un jugador: 🟩 1 s, 🟨 2–3 s, 🟧 4–6 s, ⬛ no salió */
+  .sqs{display:flex;gap:3px;flex-wrap:wrap}
+  .sq{width:14px;height:14px;border-radius:3px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08)}
+  .sq.g{background:var(--sq-g)} .sq.y{background:var(--sq-y)} .sq.o{background:var(--sq-o)} .sq.k{background:var(--sq-k)}
+  .sq.cur{background:transparent;border:1.5px dashed var(--paper)}
+  .sqs.s{gap:2px}
+  .sqs.s .sq{width:10px;height:10px;border-radius:2px}
 
-  .toggle{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;cursor:pointer;user-select:none}
-  .toggle input{width:20px;height:20px;accent-color:var(--magenta)}
   select{background:var(--ink);border:2px solid var(--line);color:var(--paper);border-radius:10px;
     padding:9px 12px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
-  select:focus{outline:none;border-color:var(--magenta)}
 
-  /* GAME */
-  .turn{text-align:center;margin-bottom:14px}
-  .turn .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:2px}
-  .turn .who{font-size:clamp(26px,7vw,42px);font-weight:900;color:var(--lime);line-height:1.05}
+  /* ---------- PARTIDA ---------- */
+  .game-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .game-prog{flex:1;min-width:0}
+  .prog-t{font-weight:900;font-size:14px}
+  .prog{display:flex;gap:3px;margin-top:6px}
+  .prog:empty{display:none}
+  .prog span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+  .prog span.d{background:var(--magenta)}
+  .prog span.c{background:var(--paper)}
+  .prog.sqs{gap:3px}
+  .prog .sq{flex:none}
+  .solo-pts{text-align:right;line-height:1}
+  .solo-pts b{display:block;font-family:var(--f-display);font-size:28px;color:var(--amber)}
+  .solo-pts span{font-size:11px;color:var(--muted);font-weight:800}
+  /* Marcador: una ficha por equipo */
+  .score{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:12px}
+  .score:empty{display:none}
+  .chip{border-radius:14px;background:var(--card);border:1.5px solid var(--line);padding:7px 11px;display:flex;align-items:center;gap:9px;min-width:0}
+  .chip b{font-family:var(--f-display);font-size:24px;line-height:1;flex:none;font-variant-numeric:tabular-nums;min-width:.6em}
+  .chip span{font-size:13.5px;font-weight:800;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .chip.lead{border-color:var(--amber)}
+  .chip.lead b{color:var(--amber)}
+  .chip.cur{border-color:var(--lime);background:rgba(166,255,61,.12)}
+  .chip.cur span{color:var(--paper)}
 
-  .stage{position:relative;border-radius:20px;overflow:hidden;border:2px solid var(--line);
+  .turn{text-align:center;margin-bottom:12px}
+  .turn .who{font-family:var(--f-display);font-weight:800;font-size:clamp(27px,6.5vw,44px);color:var(--lime);line-height:1.05}
+  .turn-sub{color:var(--muted);font-size:14px;font-weight:700;margin-top:3px}
+
+  .stage{position:relative;border-radius:22px;overflow:hidden;border:2px solid var(--line);
     aspect-ratio:16/7;background:#000;margin-bottom:16px}
   .stage iframe,.stage #ytplayer{position:absolute;inset:0;width:100%;height:100%;border:0}
   .cover{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;
     background:radial-gradient(circle at 50% 40%, #3a1c66, #170b2c);z-index:3}
-  .cover .st{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase}
-  .cover .rev-t{font-size:clamp(22px,5vw,34px);font-weight:900;color:var(--amber);margin-top:4px;line-height:1.1}
-  .cover .rev-a{font-size:16px;color:var(--paper);opacity:.85}
+  .cover .st{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;font-weight:800}
+  .cover .rev-t{font-family:var(--f-display);font-size:clamp(24px,5vw,38px);font-weight:800;color:var(--amber);margin-top:4px;line-height:1.05}
+  .cover .rev-a{font-size:16px;color:var(--paper);opacity:.85;font-weight:700}
   /* Reveal: texto + imagen de la canción debajo */
   .cover .rev{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
     justify-content:center;gap:4px;width:100%;height:100%;min-height:0}
@@ -150,7 +368,7 @@
     filter:blur(26px) saturate(1.3);opacity:.4;transform:scale(1.15)}
   .cover .rev-bg::after{content:"";position:absolute;inset:0;background:rgba(12,6,24,.45)}
   /* equalizer */
-  .eq{display:flex;gap:6px;align-items:flex-end;height:64px;margin-bottom:10px}
+  .eq{display:flex;gap:6px;align-items:flex-end;justify-content:center;height:64px;margin-bottom:10px}
   .eq span{width:9px;background:linear-gradient(var(--cyan),var(--magenta));border-radius:6px;animation:bar 1s ease-in-out infinite}
   .eq span:nth-child(2){animation-delay:.15s}
   .eq span:nth-child(3){animation-delay:.3s}
@@ -161,13 +379,14 @@
   @keyframes bar{0%,100%{height:14px}50%{height:60px}}
   .eq.paused span{animation-play-state:paused;height:14px;opacity:.5}
 
-  .controls{display:grid;gap:10px}
+  /* minmax(0,…): un título largo en las sugerencias no ensancha la partida */
+  .controls{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
   .teamgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:6px}
   .teamgrid .btn{padding:16px 12px;font-size:17px}
   /* Modo solo: escribir el título. Las sugerencias van arriba del campo
      porque en el celular el teclado tapa lo que queda abajo. */
   .guess{display:flex;flex-direction:column;gap:6px}
-  .guess input[type=text]{flex:none;width:100%;font-size:17px;padding:14px}
+  .guess input[type=text]{flex:none;width:100%;font-size:17px;padding:14px;border-color:var(--cyan)}
   .sugs{display:flex;flex-direction:column;gap:5px}
   .sug{display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;text-align:left;
     background:var(--card2);border:2px solid var(--line);border-radius:12px;padding:10px 12px;
@@ -184,14 +403,216 @@
   .score-mark{display:none;gap:10px}
   .score-mark.on{display:grid;grid-template-columns:1fr 1fr}
 
-  /* Scoreboard */
+  /* Tablero en texto: el resultado si no se pudo dibujar la imagen */
   .board{display:flex;flex-direction:column;gap:6px}
   .brow{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.04);
     border-radius:12px;padding:10px 14px}
-  .brow.cur{outline:2px solid var(--lime)}
-  .brow .pts{font-weight:900;font-size:20px;color:var(--amber)}
+  .brow .pts{font-family:var(--f-display);font-weight:800;font-size:22px;color:var(--amber)}
 
-  /* Armar playlist */
+  /* ---------- Partida como app: pantalla completa, sin scroll ----------
+     La partida ocupa exactamente el alto visible (dvh descuenta la barra del
+     navegador del celular) y la tapa se estira o se achica con el lugar que
+     dejan el resto: con 4 equipos en un celular de 640px tienen que entrar el
+     marcador y todos los botones. */
+  body.playing{overflow:hidden}
+  body.playing .wrap.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:920px;
+    padding-top:max(12px, env(safe-area-inset-top));
+    padding-bottom:max(12px, env(safe-area-inset-bottom))}
+  /* Si con muchos equipos no entra ni con la tapa al mínimo, scrollea solo la partida */
+  #s-game.on{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  #s-game > *{flex:none}
+  #s-game .stage{flex:1 1 0;aspect-ratio:auto;min-height:130px;margin-bottom:12px}
+  #s-game .ladder{margin-bottom:10px}
+
+  /* Celular con poco alto a la vista: un iPhone SE en Safari deja ~548px con
+     las barras. Con 4 equipos la fila "1 segundo más / Sin cortar" quedaba
+     fuera de cuadro, y en Un jugador las 6 sugerencias empujaban el campo
+     para escribir por debajo del borde. La tapa cede lugar (mientras hay
+     sugerencias solo dice "¿Cuál es?", así que se oculta) y los botones se
+     aprietan un poco. */
+  @media (max-width:560px) and (max-height:740px){
+    #s-game .stage{min-height:80px;margin-bottom:10px}
+    #s-game:has(.sug) .stage,#s-game:has(.sug) .ladder{display:none}
+    body.playing .controls{gap:8px}
+    body.playing .teamgrid{gap:8px;margin-bottom:0}
+    body.playing .controls .btn{padding-top:10px;padding-bottom:10px}
+    .guess,.sugs{gap:4px}
+    .sug{padding-top:8px;padding-bottom:8px}
+    .turn .who{font-size:24px}
+  }
+
+  /* Pantallas medianas: los cuatro botones secundarios van de a dos */
+  @media (min-width:561px){
+    #controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+    #controls > *{grid-column:1/-1}
+    #controls > .row{grid-column:auto}
+  }
+
+  /* Compu ancha, con amigos: el marcador va en una columna al costado, con los
+     números grandes para leerlos desde el sillón, y la tapa y los botones
+     quedan en el medio. */
+  @media (min-width:1024px) and (min-height:560px){
+    body.playing .wrap.app:has(#s-game.grupo){max-width:1160px}
+    #s-game.grupo.on{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:28px;
+      grid-template-rows:auto auto minmax(0,1fr) auto auto;
+      grid-template-areas:"top top" "turn side" "stage side" "ladder side" "controls side"}
+    #s-game.grupo .game-top{grid-area:top}
+    #s-game.grupo .turn{grid-area:turn}
+    #s-game.grupo .stage{grid-area:stage;min-height:150px}
+    #s-game.grupo .ladder{grid-area:ladder}
+    #s-game.grupo .controls{grid-area:controls}
+    #s-game.grupo .score{grid-area:side;align-self:start;grid-template-columns:1fr;gap:8px;margin:0;
+      max-height:100%;overflow-y:auto}
+    #s-game.grupo .chip{padding:12px 16px;gap:14px;border-radius:16px}
+    #s-game.grupo .chip b{font-size:34px;order:2;margin-left:auto}
+    #s-game.grupo .chip span{font-size:16px}
+  }
+
+  /* Pantallas bajas (celular acostado): la tapa y el subtítulo ceden lugar a los botones */
+  @media (max-height:520px){
+    .turn-sub{display:none}
+    .turn .who{font-size:20px}
+    #s-game .stage{min-height:64px}
+    .game-top,.score,.turn{margin-bottom:6px}
+    body.playing .cover .eq{height:30px;margin-bottom:4px}
+    body.playing .controls{gap:8px}
+    body.playing .controls .btn{padding-top:10px;padding-bottom:10px}
+  }
+
+  /* ---------- RESULTADO ---------- */
+  .res-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 18px}
+  .res-grid{display:grid;gap:14px}
+  .res-img-col{text-align:center}
+  .res-acc{display:grid;gap:10px;align-content:start}
+  .medal{font-size:34px}
+  #winner:not(:empty){margin:4px 0 14px}
+  /* Tarjeta del resultado (la misma imagen que se comparte) */
+  .result-img{position:relative;display:block;width:100%;max-width:440px;margin:0 auto;padding:0;border:0;
+    background:none;cursor:pointer;border-radius:22px;font:inherit}
+  .result-img img{display:block;width:100%;height:auto;border-radius:22px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45);transition:transform .08s}
+  .result-img:active img{transform:scale(.98)}
+  .result-img .tapme{position:absolute;right:12px;top:12px;font-size:12px;font-weight:900;background:var(--cyan);
+    color:var(--ink);padding:4px 10px;border-radius:999px}
+  .ranking-final{border:1px solid var(--line);border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,var(--card),var(--card2))}
+  .ranking-final .btn.google{width:100%;padding:13px 16px}
+  .ranking-final .hint{margin:0}
+  .cafe-card{display:flex;align-items:center;gap:12px;border:1.5px solid var(--amber);border-radius:18px;padding:13px 14px;
+    background:rgba(255,203,46,.06);margin-top:6px}
+  .cafe-card p{margin:2px 0 0;color:var(--muted);font-size:13.5px;line-height:1.5}
+  .cafe-card p b{color:var(--paper)}
+  .cafe-card .btn{flex:none}
+  @media (max-width:420px){ .cafe-card{flex-direction:column;align-items:stretch;text-align:center} }
+  @media (min-width:900px){
+    .res-grid{grid-template-columns:minmax(0,460px) minmax(0,1fr);gap:36px;align-items:start}
+    .result-img{max-width:none}
+  }
+
+  /* ---------- RANKING ---------- */
+  .chips{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px}
+  .chips button{border:1.5px solid var(--line);background:none;color:var(--muted);border-radius:12px;padding:9px 0;
+    font:inherit;font-weight:900;font-size:15px;cursor:pointer}
+  .chips button:hover{color:var(--paper)}
+  .chips button[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:var(--ink)}
+  .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin:10px 0 14px}
+  .podium:empty{display:none}
+  .pod{display:grid;justify-items:center;gap:4px;text-align:center;min-width:0}
+  .pod .n{font-weight:900;font-size:13.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pod .p{font-size:12.5px;font-weight:800;color:var(--muted)}
+  .pod .blk{width:100%;border-radius:14px 14px 4px 4px;display:grid;place-items:center;font-family:var(--f-display);
+    font-weight:800;font-size:28px;color:var(--ink)}
+  .pod.p1 .blk{height:88px;background:var(--amber)}
+  .pod.p2 .blk{height:62px;background:#d9d2ea}
+  .pod.p3 .blk{height:46px;background:#e59a5b}
+  .pod.p1 .av{width:50px;height:50px;background:var(--amber);color:var(--ink)}
+  .pod.p2 .av{background:#7b68a6}
+  .pod.p3 .av{background:#a0613a}
+  .pod.mio .n{color:var(--lime)}
+  .rk{display:grid;gap:4px}
+  .rk-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 13px;
+    border-radius:12px;background:rgba(255,255,255,.035);font-weight:800;font-size:14.5px}
+  .rk-row .pos{color:var(--muted);font-variant-numeric:tabular-nums}
+  .rk-row .nom{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rk-row .pt{font-family:var(--f-display);font-size:19px;color:var(--amber);font-variant-numeric:tabular-nums}
+  .rk-row.mio{outline:2px solid var(--lime)}
+  .rk-row small{color:var(--muted);font-weight:700}
+  .rk-salto{text-align:center;color:var(--muted);line-height:1}
+  .rk-vacio{color:var(--muted);font-size:14.5px;margin:6px 0 0}
+  .rk-yo{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 15px;border-radius:16px;
+    background:var(--magenta);color:#fff;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .rk-yo .pos{font-family:var(--f-display);font-size:24px;line-height:1}
+  .rk-yo small{display:block;font-weight:700;font-size:12.5px;opacity:.92}
+  .rk-yo .pt{font-family:var(--f-display);font-size:26px;line-height:1}
+  .rk-yo.fuera{background:var(--card2);border:1.5px solid var(--line);grid-template-columns:minmax(0,1fr);text-align:center;font-weight:800}
+  .rk-yo.fuera .btn.google{width:100%;margin-top:8px}
+  .rk-nota{margin:0}
+  @media (max-width:959px){
+    /* Tu fila queda pegada abajo mientras se mira la lista */
+    .rk-side{display:contents}
+    #rk-yo{position:sticky;bottom:calc(var(--tabs-h) + env(safe-area-inset-bottom) + 10px);z-index:5;margin-top:14px}
+    #rk-yo:empty{display:none}
+    .rk-nota{margin-top:16px}
+    .rk-jugar{margin-top:14px}
+  }
+  @media (min-width:960px){
+    .rk-grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:start}
+    .rk-side{position:sticky;top:86px;display:grid;gap:14px}
+    .podium{max-width:620px;margin-inline:auto}
+    .pod .av{width:48px;height:48px;font-size:16px}
+    .pod.p1 .av{width:58px;height:58px}
+    .pod.p1 .blk{height:110px}
+    .pod.p2 .blk{height:78px}
+    .pod.p3 .blk{height:58px}
+  }
+
+  /* ---------- MI CUENTA ---------- */
+  .prof{display:flex;gap:14px;align-items:center;margin:0 0 18px}
+  .nm{font-family:var(--f-display);font-weight:800;font-size:28px;line-height:1.05;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .edit{font-family:var(--f-body);font-size:12.5px;border:1.5px solid var(--line);border-radius:8px;padding:3px 8px;
+    color:var(--cyan);font-weight:800;background:none;cursor:pointer}
+  .prof small{display:block;color:var(--muted);font-weight:700;font-size:12.5px;margin-top:3px}
+  .nm-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .nm-form input{flex:1 1 160px;font-size:16px;padding:9px 12px}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .tile{border-radius:14px;background:var(--card);border:1px solid var(--line);padding:10px 12px;display:grid;gap:2px;min-width:0}
+  .tile b{font-family:var(--f-display);font-size:27px;line-height:1;font-variant-numeric:tabular-nums}
+  .tile span{font-size:12px;font-weight:800;color:var(--muted)}
+  .rec{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .rec > div{border-radius:12px;border:1px solid var(--line);padding:8px 10px;display:grid;font-size:12px;font-weight:800;color:var(--muted)}
+  .rec b{font-family:var(--f-display);font-size:23px;color:var(--paper);line-height:1.1}
+  .rec .none b{color:var(--line)}
+  .rec .pos{color:var(--amber)}
+  .hist{display:grid;gap:4px}
+  .hist-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:center;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.035)}
+  .hist-row small{color:var(--muted);font-weight:700;font-size:12px}
+  .hist-row b{font-family:var(--f-display);font-size:21px;grid-row:span 2;color:var(--amber)}
+  .login-card{display:grid;gap:10px;justify-items:center;text-align:center;padding:22px 18px;border:1.5px solid var(--cyan);border-radius:22px;
+    background:linear-gradient(180deg,var(--card),var(--card2))}
+  .login-card .av{background:var(--card2);border-color:var(--line);font-size:24px;width:56px;height:56px}
+  .login-card h3{font-family:var(--f-display);font-size:24px;margin:0;line-height:1.1}
+  .login-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;max-width:42ch}
+  .login-card .btn.google{padding:12px 18px}
+  .cargando{color:var(--muted);font-size:14px;margin:4px 0 0}
+  /* Listas planas, separadas por líneas */
+  .list{display:grid;border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--card)}
+  .list-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:0;border-top:1px solid var(--line);
+    font-weight:800;font-size:14.5px;color:var(--paper);text-decoration:none;background:none;font-family:inherit;text-align:left;width:100%;cursor:pointer}
+  .list > :first-child,.list > :first-child > summary{border-top:0}
+  a.list-row:hover,button.list-row:hover,summary.list-row:hover{background:rgba(255,255,255,.04)}
+  .list .ch{color:var(--muted);font-weight:900;font-size:18px;transition:transform .15s}
+  .list .act{color:var(--cyan);font-weight:900;font-size:13.5px;white-space:nowrap;background:none;border:0;font-family:inherit;cursor:pointer;padding:4px 0}
+  .list-det{border-top:1px solid var(--line)}
+  .list-det > summary{list-style:none;border-top:0}
+  .list-det > summary::-webkit-details-marker{display:none}
+  .list-det[open] .ch{transform:rotate(90deg)}
+  .salir{background:none;border:0;color:var(--no);font:inherit;font-weight:800;font-size:14.5px;cursor:pointer;display:block;margin:20px auto 0;padding:8px}
+  @media (min-width:960px){
+    .cuenta-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:start}
+    .cuenta-col:last-child > .lbl:first-child{margin-top:0}
+  }
+  @media (max-width:959px){ .cuenta-col + .cuenta-col{margin-top:4px} }
+
+  /* ---------- MIS CANCIONES ---------- */
   .songlist{display:flex;flex-direction:column;gap:10px;max-height:64vh;overflow:auto;padding-right:4px}
   .gsec{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.02);flex:0 0 auto}
   .gsec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;
@@ -212,153 +633,40 @@
   .badge.empty{background:rgba(255,77,94,.18);color:var(--no)}
   .song .link-row{display:flex;gap:8px;margin-top:10px}
   .mini{padding:9px 12px;font-size:13px;border-radius:11px}
+  @media (min-width:960px){
+    .canciones{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:24px;align-items:start}
+    .canciones > .card:first-child{position:sticky;top:86px}
+    #s-armar > .btn.big{max-width:420px;margin:0 auto;display:block}
+  }
 
-  .pill{display:inline-block;background:rgba(255,255,255,.08);border-radius:20px;padding:6px 12px;font-size:13px;color:var(--muted)}
   .center{text-align:center}
   .big-num{font-size:64px;font-weight:900;line-height:1}
-  .medal{font-size:34px}
-  /* Tarjeta del resultado en la pantalla final (la misma imagen que se comparte) */
-  .result-img{display:block;width:100%;max-width:400px;margin:12px auto 0;padding:0;border:0;
-    background:none;cursor:pointer;border-radius:22px;font:inherit}
-  .result-img img{display:block;width:100%;height:auto;border-radius:22px;
-    box-shadow:0 10px 30px rgba(0,0,0,.45);transition:transform .08s}
-  .result-img:active img{transform:scale(.98)}
   /* .board y .result-img declaran display: sin esto, el atributo hidden no las oculta */
   [hidden]{display:none!important}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6}
 
   /* Comentarios (llegan por Netlify Forms) */
-  .feedback{margin-top:26px;background:linear-gradient(180deg,var(--card),var(--card2));
-    border:1px solid var(--line);border-radius:18px;padding:18px 16px}
-  .feedback-title{font-size:17px;font-weight:900;color:var(--cyan);margin:0 0 6px}
-  .feedback-txt{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 14px}
+  .feedback{padding:4px 14px 16px}
   .feedback textarea{width:100%;background:var(--ink);border:2px solid var(--line);color:var(--paper);
     border-radius:12px;padding:12px;font:inherit;font-size:15px;resize:vertical;min-height:96px}
-  .feedback textarea:focus{outline:none;border-color:var(--magenta)}
   .feedback-row{display:flex;gap:10px;margin:10px 0 12px;flex-wrap:wrap}
-  .feedback-row input{flex:1 1 190px;min-width:0;background:var(--ink);border:2px solid var(--line);
-    color:var(--paper);border-radius:12px;padding:12px;font:inherit;font-size:15px}
-  .feedback-row input:focus{outline:none;border-color:var(--magenta)}
+  .feedback-row input{flex:1 1 190px;min-width:0;padding:12px}
+  .feedback .btn{width:100%}
   .feedback-state{margin:12px 0 0;font-size:14px;line-height:1.55;color:var(--muted);min-height:1px}
+  .feedback-state:empty{display:none}
   .feedback-state.ok{color:var(--lime);font-weight:800}
   .feedback-state.err{color:var(--no)}
   .feedback-state a{color:var(--cyan)}
   .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
-  /* Mientras se juega: el logo y la pastilla se mantienen, pero los comentarios
-     y el pie quedarían pegados abajo del tablero en plena partida, y la
-     bajada ("el juego para cantar con amigos…") se lleva 63px que en un celular
-     de 640px de alto dejaban los botones de escuchar de nuevo fuera de cuadro. */
-  body.playing .sub,body.playing .feedback,body.playing .footer-note{display:none}
 
-  /* ---------- Partida como app: pantalla completa, sin scroll ----------
-     Antes la pantalla de juego era una página más: en un celular de 640px con 4
-     equipos el tablero quedaba entero fuera de cuadro, y en una compu de 720px
-     no se veía nunca sin scrollear. Ahora la partida ocupa exactamente el alto
-     visible (dvh descuenta la barra del navegador del celular) y la tapa se
-     estira o se achica con el lugar que dejan el resto. En la compu se mantiene
-     el armado de siempre: logo arriba y tablero abajo. En el celular el logo se
-     oculta y el tablero sube como fichas (ver más abajo). */
-  body.playing{overflow:hidden}
-  body.playing .tagline{margin-bottom:18px}
-  body.playing .wrap{display:flex;flex-direction:column;height:100vh;height:100dvh;
-    padding-top:max(12px, env(safe-area-inset-top));
-    padding-bottom:max(12px, env(safe-area-inset-bottom));
-    padding-left:max(16px, env(safe-area-inset-left));
-    padding-right:max(16px, env(safe-area-inset-right))}
-  /* Si con muchos equipos no entra ni con la tapa al mínimo, scrollea solo la partida */
-  #s-game.on{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-  .game-top{flex:none;margin-bottom:10px}
-  body.playing .turn{flex:none;margin-bottom:10px}
-  body.playing .stage{flex:1 1 0;aspect-ratio:auto;min-height:130px;margin-bottom:12px}
-  body.playing .controls{flex:none}
-
-  /* Tablero en la compu: abajo, como siempre, con los equipos lado a lado. Con 2
-     equipos es una sola fila y no le roba alto a la tapa; con más se reparten en
-     filas. Los nombres largos se recortan con "…", el puntaje se ve siempre. */
-  #s-game .board-card{flex:none;margin:12px 0 0;padding:12px 16px}
-  #s-game .board-card > h3{margin-bottom:8px}
-  .scorebar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
-  .scorebar .brow{min-width:0;gap:10px}
-  .scorebar .brow > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .scorebar .brow .pts{flex:none}
-
-  /* Tablero en el celular: sin logo, y el tablero sube arriba de todo como fichas
-     compactas, de a dos por fila (con 4 equipos en una tira horizontal el último
-     quedaba oculto, y con fichas más angostas los nombres quedaban en "Equi…").
-     Los botones quedan abajo, a mano del pulgar. */
-  @media (max-width:560px){
-    body.playing .brand,body.playing .tagline{display:none}
-    #s-game .game-top{order:-2}
-    #s-game .board-card{order:-1;margin:0 0 12px;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
-    #s-game .board-card > h3{display:none}
-    .scorebar{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
-    .scorebar .brow{gap:6px;padding:7px 10px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
-    .scorebar .brow > span:first-child{font-weight:800;font-size:14px}
-    .scorebar .brow .pts{font-size:18px;line-height:1}
-    .scorebar .brow.cur{outline:none;border-color:var(--lime);background:rgba(166,255,61,.12)}
-  }
-
-  /* Celular con poco alto a la vista: un iPhone SE en Safari deja ~548px con
-     las barras. Con 4 equipos la fila "1 segundo más / Sin cortar" quedaba
-     fuera de cuadro, y en Un jugador las 6 sugerencias empujaban el campo
-     para escribir por debajo del borde. La tapa cede lugar (mientras hay
-     sugerencias solo dice "¿Cuál es?", así que se oculta) y los botones se
-     aprietan un poco. */
-  @media (max-width:560px) and (max-height:740px){
-    body.playing .stage{min-height:80px;margin-bottom:10px}
-    #s-game:has(.sug) .stage{display:none}
-    body.playing .controls{gap:8px}
-    body.playing .teamgrid{gap:8px;margin-bottom:0}
-    body.playing .controls .btn{padding-top:10px;padding-bottom:10px}
-    .guess,.sugs{gap:4px}
-    .sug{padding-top:8px;padding-bottom:8px}
-  }
-
-  /* Compu: con el logo arriba y el tablero abajo, en una laptop de 650px de alto
-     sobraban hasta 89px al elegir quién arriesga. Se gana lugar sin sacar nada:
-     "Canción 1/10" y "Terminar" van a los costados del título en vez de tener
-     su propia fila, los cuatro botones secundarios van en una sola fila y el
-     logo pega un poco más a la partida. */
-  @media (min-width:561px){
-    body.playing .brand{margin:0 0 10px}
-    body.playing .tagline{margin-bottom:12px}
-    #s-game.on{position:relative}
-    #s-game .game-top{position:absolute;top:0;left:0;right:0;margin:0;align-items:flex-start;pointer-events:none}
-    #s-game .game-top > *{pointer-events:auto}
-    body.playing .turn .who{padding:0 150px}
-    body.playing .stage{min-height:110px}
-    #controls{grid-template-columns:1fr 1fr}
-    #controls > *{grid-column:1/-1}
-    #controls > .row{grid-column:auto}
-  }
-
-  /* Pantallas bajas (celular acostado): el logo, la tapa y el subtítulo ceden lugar a los botones */
-  @media (max-height:520px){
-    body.playing .brand,body.playing .tagline{display:none}
-    body.playing .turn .lbl{display:none}
-    body.playing .turn .who{font-size:20px}
-    body.playing .stage{min-height:64px}
-    body.playing .game-top,body.playing .scorebar,body.playing .turn{margin-bottom:6px}
-    body.playing .cover .eq{height:30px;margin-bottom:4px}
-    body.playing .controls{gap:8px}
-    body.playing .controls .btn{padding-top:10px;padding-bottom:10px}
-  }
-
-  /* Cómo se juega / preguntas frecuentes (página aparte, para buscadores y para el que llega nuevo) */
+  /* Cómo se juega / Privacidad (páginas aparte, para buscadores y para el que llega nuevo) */
   .info{margin-top:26px;margin-bottom:18px}
-  /* Bancá el proyecto (Cafecito, al fondo del inicio) */
-  .support{border:2px solid var(--amber);text-align:center}
-  .support-txt{color:var(--muted);font-size:14.5px;line-height:1.65;margin:0 auto 10px;max-width:560px}
-  .support-txt b,.support-after b{color:var(--paper)}
-  .support .btn{margin-top:14px}
-  .support-after{color:var(--muted);font-size:13px;margin:10px 0 0;line-height:1.5}
-  /* En la página de Cómo se juega: el título de la página y el de las preguntas */
-  .info h1{font-size:24px;margin:0 0 14px;text-align:center}
-  .info h2{font-size:20px;justify-content:center;margin:22px 0 6px}
+  .info h1{font-family:var(--f-display);font-size:28px;margin:0 0 14px;text-align:center}
+  .info h2{font-family:var(--f-display);font-size:22px;justify-content:center;margin:22px 0 6px}
   /* Ahí el logo es un link que vuelve al juego */
   a.brand{color:inherit;text-decoration:none}
-  .info p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 12px}
-  .info ol,.info ul{color:var(--muted);font-size:14.5px;line-height:1.8;padding-left:20px;margin:0 0 8px}
+  .info p{color:var(--muted);font-size:15px;line-height:1.7;margin:0 0 12px}
+  .info ol,.info ul{color:var(--muted);font-size:15px;line-height:1.8;padding-left:20px;margin:0 0 8px}
   .info li b,.info p b{color:var(--paper)}
   .info p a,.info li a{color:var(--cyan)}
   .faq{border-top:1px solid var(--line);padding:12px 0 0;margin-top:8px}
@@ -374,7 +682,9 @@
   @keyframes fl{0%{opacity:.85}100%{opacity:0}}
 
   /* ---------- Responsive / celular ---------- */
-  html,body{overflow-x:hidden;max-width:100%}
+  /* clip y no hidden: hidden convierte al body en el que scrollea, y entonces
+     el celular no esconde la barra del navegador al bajar */
+  html,body{overflow-x:clip;max-width:100%}
   @media (max-width:560px){
     .wrap{padding:14px 12px 60px}
     .brand{gap:10px;margin:6px 0 14px}
@@ -382,36 +692,39 @@
     .card{padding:14px;border-radius:16px;margin-bottom:14px}
     .card>h3{font-size:13px}
     h2{font-size:19px}
+    .hdr-t{font-size:25px}
     .hint{font-size:13px}
     .btn{padding:13px 15px;font-size:15px}
     .btn.big{padding:15px 16px;font-size:17px}
-    .genres{grid-template-columns:1fr 1fr;gap:10px}
-    .genre{padding:13px}
-    .genre .em{font-size:22px}
-    .genre .gn{font-size:15px}
-    .genre .gc{font-size:12px}
+    .mode{min-height:170px;padding:14px}
+    .mode-t{font-size:22px}
+    .mode-d{font-size:13px}
     .teamgrid{grid-template-columns:1fr 1fr}
     .teamgrid .btn{font-size:16px;padding:15px 8px}
     .solo-acc .btn{font-size:14px;padding:13px 8px}
     /* con equipos impares, el último va centrado y no pegado a la izquierda */
     .teamgrid .btn:last-child:nth-child(odd){grid-column:1/-1;justify-self:center;width:calc(50% - 5px)}
     .stage{aspect-ratio:16/9}
-    .turn .who{font-size:23px;line-height:1.1}
-    .turn .lbl{font-size:12px}
-    .rev-t{font-size:22px}
+    .turn .who{font-size:25px;line-height:1.1}
+    .turn-sub{font-size:13px}
     .cover{padding:10px}
     .cover .st{font-size:13px;letter-spacing:2px}
+    .cover .rev-t{font-size:23px}
     .cover .rev-a{font-size:14px}
+    .score{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+    .chip{padding:6px 10px}
+    .chip b{font-size:21px}
     .brow{padding:10px 12px}
-    .brow .pts{font-size:18px}
     .song .link-row{flex-wrap:wrap}
     .song .link-row input{flex-basis:100%;order:3}
-    .prow input{font-size:16px}       /* evita zoom en iOS al enfocar */
-    .feedback{padding:14px;border-radius:16px}
+    .prow input,.nm-form input{font-size:16px}       /* evita zoom en iOS al enfocar */
     .feedback textarea,.feedback-row input{font-size:16px}
     .footer-note{font-size:11px}
   }
   @media (max-width:360px){
     .genres{grid-template-columns:1fr}
+    .modes{grid-template-columns:1fr}
+    .mode{min-height:0}
     .score-mark.on{grid-template-columns:1fr}
+    .rec{grid-template-columns:1fr 1fr}
   }

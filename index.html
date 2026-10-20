@@ -61,163 +61,282 @@
   </script>
 </head>
 <body>
-  <div class="wrap">
+  <!-- Arriba: el logo y, en la compu, las tres secciones al lado. En el
+       celular las secciones bajan a una barra fija abajo (lo hace el CSS) y
+       durante la partida no se ve nada de esto. -->
+  <header class="topnav">
+    <div class="topnav-in">
+      <h1 class="brand">
+        <a href="./" onclick="irA('jugar');return false" aria-label="En una nota · Ensalada mixta, ir al inicio">
+          <span class="note">🎵</span>
+          <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
+        </a>
+      </h1>
+      <span class="tagline">🥗 ensalada mixta</span>
+      <nav class="tabs" aria-label="Secciones">
+        <button type="button" class="tab" data-tab="jugar" onclick="irA('jugar')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+          <span>Jugar</span>
+        </button>
+        <button type="button" class="tab" data-tab="ranking" id="tab-ranking" onclick="irA('ranking')" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+          <span>Ranking</span>
+        </button>
+        <button type="button" class="tab" data-tab="cuenta" onclick="irA('cuenta')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span>Mi cuenta</span>
+        </button>
+      </nav>
+      <!-- Avatar o "Entrar" (lo arma src/cuenta.js) -->
+      <div id="nav-cuenta" class="nav-cuenta"></div>
+    </div>
+  </header>
 
-    <h1 class="brand">
-      <span class="note">🎵</span>
-      <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
-    </h1>
-    <div class="tagline">🥗 ensalada mixta</div>
-    <div class="sub">El juego para cantar con amigos · edición casera</div>
+  <main class="wrap app">
 
-    <!-- ===================== SETUP ===================== -->
-    <section id="s-setup" class="screen on">
-
-      <!-- Cuenta con Google (opcional): la arma src/cuenta.js -->
-      <div id="cuenta-bar" class="cuenta-bar" hidden></div>
-
-      <div class="card">
-        <h3>1 · Elegí los géneros</h3>
-        <div id="genres" class="genres"></div>
-        <p class="hint" style="margin-top:14px">Se mezclan todas las canciones de los géneros elegidos.</p>
-      </div>
-
-      <div class="card">
-        <h3>2 · ¿Quiénes juegan?</h3>
-        <div class="modos" role="group" aria-label="Modo de juego">
-          <button type="button" class="modo" id="modo-grupo" onclick="setModo('grupo')">👥 Con amigos</button>
-          <button type="button" class="modo" id="modo-solo" onclick="setModo('solo')">🎧 Un jugador</button>
+    <!-- ===================== INICIO ===================== -->
+    <!-- Una pregunta y un atajo: cómo juegan hoy y repetir la última. -->
+    <section id="s-inicio" class="screen on">
+      <div class="inicio">
+        <div class="inicio-main">
+          <p class="hola"><small id="hola">El juego para cantar con amigos</small>¿Cómo juegan hoy?</p>
+          <div class="modes">
+            <button type="button" class="mode mode-grupo" onclick="elegirModo('grupo')">
+              <span class="mode-ic" aria-hidden="true">👥</span>
+              <span class="mode-t">Con amigos</span>
+              <span class="mode-d">Por equipos. Se corta, gritan ¡YO! y siguen la que sigue.</span>
+              <span class="mode-go">Armar partida →</span>
+            </button>
+            <button type="button" class="mode mode-solo" onclick="elegirModo('solo')">
+              <span class="mode-ic" aria-hidden="true">🎧</span>
+              <span class="mode-t">Un jugador</span>
+              <span class="mode-d">Escribís el título. Cuanto antes la sacás, más puntos.</span>
+              <span class="mode-go">Elegir géneros →</span>
+            </button>
+          </div>
+          <!-- En la compu sobra ancho: las reglas en tres pasos, para el que llega nuevo -->
+          <ol class="pasos" aria-label="Cómo se juega">
+            <li><b>1 · Suena</b>Un segundo de una canción tapada, y se corta.</li>
+            <li><b>2 · ¡YO!</b>El primero que grita sigue cantando la parte que sigue.</li>
+            <li><b>3 · Se revela</b>Aparece la canción y el grupo decide si la pegó.</li>
+          </ol>
         </div>
-        <div id="teams-box">
-          <div id="teams" class="teams"></div>
-          <div class="row">
-            <button class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
+        <div class="inicio-side">
+          <div id="repetir"></div>
+          <div id="record-card"></div>
+          <div class="accesos">
+            <a class="acceso" href="como-se-juega/"><span aria-hidden="true">🎤</span>Cómo se juega</a>
+            <button type="button" class="acceso" onclick="show('s-armar')"><span aria-hidden="true">📂</span>Mis canciones</button>
+            <button type="button" class="acceso" onclick="shareGame()"><span aria-hidden="true">📲</span>Compartir</button>
           </div>
         </div>
-        <!-- Con un jugador no hay grupo que juzgue: se escribe el título y el juego lo comprueba -->
-        <p class="hint" id="solo-box" style="margin:0" hidden>Suena 1 segundo y escribís el título. Si la sacás con
-          <b>1 segundo, 10 puntos</b>. Si no, se repite desde el mismo punto pero más largo (2 segundos, 3…
-          hasta 6) y vale menos, hasta 1 punto. Errar también suma un segundo.</p>
       </div>
+      <p class="cafe-linea">Gratis y sin anuncios ·
+        <a href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank" data-cafecito="inicio">Invitame un cafecito ☕</a></p>
+    </section>
 
-      <div class="card">
-        <h3>3 · Opciones</h3>
-        <label class="toggle" style="justify-content:space-between">
-          <span>🎵 Canciones por partida</span>
-          <select id="opt-maxsongs">
-            <option value="5">5</option>
-            <option value="10" selected>10</option>
-            <option value="15">15</option>
-            <option value="20">20</option>
-            <option value="30">30</option>
-            <option value="0">Sin límite</option>
-          </select>
-        </label>
-        <div id="opt-penalty-box">
-          <div style="height:12px"></div>
-          <label class="toggle" style="justify-content:space-between">
-            <span>➖ Restar un punto si el que arriesga erra</span>
-            <input type="checkbox" id="opt-penalty">
+    <!-- ===================== ARMAR PARTIDA ===================== -->
+    <section id="s-setup" class="screen">
+      <div class="hdr">
+        <button type="button" class="back" onclick="irA('jugar')" aria-label="Volver al inicio">‹</button>
+        <h2 class="hdr-t"><small>Armar partida</small><span id="setup-titulo">Con amigos</span></h2>
+      </div>
+      <div class="armar">
+        <div class="armar-gen">
+          <div class="lbl"><span>Géneros <span class="lbl-info" id="gen-info"></span></span>
+            <button type="button" class="lbl-acc" id="gen-todos" onclick="toggleTodos()">Elegir todos</button></div>
+          <div id="genres" class="genres"></div>
+          <p class="hint" style="margin:10px 0 0">Se mezclan todas las canciones de los géneros elegidos.</p>
+        </div>
+
+        <div class="armar-opc">
+          <div class="lbl">Modo</div>
+          <div class="seg seg-modo" role="group" aria-label="Modo de juego">
+            <button type="button" id="modo-grupo" onclick="setModo('grupo')">👥 Con amigos</button>
+            <button type="button" id="modo-solo" onclick="setModo('solo')">🎧 Un jugador</button>
+          </div>
+
+          <div id="teams-box">
+            <div class="lbl">Equipos</div>
+            <div id="teams" class="teams"></div>
+            <button type="button" class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
+          </div>
+          <!-- Con un jugador no hay grupo que juzgue: se escribe el título y el juego lo comprueba -->
+          <div id="solo-box" hidden>
+            <div class="lbl">Cuánto vale <span class="lbl-info">según los segundos que hagan falta</span></div>
+            <div class="ladder" aria-hidden="true">
+              <div><b>10</b><span>1 s</span></div><div><b>7</b><span>2 s</span></div><div><b>5</b><span>3 s</span></div>
+              <div><b>3</b><span>4 s</span></div><div><b>2</b><span>5 s</span></div><div><b>1</b><span>6 s</span></div>
+            </div>
+            <p class="hint" style="margin:8px 0 0">Suena 1 segundo y escribís el título. Si no sale, se repite desde
+              el mismo punto un segundo más largo, hasta 6. Errar también suma un segundo.</p>
+          </div>
+
+          <div class="lbl">Canciones por partida</div>
+          <div class="seg" id="opt-maxsongs" role="group" aria-label="Canciones por partida"></div>
+
+          <label class="tog" id="opt-penalty-box">
+            <span>Restar un punto si el que arriesga erra<small>Nunca baja de cero</small></span>
+            <input type="checkbox" class="switch" id="opt-penalty" onchange="setPenalty(this.checked)">
           </label>
-          <p class="hint" style="margin-top:6px">Nunca baja de cero.</p>
+
+          <div id="pool-warn"></div>
+          <div class="dock">
+            <button type="button" class="btn mag big" onclick="startGame()">▶ ¡A jugar!</button>
+            <p class="dock-info" id="pool-info" role="status"></p>
+          </div>
         </div>
-        <div style="height:12px"></div>
-        <button class="btn ghost mini" onclick="resetHistory()">🔄 Reiniciar historial de canciones ya escuchadas</button>
-        <p class="hint" style="margin-top:8px">Las canciones que ya sonaron en partidas anteriores no se repiten hasta agotar la playlist elegida. Usá esto si querés que puedan volver a salir antes.</p>
       </div>
-
-      <div id="pool-warn"></div>
-
-      <button class="btn mag big" onclick="startGame()">▶ ¡A jugar!</button>
-      <div style="height:12px"></div>
-      <button class="btn ghost big" onclick="show('s-armar')">🔗 Armar / vincular canciones</button>
-
-      <div style="height:12px"></div>
-      <!-- Las reglas y las preguntas frecuentes tienen su propia página -->
-      <a class="btn ghost big" href="como-se-juega/">🎤 Cómo se juega</a>
-      <div style="height:12px"></div>
-      <button class="btn ghost big" id="ranking-btn" onclick="verRanking(document.getElementById('opt-maxsongs').value)" hidden>🏆 Ranking</button>
-
-    <div class="info">
-      <button class="btn cyan big" onclick="shareGame()">📲 Compartir con tus amigos</button>
-    </div>
-
-    <!-- ===================== CAFECITO ===================== -->
-    <!-- Tarjeta propia al fondo del inicio, aparte de Cómo se juega: a mano para
-         el que ya vuelve a jugar, sin competirle a "¡A jugar!". -->
-    <section class="card support">
-      <h3>☕ Bancá el proyecto</h3>
-      <p class="support-txt"><b>En una nota</b> es gratis, sin anuncios y no hace falta registrarse, y lo hago solo en mis
-        ratos libres. El dominio, el hosting y el tiempo de armar cada playlist nueva salen de mi bolsillo.</p>
-      <p class="support-txt">Si el juego les alegró alguna juntada, <b>un cafecito ayuda a mantenerlo vivo</b>
-        y a seguir sumando canciones 💛</p>
-      <a class="btn amber" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
-         data-cafecito="inicio">☕ Invitame un cafecito</a>
-      <p class="support-after">¿No podés colaborar? <b>Compartilo</b> con tus amigos, que también suma un montón 🙌</p>
-    </section>
     </section>
 
-    <!-- ===================== ARMAR PLAYLIST ===================== -->
+    <!-- ===================== MIS CANCIONES ===================== -->
     <section id="s-armar" class="screen">
-      <div class="row spread" style="margin-bottom:14px">
-        <h2>🔗 Armar playlist</h2>
-        <button class="btn ghost mini" onclick="show('s-setup')">← Volver</button>
+      <div class="hdr">
+        <button type="button" class="back" onclick="volver()" aria-label="Volver">‹</button>
+        <h2 class="hdr-t"><small>Mi cuenta</small>Mis canciones</h2>
       </div>
-      <div class="card" style="border-color:var(--lime)">
-        <h3 style="color:var(--lime)">🎵 Tus archivos de audio (recomendado)</h3>
-        <p class="hint" style="margin:0 0 12px">La forma más segura de que <b>siempre suene</b>: cargá canciones desde tu compu (MP3, M4A, etc.). Se reproducen sin internet y quedan guardadas para la próxima. Van a la playlist <b>“Mis canciones”</b>.</p>
-        <input type="file" id="audiofiles" accept="audio/*" multiple style="display:none" onchange="onAudioFiles(this)">
-        <button class="btn lime big" onclick="document.getElementById('audiofiles').click()">📂 Cargar canciones de mi compu</button>
-        <div id="local-list" style="margin-top:12px"></div>
-      </div>
-
-      <p class="hint">— o — usá <b>YouTube</b>: pegá el link de cada canción (tocá <b>Buscar</b>, copiá el link y pegalo). Ojo: si abrís el archivo con doble clic, YouTube suele bloquear la reproducción; por eso conviene usar tus audios.</p>
-
-      <div class="card">
-        <div class="row spread" style="margin-bottom:10px">
-          <span class="pill" id="link-count">0 vinculadas</span>
-          <button class="btn ghost mini" onclick="addCustomSong()">＋ Canción propia (YouTube)</button>
+      <div class="canciones">
+        <div class="card" style="border-color:var(--lime)">
+          <h3 style="color:var(--lime)">🎵 Tus archivos de audio (recomendado)</h3>
+          <p class="hint" style="margin:0 0 12px">La forma más segura de que <b>siempre suene</b>: cargá canciones desde tu compu (MP3, M4A, etc.). Se reproducen sin internet y quedan guardadas para la próxima. Van a la playlist <b>“Mis canciones”</b>.</p>
+          <input type="file" id="audiofiles" accept="audio/*" multiple style="display:none" onchange="onAudioFiles(this)">
+          <button type="button" class="btn lime big" onclick="document.getElementById('audiofiles').click()">📂 Cargar canciones de mi compu</button>
+          <div id="local-list" style="margin-top:12px"></div>
         </div>
-        <div id="songlist" class="songlist"></div>
+
+        <div>
+          <p class="hint">— o — usá <b>YouTube</b>: pegá el link de cada canción (tocá <b>Buscar</b>, copiá el link y pegalo). Ojo: si abrís el archivo con doble clic, YouTube suele bloquear la reproducción; por eso conviene usar tus audios.</p>
+          <div class="card">
+            <div class="row spread" style="margin-bottom:10px">
+              <span class="pill" id="link-count">0 vinculadas</span>
+              <button type="button" class="btn ghost mini" onclick="addCustomSong()">＋ Canción propia (YouTube)</button>
+            </div>
+            <div id="songlist" class="songlist"></div>
+          </div>
+        </div>
       </div>
-      <button class="btn mag big" onclick="show('s-setup')">Listo</button>
+      <button type="button" class="btn mag big" onclick="volver()">Listo</button>
     </section>
 
     <!-- ===================== RANKING ===================== -->
     <!-- Modo un jugador: una tabla por cantidad de canciones (src/cuenta.js) -->
     <section id="s-ranking" class="screen">
-      <div class="row spread" style="margin-bottom:14px">
-        <h2>🏆 Ranking</h2>
-        <button class="btn ghost mini" onclick="show('s-setup')">← Volver</button>
+      <div class="hdr">
+        <h2 class="hdr-t"><small>Un jugador · el mejor puntaje de cada cuenta</small><span id="rk-titulo">Ranking</span></h2>
       </div>
       <p class="hint" id="rk-aviso" role="status" style="color:var(--lime)"></p>
-      <div class="rk-tabs" id="rk-tabs" role="group" aria-label="Canciones por partida"></div>
-      <div class="card">
-        <h3 id="rk-titulo">🎧 Un jugador</h3>
-        <p class="hint">El mejor puntaje de cada cuenta. A igual puntaje, queda arriba el que lo hizo primero.</p>
-        <div id="rk-lista" class="board"></div>
+      <div class="rk-grid">
+        <div class="rk-main">
+          <div class="chips" id="rk-tabs" role="group" aria-label="Canciones por partida"></div>
+          <div id="rk-podio" class="podium"></div>
+          <div id="rk-lista" class="rk"></div>
+        </div>
+        <div class="rk-side">
+          <!-- Tu fila: fija abajo en el celular, aunque estés lejos del podio -->
+          <div id="rk-yo"></div>
+          <p class="hint rk-nota">A igual puntaje queda arriba el que lo hizo primero. En el ranking se ve solo un nombre corto.</p>
+          <button type="button" class="btn ghost big rk-jugar" onclick="elegirModo('solo')">🎧 Jugar un jugador</button>
+        </div>
       </div>
-      <div class="card">
-        <h3>Tus partidas</h3>
-        <div id="rk-mias" class="board"></div>
+    </section>
+
+    <!-- ===================== MI CUENTA ===================== -->
+    <section id="s-cuenta" class="screen">
+      <div class="cuenta-grid">
+        <div class="cuenta-col">
+          <!-- Perfil, estadísticas, récords y últimas partidas (src/cuenta.js) -->
+          <div id="cuenta-perfil"></div>
+          <!-- Lo de este navegador, cuando no hay sesión (src/main.js) -->
+          <div id="cuenta-local"></div>
+        </div>
+        <div class="cuenta-col">
+          <div class="lbl">Mis canciones</div>
+          <div class="list" id="cuenta-canciones"></div>
+
+          <div class="lbl">Preferencias</div>
+          <div class="list">
+            <label class="list-row" for="pref-penalty">
+              <span>Restar un punto si erra<small>Con amigos · nunca baja de cero</small></span>
+              <input type="checkbox" class="switch" id="pref-penalty" onchange="setPenalty(this.checked)">
+            </label>
+            <div class="list-row">
+              <span>Canciones ya escuchadas<small id="pref-hist"></small></span>
+              <button type="button" class="act" onclick="resetHistory()">Reiniciar</button>
+            </div>
+          </div>
+
+          <div class="lbl">Ayuda</div>
+          <div class="list">
+            <a class="list-row" href="como-se-juega/"><span>Cómo se juega<small>Reglas y preguntas frecuentes</small></span><span class="ch" aria-hidden="true">›</span></a>
+            <!-- ===================== COMENTARIOS =====================
+                 Netlify Forms: el markup viaja en el HTML del deploy y Netlify se
+                 encarga de recibirlo. Se manda por fetch para no salir de la página;
+                 si falla (por ejemplo sirviendo local con npm run dev) se ofrece
+                 mandarlo por mail. -->
+            <details class="list-det" id="comentarios">
+              <summary class="list-row"><span>Dejame un comentario<small>¿Falta una canción? ¿Se rompió algo? Lo leo yo.</small></span><span class="ch" aria-hidden="true">›</span></summary>
+              <div class="feedback">
+                <form name="comentarios" method="POST" data-netlify="true" netlify-honeypot="bot-field"
+                      onsubmit="sendFeedback(event)">
+                  <input type="hidden" name="form-name" value="comentarios" />
+                  <p class="hp"><label>No completar: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
+                  <textarea name="mensaje" id="fb-msg" rows="4" maxlength="2000" required
+                            placeholder="Tu comentario, idea o la canción que falta…"></textarea>
+                  <div class="feedback-row">
+                    <input type="text" name="nombre" id="fb-nombre" maxlength="60" placeholder="Tu nombre (opcional)" />
+                    <input type="email" name="email" id="fb-email" maxlength="120" placeholder="Tu mail (si querés respuesta)" />
+                  </div>
+                  <button class="btn cyan" type="submit" id="fb-send">📩 Enviar comentario</button>
+                </form>
+                <p class="feedback-state" id="fb-state" role="status"></p>
+              </div>
+            </details>
+            <a class="list-row" href="privacidad/"><span>Privacidad<small>Qué se guarda y dónde</small></span><span class="ch" aria-hidden="true">›</span></a>
+          </div>
+
+          <!-- ===================== CAFECITO ===================== -->
+          <div class="cafe-card">
+            <div class="grow">
+              <div class="eyebrow">Bancá el proyecto</div>
+              <p><b>En una nota</b> es gratis, sin anuncios y lo hago solo en mis ratos libres. Si les alegró
+                alguna juntada, un cafecito paga el dominio y las playlists nuevas 💛</p>
+            </div>
+            <a class="btn amber mini" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+               data-cafecito="cuenta">☕ Cafecito</a>
+          </div>
+
+          <div id="cuenta-salir"></div>
+
+          <div class="footer-note">
+            Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
+            Tus links y canciones quedan guardados solo en este navegador.<br>
+            Si entrás con Google, guardamos solo un nombre corto (que podés cambiar) y tus partidas de un jugador, para el ranking: ni tu mail ni tu foto se muestran. <a href="privacidad/" style="color:inherit">Privacidad</a><br>
+            Para saber cuánta gente juega usamos Google Analytics, que mide el uso de forma anónima: no guardamos datos personales ni los vendemos.
+          </div>
+        </div>
       </div>
-      <button class="btn mag big" onclick="show('s-setup')">▶ Volver a jugar</button>
     </section>
 
     <!-- ===================== GAME ===================== -->
     <!-- La partida ocupa exactamente la pantalla, sin scroll: la tapa se estira o
-         se achica según el lugar que dejan el resto. En la compu va como siempre
-         (logo arriba, tablero abajo); en el celular el tablero sube como fichas y
-         los botones quedan abajo, a mano del pulgar (el orden lo cambia el CSS). -->
+         se achica según el lugar que dejan el resto. Arriba el progreso y el
+         marcador, abajo los botones, a mano del pulgar. En la compu ancha, con
+         amigos, el marcador va en una columna al costado (el orden lo pone el CSS). -->
     <section id="s-game" class="screen">
-      <div class="game-top row spread">
-        <span class="pill" id="round-pill">Canción 1</span>
-        <button class="btn ghost mini" onclick="endGame()">Terminar 🏁</button>
+      <div class="game-top">
+        <div class="game-prog">
+          <div class="prog-t" id="round-pill">Canción 1</div>
+          <div class="prog" id="prog" aria-hidden="true"></div>
+        </div>
+        <div class="solo-pts" id="solo-pts" hidden><b id="solo-pts-n">0</b><span>puntos</span></div>
+        <button type="button" class="btn ghost mini" onclick="endGame()">Terminar 🏁</button>
       </div>
+
+      <div id="board" class="score" aria-label="Marcador"></div>
 
       <div class="turn">
         <div class="who" id="phase-title">🎧 Escuchen todos</div>
-        <div class="lbl" id="phase-sub">El equipo que dice “¡YO!” primero, arriesga</div>
+        <div class="turn-sub" id="phase-sub">El equipo que dice “¡YO!” primero, arriesga</div>
       </div>
 
       <div class="stage">
@@ -231,79 +350,52 @@
         </div>
       </div>
 
-      <div class="controls" id="controls"></div>
+      <!-- Un jugador: cuánto vale acertar con lo que ya sonó -->
+      <div class="ladder" id="ladder" hidden></div>
 
-      <div class="card board-card">
-        <h3>Tablero</h3>
-        <div id="board" class="board scorebar" aria-label="Marcador"></div>
-      </div>
+      <div class="controls" id="controls"></div>
     </section>
 
     <!-- ===================== RESULTS ===================== -->
     <section id="s-results" class="screen">
-      <div class="card center">
-        <div class="medal">🏆</div>
-        <h2 style="justify-content:center">¡Terminó el juego!</h2>
-        <!-- La imagen que se comparte, ya armada: tocarla también la comparte -->
-        <button type="button" class="result-img" id="result-img" hidden aria-label="Compartir esta imagen"
-                onclick="shareResult(document.getElementById('share-btn'), 'imagen')">
-          <img alt="Imagen con el resultado de la partida" width="1080" height="1080" />
-        </button>
-        <div id="winner" style="margin:10px 0 20px"></div>
-        <div id="final-board" class="board"></div>
-        <div style="height:18px"></div>
-        <button class="btn cyan big" id="share-btn" onclick="shareResult(this, 'boton')">📲 Compartir el resultado</button>
-        <p class="hint" id="share-hint" style="margin:8px 0 0">Manda una imagen con el marcador al grupo</p>
-        <div style="height:14px"></div>
-        <!-- Un jugador con cuentas activas: dónde quedó en el ranking, o entrar para guardarla -->
-        <div id="ranking-final" class="ranking-final" hidden></div>
-        <button class="btn mag big" id="rematch-btn" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
-        <div style="height:10px"></div>
-        <!-- Al terminar es cuando más ganas hay de bancar el juego: el botón va
-             a mano, debajo de Revancha. Aparece desde la primera partida
-             y con lo que ya jugaron (lo arma pedirCafecito() en main.js). -->
-        <div id="cafecito-final" hidden>
-          <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
-             data-cafecito="final">☕ Invitame un cafecito</a>
-          <p class="hint" id="cafecito-txt" style="margin:8px 0 0"></p>
-          <div style="height:14px"></div>
+      <div class="res-head">
+        <h2 class="hdr-t"><small id="res-sub">Con amigos</small><span id="res-titulo">¡Terminó la partida!</span></h2>
+        <span class="pill lime" id="res-record" hidden>🏅 Récord nuevo</span>
+      </div>
+      <div class="res-grid">
+        <div class="res-img-col">
+          <div class="medal">🏆</div>
+          <!-- La imagen que se comparte, ya armada: tocarla también la comparte -->
+          <button type="button" class="result-img" id="result-img" hidden aria-label="Compartir esta imagen"
+                  onclick="shareResult(document.getElementById('share-btn'), 'imagen')">
+            <img alt="Imagen con el resultado de la partida" width="1080" height="1080" />
+            <span class="tapme" aria-hidden="true">Tocá para compartir</span>
+          </button>
+          <div id="winner"></div>
+          <div id="final-board" class="board"></div>
         </div>
-        <button class="btn ghost big" onclick="goHome()">🏠 Menú principal</button>
-        <div style="height:10px"></div>
-        <button class="btn ghost big" onclick="shareGame()">🔗 Compartir solo el link</button>
+        <div class="res-acc">
+          <!-- Un jugador con cuentas activas: dónde quedó en el ranking, o entrar para guardarla -->
+          <div id="ranking-final" class="ranking-final" hidden></div>
+          <button type="button" class="btn cyan big" id="share-btn" onclick="shareResult(this, 'boton')">📲 Compartir el resultado</button>
+          <p class="hint" id="share-hint" style="margin:0;text-align:center">Manda una imagen con el marcador al grupo</p>
+          <div class="g2">
+            <button type="button" class="btn mag" id="rematch-btn" onclick="rematch()">🔁 Revancha</button>
+            <button type="button" class="btn ghost" onclick="goHome()">Volver al inicio</button>
+          </div>
+          <button type="button" class="linkish" onclick="shareGame()">🔗 Compartir solo el link del juego</button>
+          <!-- Al terminar es cuando más ganas hay de bancar el juego: aparece desde
+               la primera partida y con lo que ya jugaron (lo arma pedirCafecito()
+               en main.js). -->
+          <div id="cafecito-final" class="cafe-card" hidden>
+            <p class="grow" id="cafecito-txt"></p>
+            <a class="btn amber mini" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
+               data-cafecito="final">☕ Invitame un cafecito</a>
+          </div>
+        </div>
       </div>
     </section>
-
-    <!-- ===================== COMENTARIOS =====================
-         Netlify Forms: el markup viaja en el HTML del deploy y Netlify se
-         encarga de recibirlo. Se manda por fetch para no salir de la página;
-         si falla (por ejemplo sirviendo local con npm run dev) se ofrece
-         mandarlo por mail. -->
-    <div class="feedback">
-      <div class="feedback-title">💬 Dejame un comentario</div>
-      <p class="feedback-txt">¿Falta una canción? ¿Se rompió algo? ¿Se te ocurre un modo nuevo? Escribime, lo leo yo.</p>
-      <form name="comentarios" method="POST" data-netlify="true" netlify-honeypot="bot-field"
-            onsubmit="sendFeedback(event)">
-        <input type="hidden" name="form-name" value="comentarios" />
-        <p class="hp"><label>No completar: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
-        <textarea name="mensaje" id="fb-msg" rows="4" maxlength="2000" required
-                  placeholder="Tu comentario, idea o la canción que falta…"></textarea>
-        <div class="feedback-row">
-          <input type="text" name="nombre" id="fb-nombre" maxlength="60" placeholder="Tu nombre (opcional)" />
-          <input type="email" name="email" id="fb-email" maxlength="120" placeholder="Tu mail (si querés respuesta)" />
-        </div>
-        <button class="btn cyan big" type="submit" id="fb-send">📩 Enviar comentario</button>
-      </form>
-      <p class="feedback-state" id="fb-state" role="status"></p>
-    </div>
-
-    <div class="footer-note">
-      Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
-      Tus links y canciones quedan guardados solo en este navegador.<br>
-      Si entrás con Google, guardamos solo un nombre corto (que podés cambiar) y tus partidas de un jugador, para el ranking: ni tu mail ni tu foto se muestran. <a href="privacidad/" style="color:inherit">Privacidad</a><br>
-      Para saber cuánta gente juega usamos Google Analytics, que mide el uso de forma anónima: no guardamos datos personales ni los vendemos.
-    </div>
-  </div>
+  </main>
 
   <div class="flash" id="flash"></div>
 

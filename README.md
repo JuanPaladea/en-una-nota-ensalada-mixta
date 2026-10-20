@@ -9,6 +9,15 @@ Después se **revela** la canción y el grupo decide si la pegó.
 
 ## ✨ Características
 
+- **Tres secciones**: **Jugar** (inicio, armar partida, partida y resultado), **Ranking** y **Mi cuenta**.
+  En el celular van en una barra fija abajo, que se esconde al armar la partida, durante el juego y en
+  el resultado; en la compu van arriba, al lado del logo, y las pantallas usan dos columnas (géneros y
+  opciones, podio y tu puesto, perfil y preferencias). Con amigos en una pantalla ancha, el marcador va
+  en una columna al costado.
+- **Inicio**: se elige con amigos o un jugador, **repetir la última** arma la partida anterior en un toque
+  (mismos géneros, modo y cantidad) y se ve tu récord con tu puesto en el ranking.
+- Letras **Baloo 2** (títulos) y **Nunito** (texto), servidas desde el sitio con `@fontsource-variable`.
+
 - **16 playlists** con +500 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
   Pop/Reggaetón, Internacional, Clásicos, Disney, Fiesta, Rock en Español, Trap/Urbano,
   Baladas, Folklore, Infantiles, Pop Nacional, Boy Bands y Pop 2000s, Cachengue y RKT y
@@ -32,7 +41,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
   se va anotando en la base mientras se juega y la base comprueba cada paso (que el video sea del
   catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
   sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
-  entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se puede cambiar;
+  entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se cambia en Mi cuenta;
   el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
   el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
@@ -49,14 +58,14 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - **Cafecito**: el pedido aparece en la pantalla final desde la primera partida
   terminada en ese navegador, contando cuántas partidas y canciones llevan (se guarda en
   localStorage). Además hay una tarjeta fija al fondo del inicio que explica para qué es. Se miden las veces que se
-  muestra el pedido final (`cafecito_visto`) y los clics (`cafecito`, con `desde`: `final` o `inicio`).
+  muestra el pedido final (`cafecito_visto`) y los clics (`cafecito`, con `desde`: `final`, `inicio` o `cuenta`).
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.
 - Página aparte **Cómo se juega** (`/como-se-juega/`, con un botón desde el inicio): las
   reglas a la vista y las preguntas frecuentes plegadas, con datos estructurados `FAQPage`;
   imagen de OpenGraph en **PNG** (WhatsApp y Facebook no muestran previews en SVG) y
   `manifest.webmanifest` para instalarla desde el celular.
-- **Comentarios**: formulario al pie (comentario + nombre y mail opcionales) que llega por
+- **Comentarios**: formulario en Mi cuenta → Ayuda (comentario + nombre y mail opcionales) que llega por
   **Netlify Forms** al mail configurado. Se manda sin recargar la página; si el envío falla
   (por ejemplo con `npm run dev`, donde no hay Netlify) ofrece mandar el mismo texto por mail.
 - Responsive (pensado también para celular).

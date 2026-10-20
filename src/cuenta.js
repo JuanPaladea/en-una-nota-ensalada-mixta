@@ -59,10 +59,13 @@ function limpiarUrl(){
 /* ============================================================
    SESIÓN
    ============================================================ */
+let alCambiar = ()=>{};      // main.js: rehace el saludo del inicio y Mi cuenta
+
 export async function iniciarCuentas(opciones){
   mostrar = opciones.show;
+  alCambiar = opciones.alCambiar || alCambiar;
   if(!cuentasActivas) return;
-  document.getElementById("ranking-btn").hidden = false;
+  document.getElementById("tab-ranking").hidden = false;
   renderCuenta();
   const vuelve = volviendoDeGoogle();
   if(!vuelve && !haySesionGuardada()) return;
@@ -83,17 +86,23 @@ export async function iniciarCuentas(opciones){
   }
 }
 
+export const usuarioActual = ()=> usuario;
+
 async function tomarSesion(sesion){
   const id = sesion && sesion.user ? sesion.user.id : null;
-  if(!id){ usuario = null; renderCuenta(); return; }
+  if(!id){
+    if(!usuario) return;
+    usuario = null; olvidarCache(); renderCuenta(); return;
+  }
   if(usuario && usuario.id === id) return;
   const sb = await cliente();
   const { data } = await sb.from("perfiles").select("nombre").eq("id", id).maybeSingle();
   usuario = { id, nombre: data ? data.nombre : "Jugador" };
+  olvidarCache();
   renderCuenta();
 }
 
-// desde: inicio | final | ranking
+// desde: inicio | final | ranking | cuenta
 async function entrar(desde){
   track("cuenta", { accion: "entrar", desde });
   // Desde la pantalla final, la partida que acaban de jugar se guarda al volver
@@ -116,38 +125,168 @@ async function salir(){
   track("cuenta", { accion: "salir" });
   try{ const sb = await cliente(); await sb.auth.signOut(); }catch(_){}
   usuario = null;
+  olvidarCache();
   renderCuenta();
 }
 
-async function renombrar(){
+// El nombre del ranking se cambia ahí mismo, en Mi cuenta (antes era una
+// ventanita del navegador)
+function editarNombre(abrir){
+  const ver = document.getElementById("nm-ver"), form = document.getElementById("nm-form");
+  if(!ver || !form) return;
+  ver.hidden = abrir; form.hidden = !abrir;
+  if(abrir){ const inp = document.getElementById("nm-in"); inp.value = usuario.nombre; inp.focus(); inp.select(); }
+}
+async function guardarNombre(ev){
+  ev.preventDefault();
   if(!usuario) return;
-  const nuevo = (prompt("¿Con qué nombre querés aparecer en el ranking?", usuario.nombre) || "").trim().slice(0, 30);
-  if(!nuevo || nuevo === usuario.nombre) return;
+  const nuevo = (document.getElementById("nm-in").value || "").trim().slice(0, 30);
+  if(!nuevo || nuevo === usuario.nombre){ editarNombre(false); return; }
+  const btn = ev.target.querySelector("button[type=submit]");
+  if(btn) btn.disabled = true;
   const sb = await cliente();
   const { error } = await sb.from("perfiles").update({ nombre: nuevo }).eq("id", usuario.id);
+  if(btn) btn.disabled = false;
   if(error){ alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
   usuario.nombre = nuevo;
   track("cuenta", { accion: "renombrar" });
   renderCuenta();
-  if(document.getElementById("s-ranking").classList.contains("on")) verRanking(rankingVisto);
 }
 
 const LOGO_G = `<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
 function botonGoogle(desde, texto){
   return `<button type="button" class="btn google" onclick="entrarConGoogle('${desde}')">${LOGO_G}<span>${texto}</span></button>`;
 }
+// "Juan P." → "JP"
+function iniciales(nombre){
+  const p = String(nombre).replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/).filter(Boolean);
+  return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase();
+}
 
-// La barrita del inicio
+// Lo que depende de la sesión: el avatar de arriba y Mi cuenta
 function renderCuenta(){
-  const el = document.getElementById("cuenta-bar");
+  const nav = document.getElementById("nav-cuenta");
+  if(nav){
+    nav.innerHTML = !cuentasActivas ? ""
+      : usuario
+        ? `<button type="button" class="av" onclick="irA('cuenta')" aria-label="Mi cuenta: ${esc(usuario.nombre)}">${esc(iniciales(usuario.nombre))}</button>`
+        : botonGoogle("inicio", "Entrar");
+  }
+  if(document.getElementById("s-cuenta").classList.contains("on")) renderMiCuenta();
+  else renderSalir();
+  alCambiar();
+}
+function renderSalir(){
+  const el = document.getElementById("cuenta-salir");
+  if(el) el.innerHTML = usuario ? `<button type="button" class="salir" onclick="salirDeCuenta()">Cerrar sesión</button>` : "";
+}
+
+/* ============================================================
+   MI CUENTA
+   Perfil, estadísticas, récords con su puesto y las últimas partidas. Todo
+   sale de las partidas propias (las reglas de la base no dejan leer otras)
+   y los puestos de ranking_solo().
+   ============================================================ */
+let misPartidas = null;        // cache: [{ canciones, segundos, puntos, jugada }], más nuevas primero
+let puestos = {};              // cache: { canciones: fila de ranking_solo con es_mio, o null }
+function olvidarCache(){ misPartidas = null; puestos = {}; }
+
+async function cargarMisPartidas(){
+  if(misPartidas) return misPartidas;
+  const sb = await cliente();
+  const { data, error } = await sb.from("partidas_solo")
+    .select("canciones, segundos, puntos, jugada")
+    .order("jugada", { ascending: false }).limit(500);
+  if(error) throw error;
+  misPartidas = data || [];
+  return misPartidas;
+}
+// Tu fila en el ranking de esa cantidad (puesto y mejor puntaje), o null
+export async function miPuesto(canciones){
+  if(!cuentasActivas || !usuario) return null;
+  const k = String(canciones);
+  if(!(k in puestos)){
+    puestos[k] = miFilaDelRanking(canciones).catch(()=> null);
+  }
+  return puestos[k];
+}
+
+const cuadritos = (segundos, chicos)=> `<span class="sqs${chicos ? " s" : ""}">${segundos.map(s=>
+  `<span class="sq ${s === 0 ? "k" : s === 1 ? "g" : s <= 3 ? "y" : "o"}"></span>`).join("")}</span>`;
+const fechaCorta = (d)=> new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+
+let turnoCuenta = 0;
+export async function renderMiCuenta(){
+  renderSalir();
+  const el = document.getElementById("cuenta-perfil");
+  const local = document.getElementById("cuenta-local");
   if(!el) return;
-  el.hidden = !cuentasActivas;
-  el.innerHTML = usuario
-    ? `<span>👤 <b>${esc(usuario.nombre)}</b>
-         <button type="button" class="linkish" onclick="renombrarCuenta()" aria-label="Cambiar el nombre del ranking">✏️</button></span>
-       <button type="button" class="btn ghost mini" onclick="salirDeCuenta()">Salir</button>`
-    : `<span class="cuenta-txt">Entrá para guardar tus partidas y aparecer en el ranking</span>
-       ${botonGoogle("inicio", "Entrar con Google")}`;
+  local.hidden = Boolean(usuario);
+  if(!cuentasActivas){ el.innerHTML = ""; return; }
+  if(!usuario){
+    el.innerHTML = `<div class="login-card">
+        <div class="av" aria-hidden="true">🎧</div>
+        <h3>Guardá tus partidas</h3>
+        <p>Entrá con Google para tener tus récords de Un jugador en cualquier dispositivo y aparecer en el ranking.
+          Solo se muestra un nombre corto que podés cambiar.</p>
+        ${botonGoogle("cuenta", "Entrar con Google")}
+      </div>`;
+    return;
+  }
+  const turno = ++turnoCuenta;
+  el.innerHTML = `
+    <div class="prof">
+      <div class="av lg" aria-hidden="true">${esc(iniciales(usuario.nombre))}</div>
+      <div class="grow">
+        <div class="nm" id="nm-ver"><span>${esc(usuario.nombre)}</span>
+          <button type="button" class="edit" onclick="editarNombre(true)">Editar</button></div>
+        <form class="nm-form" id="nm-form" hidden onsubmit="guardarNombre(event)">
+          <input type="text" id="nm-in" maxlength="30" aria-label="Tu nombre en el ranking" autocomplete="nickname">
+          <button type="submit" class="btn mag mini">Guardar</button>
+          <button type="button" class="btn ghost mini" onclick="editarNombre(false)">Cancelar</button>
+        </form>
+        <small>Así te ven en el ranking · entraste con Google</small>
+      </div>
+    </div>
+    <div id="cuenta-datos"><p class="cargando">Cargando tus partidas…</p></div>`;
+  try{
+    const partidas = await cargarMisPartidas();
+    if(turno !== turnoCuenta) return;
+    const box = document.getElementById("cuenta-datos");
+    if(!partidas.length){
+      box.innerHTML = `<div class="tarjeta"><span class="grow"><span class="tarjeta-t">Todavía no jugaste con tu cuenta</span>
+        <span class="tarjeta-d">Las partidas de Un jugador se guardan solas y entran al ranking.</span></span></div>`;
+      return;
+    }
+    const canciones = partidas.reduce((n, p)=> n + p.segundos.length, 0);
+    const salieron = partidas.flatMap(p=> p.segundos).filter(s=> s > 0);
+    const promedio = salieron.length ? (salieron.reduce((a, b)=> a + b, 0) / salieron.length) : 0;
+    const mejores = {};
+    partidas.forEach(p=>{ mejores[p.canciones] = Math.max(mejores[p.canciones] || 0, p.puntos); });
+    box.innerHTML = `
+      <div class="tiles">
+        <div class="tile"><b>${partidas.length}</b><span>partidas</span></div>
+        <div class="tile"><b>${canciones}</b><span>canciones</span></div>
+        <div class="tile"><b>${promedio ? promedio.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " s" : "—"}</b><span>promedio para sacarla</span></div>
+      </div>
+      <div class="lbl">Tus récords</div>
+      <div class="rec">${OPCIONES_CANCIONES.map(n=> `<div class="${mejores[n] ? "" : "none"}" data-rec="${n}">
+          ${n ? n + " canciones" : "Sin límite"}<b>${mejores[n] || "—"}</b><span class="pos">${mejores[n] ? "…" : ""}</span></div>`).join("")}</div>
+      <div class="lbl">Últimas partidas</div>
+      <div class="hist">${partidas.slice(0, 5).map(p=> `<div class="hist-row">
+          ${cuadritos(p.segundos, true)}<b>${p.puntos}</b>
+          <small>${fechaCorta(p.jugada)} · ${p.canciones ? p.canciones + " canciones" : "sin límite"}</small></div>`).join("")}</div>`;
+    // el puesto de cada récord, de a uno a medida que llegan
+    OPCIONES_CANCIONES.filter(n=> mejores[n]).forEach(async n=>{
+      const mio = await miPuesto(n);
+      if(turno !== turnoCuenta) return;
+      const celda = box.querySelector(`[data-rec="${n}"] .pos`);
+      if(celda) celda.textContent = mio ? "#" + mio.puesto : "";
+    });
+  }catch(e){
+    if(turno !== turnoCuenta) return;
+    document.getElementById("cuenta-datos").innerHTML = `<p class="cargando">No pudimos cargar tus partidas.</p>`;
+  }
 }
 
 /* ============================================================
@@ -210,7 +349,8 @@ export function soloResolvio(segundos, titulo){
 async function guardarPartida(p){
   const puntos = await rpc("solo_terminar", { p_partida: p.id });
   if(puntos === null) throw new Error("partida vencida");
-  const mio = await miFilaDelRanking(p.canciones);
+  olvidarCache();
+  const mio = await miPuesto(p.canciones);
   track("partida_guardada", {
     canciones_por_partida: p.canciones, puntos, puesto: mio ? Number(mio.puesto) : 0,
   });
@@ -264,89 +404,101 @@ export async function rankingFinal(resueltas){
   try{
     const { puntos, mio } = await guardarPartida(partidaFinal);
     if(turno !== turnoFinal) return;          // ya arrancó otra partida
-    const de = canciones ? ` con ${canciones} canciones` : " sin límite";
+    const de = canciones ? ` · ${canciones} canciones` : " · sin límite";
     const txt = !mio ? "Partida guardada."
-      : mio.puntos === puntos ? `🏆 Quedaste <b>#${mio.puesto}</b> en el ranking${de}.`
-      : `Partida guardada. Tu mejor${de} (${mio.puntos} puntos) está <b>#${mio.puesto}</b>.`;
-    el.innerHTML = `<p class="hint" style="margin:0 0 10px">${txt}</p>
-      <button type="button" class="btn ghost big" onclick="verRanking(${canciones})">🏆 Ver el ranking</button>`;
+      : mio.puntos === puntos ? `Quedaste <b style="color:var(--amber)">#${mio.puesto}</b>`
+      : `Tu mejor (${mio.puntos} puntos) está <b style="color:var(--amber)">#${mio.puesto}</b>`;
+    el.innerHTML = `<button type="button" class="tarjeta" style="border:0;padding:0;background:none" onclick="verRanking(${canciones})">
+        <span class="grow"><span class="eyebrow">Ranking${de}</span><span class="tarjeta-t">${txt}</span></span>
+        <span class="pill amber">Ver ›</span></button>`;
   }catch(e){
     if(turno !== turnoFinal) return;
-    el.innerHTML = `<p class="hint" style="margin:0">No pudimos guardar la partida en el ranking 😕</p>`;
+    el.innerHTML = `<p class="hint">No pudimos guardar la partida en el ranking 😕</p>`;
   }
 }
 
 /* ============================================================
    RANKING
+   Podio para los tres primeros, lista corta debajo y tu fila aparte (fija
+   abajo en el celular), aunque estés lejos del podio.
    ============================================================ */
 const nombreOpcion = (n)=> n ? n + " canciones" : "Sin límite";
 
+let turnoRanking = 0;
 export async function verRanking(canciones, aviso){
   if(!cuentasActivas) return;
   rankingVisto = OPCIONES_CANCIONES.includes(Number(canciones)) ? Number(canciones) : 10;
   if(!document.getElementById("s-ranking").classList.contains("on")) mostrar("s-ranking");
   track("ranking_visto", { canciones_por_partida: rankingVisto });
+  const turno = ++turnoRanking;
   document.getElementById("rk-aviso").textContent = aviso || "";
+  document.getElementById("rk-aviso").hidden = !aviso;
   document.getElementById("rk-tabs").innerHTML = OPCIONES_CANCIONES.map(n=>
-    `<button type="button" class="rk-tab" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n})">${n || "∞"}</button>`).join("");
-  document.getElementById("rk-titulo").textContent = "🎧 Un jugador · " + nombreOpcion(rankingVisto);
+    `<button type="button" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n})"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
+  document.getElementById("rk-titulo").textContent = "Ranking · " + nombreOpcion(rankingVisto).toLowerCase();
+  const podio = document.getElementById("rk-podio");
   const lista = document.getElementById("rk-lista");
-  lista.innerHTML = `<p class="hint" style="margin:0">Cargando…</p>`;
-  renderMias();
+  const yo = document.getElementById("rk-yo");
+  podio.innerHTML = "";
+  lista.innerHTML = `<p class="rk-vacio">Cargando…</p>`;
+  yo.innerHTML = "";
   try{
     const sb = await cliente();
     const { data, error } = await sb.rpc("ranking_solo", { p_canciones: rankingVisto, p_limite: LIMITE_RANKING });
     if(error) throw error;
+    if(turno !== turnoRanking) return;       // cambiaron de pestaña mientras cargaba
+    renderYo(data);
     if(!data.length){
-      lista.innerHTML = `<p class="hint" style="margin:0">Todavía nadie jugó${rankingVisto ? " con " + rankingVisto + " canciones" : " sin límite"}. ¡Podés ser el primero!</p>`;
+      lista.innerHTML = `<p class="rk-vacio">Todavía nadie jugó${rankingVisto ? " con " + rankingVisto + " canciones" : " sin límite"}. ¡Podés ser el primero!</p>`;
       return;
     }
-    const medallas = ["🥇", "🥈", "🥉"];
-    lista.innerHTML = data.map((f, i)=>`
-      ${i > 0 && f.puesto - data[i-1].puesto > 1 ? `<div class="rk-salto">⋯</div>` : ""}
-      <div class="brow ${f.es_mio ? "cur" : ""}">
-        <span>${medallas[f.puesto - 1] || `<span class="rk-n">${f.puesto}.</span>`} ${esc(f.nombre)}${f.es_mio ? " <small>(vos)</small>" : ""}</span>
-        <span class="pts">${f.puntos}</span>
+    const tres = [2, 1, 3].map(p=> data.find(f=> Number(f.puesto) === p)).filter(Boolean);
+    podio.innerHTML = tres.map(f=> `<div class="pod p${f.puesto} ${f.es_mio ? "mio" : ""}">
+        <div class="av" aria-hidden="true">${esc(iniciales(f.nombre))}</div>
+        <div class="n">${esc(f.nombre)}${f.es_mio ? " (vos)" : ""}</div>
+        <div class="p">${f.puntos} pts</div>
+        <div class="blk">${f.puesto}</div>
+      </div>`).join("");
+    // Los del podio no se repiten abajo; tu fila, si quedó fuera de los
+    // primeros, va solo en la tarjeta de abajo
+    const resto = data.filter(f=> Number(f.puesto) > 3 && Number(f.puesto) <= LIMITE_RANKING);
+    lista.innerHTML = resto.map(f=> `<div class="rk-row ${f.es_mio ? "mio" : ""}">
+        <span class="pos">${f.puesto}</span>
+        <span class="nom">${esc(f.nombre)}${f.es_mio ? " <small>(vos)</small>" : ""}</span>
+        <span class="pt">${f.puntos}</span>
       </div>`).join("");
   }catch(e){
-    lista.innerHTML = `<p class="hint" style="margin:0">No pudimos cargar el ranking. Probá de nuevo en un rato.</p>`;
+    if(turno !== turnoRanking) return;
+    lista.innerHTML = `<p class="rk-vacio">No pudimos cargar el ranking. Probá de nuevo en un rato.</p>`;
   }
 }
-
-// Tus partidas: las últimas, de la cantidad de canciones que se está mirando
-async function renderMias(){
-  const box = document.getElementById("rk-mias");
+// Tu fila: puesto, puntos y cuánto te falta para el de arriba
+function renderYo(data){
+  const yo = document.getElementById("rk-yo");
   if(!usuario){
-    box.innerHTML = `<p class="hint" style="margin:0 0 10px">Entrá con tu cuenta de Google para guardar tus partidas y aparecer acá.</p>
-      ${botonGoogle("ranking", "Entrar con Google")}`;
+    yo.innerHTML = `<div class="rk-yo fuera">Entrá con Google para aparecer acá${botonGoogle("ranking", "Entrar con Google")}</div>`;
     return;
   }
-  box.innerHTML = `<p class="hint" style="margin:0">Cargando…</p>`;
-  const pedido = rankingVisto;
-  try{
-    const sb = await cliente();
-    const { data, error } = await sb.from("partidas_solo")
-      .select("puntos, segundos, jugada").eq("canciones", pedido)
-      .order("jugada", { ascending: false }).limit(15);
-    if(error) throw error;
-    if(pedido !== rankingVisto) return;      // cambiaron de pestaña mientras cargaba
-    if(!data.length){
-      box.innerHTML = `<p class="hint" style="margin:0">Todavía no jugaste${pedido ? " con " + pedido + " canciones" : " sin límite"} con tu cuenta.</p>`;
-      return;
-    }
-    const fecha = (d)=> new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
-    box.innerHTML = data.map(p=>`
-      <div class="brow">
-        <span><small class="rk-fecha">${fecha(p.jugada)}</small>
-          <span class="tira">${p.segundos.map(s=> soloTramo({ ok: s > 0, seg: s }).emoji).join("")}</span></span>
-        <span class="pts">${p.puntos}</span>
-      </div>`).join("");
-  }catch(e){
-    box.innerHTML = `<p class="hint" style="margin:0">No pudimos cargar tus partidas.</p>`;
+  const mio = data.find(f=> f.es_mio);
+  if(!mio){
+    yo.innerHTML = `<div class="rk-yo fuera">Todavía no jugaste${rankingVisto ? " con " + rankingVisto + " canciones" : " sin límite"} con tu cuenta.</div>`;
+    return;
   }
+  const puesto = Number(mio.puesto);
+  const arriba = data.filter(f=> Number(f.puesto) < puesto && !f.es_mio).pop();
+  const falta = puesto === 1 ? "¡Vas primero!"
+    : arriba ? (Number(arriba.puesto) === puesto - 1
+        ? `Te faltan ${arriba.puntos - mio.puntos + 1} puntos para el #${arriba.puesto}`
+        : `Te faltan ${arriba.puntos - mio.puntos + 1} puntos para entrar al top ${arriba.puesto}`)
+    : "";
+  yo.innerHTML = `<div class="rk-yo">
+      <span class="pos">#${puesto}</span>
+      <span>Vos · ${esc(mio.nombre)}${falta ? `<small>${falta}</small>` : ""}</span>
+      <span class="pt">${mio.puntos}</span>
+    </div>`;
 }
 
 // Los onclick del HTML llaman funciones globales (como en main.js)
 Object.assign(window, {
-  entrarConGoogle: entrar, salirDeCuenta: salir, renombrarCuenta: renombrar, verRanking,
+  entrarConGoogle: entrar, salirDeCuenta: salir, editarNombre, guardarNombre, verRanking,
 });

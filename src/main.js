@@ -6,7 +6,7 @@ import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
-import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio } from "./cuenta.js";
+import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verRanking, usuarioActual, miPuesto, renderMiCuenta, cuentasActivas } from "./cuenta.js";
 
 /* ============================================================
    ESTADO
@@ -19,6 +19,9 @@ const LS_TEAMS = "eun_teams_v1";
 const LS_JUGADO = "eun_jugado_v1";
 const LS_MODO = "eun_modo_v1";
 const LS_RECORD = "eun_record_solo_v1";
+const LS_ULTIMA = "eun_ultima_v1";
+const LS_PENALTY = "eun_resta_v1";
+const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];   // canciones por partida; 0 = sin límite
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
@@ -30,7 +33,14 @@ let selectedGenres = new Set();
 // Equipos: los nombres se guardan en localStorage y sobreviven a la revancha,
 // al volver al menú principal y a recargar la página (los puntos no).
 let teams = loadTeams();                  // [{name, score}]
-let opts = { noRepeat:true, maxSongs:10, penalty:false }; // penalty: el que arriesga y erra pierde un punto
+// La última partida que se armó: para "Repetir la última" y para que Armar
+// partida arranque con los mismos géneros y la misma cantidad.
+let ultima = load(LS_ULTIMA, null);       // { modo, generos:[ids], canciones }
+let opts = {
+  noRepeat:true,
+  maxSongs: ultima && OPCIONES_CANCIONES.includes(ultima.canciones) ? ultima.canciones : 10,
+  penalty: load(LS_PENALTY, false) === true,   // el que arriesga y erra pierde un punto
+};
 // 'grupo' = equipos, el grupo juzga · 'solo' = se escribe el título y el juego lo comprueba
 let modo = load(LS_MODO, "grupo") === "solo" ? "solo" : "grupo";
 let record = load(LS_RECORD, {});         // modo solo: { "10": mejor puntaje con 10 canciones, ... }
@@ -78,18 +88,46 @@ function countLinked(){
 /* ============================================================
    NAVEGACIÓN / UTILIDADES DE UI
    ============================================================ */
+// Tres secciones: Jugar, Ranking y Mi cuenta. Cada pantalla ilumina la suya
+// arriba (compu) o en la barra de abajo (celular). Armar partida, la partida
+// y el resultado van sin la barra de abajo: ahí manda el botón principal.
+const SECCION = {
+  "s-inicio":"jugar", "s-setup":"jugar", "s-game":"jugar", "s-results":"jugar",
+  "s-ranking":"ranking", "s-cuenta":"cuenta", "s-armar":"cuenta",
+};
+const SIN_TABS = ["s-setup", "s-game", "s-results"];
+let pantalla = "s-inicio", pantallaAnterior = "s-inicio";
 function show(id){
+  if(id !== pantalla){ pantallaAnterior = pantalla; pantalla = id; }
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   document.getElementById(id).classList.add("on");
-  // El CSS usa esta clase para sacar de la pantalla de juego lo que no se juega:
-  // los comentarios y el pie. El logo se queda.
+  // El CSS usa estas clases: en la partida no se ve nada de arriba, y en
+  // las pantallas de SIN_TABS el celular esconde la barra de abajo.
   document.body.classList.toggle("playing", id==="s-game");
+  document.body.classList.toggle("sin-tabs", SIN_TABS.includes(id));
+  document.querySelectorAll(".tab").forEach(t=>{
+    if(t.dataset.tab === SECCION[id]) t.setAttribute("aria-current", "page");
+    else t.removeAttribute("aria-current");
+  });
   scrollTop();
+  if(id==="s-inicio") renderInicio();
+  if(id==="s-setup") renderSetup();
   if(id==="s-armar") renderSongList();
+  if(id==="s-cuenta"){ renderCuentaLocal(); renderMiCuenta(); }
 }
-// El menú es largo y abajo de todo están los comentarios: si no volvemos
-// arriba a mano, al apretar "¡A jugar!" la pantalla se queda donde estaba y lo
-// primero que se ve es esa sección, con el juego fuera de cuadro. Va sin
+// Las secciones de arriba / de la barra de abajo
+function irA(seccion){
+  track("seccion", { seccion });
+  if(seccion==="ranking"){ verRanking(opts.maxSongs); return; }
+  show(seccion==="cuenta" ? "s-cuenta" : "s-inicio");
+}
+// Mis canciones se abre desde el inicio, desde Mi cuenta o desde el aviso de
+// Armar partida: "Volver" lleva a donde estaba.
+function volver(){
+  show(["s-inicio", "s-setup", "s-cuenta"].includes(pantallaAnterior) ? pantallaAnterior : "s-inicio");
+}
+// Si no volvemos arriba a mano, al cambiar de pantalla se queda donde estaba
+// la anterior y lo primero que se ve es el medio de la nueva. Va sin
 // animación y repetido en el frame siguiente porque al ocultar la pantalla
 // anterior cambia el alto de la página: con "smooth" el navegador del celular
 // cancelaba el scroll a mitad de camino.
@@ -107,32 +145,200 @@ function flash(color){
   f.style.background=color; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
 }
 
+const plural = (n, uno, varios)=> n + " " + (n===1 ? uno : varios);
+
 /* ============================================================
-   SETUP: géneros y jugadores
+   INICIO
+   Cómo juegan hoy (las dos tarjetas grandes del HTML), repetir la última
+   partida y el récord de Un jugador con el puesto en el ranking.
    ============================================================ */
+function renderInicio(){
+  const u = usuarioActual();
+  document.getElementById("hola").textContent = u
+    ? "Hola, " + u.nombre.split(" ")[0]
+    : "El juego para cantar con amigos";
+  renderRepetir();
+  renderRecordCard();
+}
+// Los géneros de la última partida que todavía existen (y "Mis canciones" solo
+// si quedan audios cargados).
+function generosDeUltima(){
+  if(!ultima || !Array.isArray(ultima.generos)) return [];
+  const validos = new Set(GENRES.map(g=> g.id));
+  return ultima.generos.filter(id=> validos.has(id) || (id==="local" && localTracks.length));
+}
+// "Rock Nacional 🇦🇷" → "Rock Nacional": en una línea corta los emojis sobran
+function nombreGenero(id){
+  if(id==="local") return "Mis canciones";
+  const g = GENRES.find(x=> x.id===id);
+  return g ? g.name.replace(/[^\p{L}\p{N})]+$/u, "") : id;
+}
+function renderRepetir(){
+  const el = document.getElementById("repetir");
+  const gens = generosDeUltima();
+  if(!gens.length){ el.innerHTML = ""; return; }
+  const nombres = gens.slice(0, 2).map(nombreGenero).join(" + ") + (gens.length > 2 ? ` + ${gens.length-2} más` : "");
+  const quienes = ultima.modo==="solo" ? "Un jugador" : "Con amigos · " + plural(teams.length, "equipo", "equipos");
+  const cuantas = ultima.canciones ? ultima.canciones + " canciones" : "sin límite";
+  el.innerHTML = `<button type="button" class="tarjeta" onclick="repetirUltima()">
+      <span class="grow">
+        <span class="eyebrow">Repetir la última</span>
+        <span class="tarjeta-t">${esc(nombres)}</span>
+        <span class="tarjeta-d">${quienes} · ${cuantas}</span>
+      </span>
+      <span class="play-dot" aria-hidden="true">▶</span>
+    </button>`;
+}
+// Arma la partida anterior en un toque: mismos géneros, modo y cantidad
+function repetirUltima(){
+  const gens = generosDeUltima();
+  if(!gens.length) return;
+  selectedGenres = new Set(gens);
+  setModo(ultima.modo==="solo" ? "solo" : "grupo");
+  if(OPCIONES_CANCIONES.includes(ultima.canciones)) opts.maxSongs = ultima.canciones;
+  track("repetir_ultima", { modo_juego: modo, canciones_por_partida: opts.maxSongs });
+  startGame();
+}
+// Tu récord con la cantidad de canciones que venís jugando y, con cuenta, tu
+// puesto en esa tabla. Tocándola se abre el ranking.
+let turnoRecord = 0;
+async function renderRecordCard(){
+  const el = document.getElementById("record-card");
+  const turno = ++turnoRecord;
+  let n = opts.maxSongs;
+  // Si con esa cantidad nunca jugó Un jugador, la que tenga récord
+  if(!record[String(n)]){
+    const otra = OPCIONES_CANCIONES.find(k=> record[String(k)]);
+    if(otra !== undefined) n = otra;
+  }
+  const de = n ? n + " canciones" : "sin límite";
+  const tarjeta = (pts, pill)=> {
+    const cuerpo = `<span class="grow"><span class="eyebrow" style="color:var(--cyan)">Récord · ${de}</span>
+      <span class="big-pts">${pts} <small>pts</small></span></span>${pill}`;
+    return cuentasActivas
+      ? `<button type="button" class="tarjeta" onclick="verRanking(${n})">${cuerpo}</button>`
+      : `<div class="tarjeta">${cuerpo}</div>`;
+  };
+  const local = record[String(n)] || 0;
+  const u = usuarioActual();
+  if(!u){
+    if(local) el.innerHTML = tarjeta(local, cuentasActivas ? `<span class="pill amber">Sumate al ranking ›</span>` : "");
+    else el.innerHTML = cuentasActivas
+      ? `<button type="button" class="tarjeta" onclick="irA('ranking')">
+          <span class="grow"><span class="eyebrow">Ranking · Un jugador</span>
+          <span class="tarjeta-t">¿Quién la saca con un segundo?</span></span>
+          <span class="pill amber">Ver ›</span></button>`
+      : "";
+    return;
+  }
+  if(local) el.innerHTML = tarjeta(local, `<span class="pill amber">Ranking ›</span>`);
+  const mio = await miPuesto(n);
+  if(turno !== turnoRecord) return;
+  const pts = Math.max(local, mio ? mio.puntos : 0);
+  el.innerHTML = pts ? tarjeta(pts, `<span class="pill amber">${mio ? "#" + mio.puesto + " en el ranking" : "Ranking"} ›</span>`) : "";
+}
+
+/* ============================================================
+   MI CUENTA: lo que queda en este navegador
+   El perfil, las estadísticas y las partidas de la cuenta los arma
+   cuenta.js; esto es lo que existe con o sin sesión.
+   ============================================================ */
+function renderCuentaLocal(){
+  const box = document.getElementById("cuenta-local");
+  if(usuarioActual()){ box.innerHTML = ""; }
+  else {
+    const mejor = Math.max(0, ...Object.values(record).map(Number).filter(Number.isFinite));
+    box.innerHTML = `<div class="lbl">En este navegador</div>
+      <div class="tiles">
+        <div class="tile"><b>${jugado.partidas}</b><span>partidas</span></div>
+        <div class="tile"><b>${jugado.canciones}</b><span>canciones</span></div>
+        <div class="tile"><b>${mejor || "—"}</b><span>mejor récord</span></div>
+      </div>
+      <div class="lbl">Tus récords de Un jugador</div>
+      <div class="rec">${OPCIONES_CANCIONES.map(n=>{
+        const pts = record[String(n)] || 0;
+        return `<div class="${pts ? "" : "none"}">${n ? n + " canciones" : "Sin límite"}<b>${pts || "—"}</b></div>`;
+      }).join("")}</div>`;
+  }
+  const propios = Object.keys(links).length + customSongs.length;
+  document.getElementById("cuenta-canciones").innerHTML = `
+    <button type="button" class="list-row" onclick="show('s-armar')">
+      <span>${localTracks.length ? plural(localTracks.length, "audio", "audios") + " de tu compu" : "Todavía no cargaste audios"}<small>Suenan sin internet</small></span>
+      <span class="act">Cargar</span></button>
+    <button type="button" class="list-row" onclick="show('s-armar')">
+      <span>${propios ? plural(propios, "link propio", "links propios") : "Ningún link propio"} de YouTube<small>Canciones nuevas o reemplazos de las precargadas</small></span>
+      <span class="act">Vincular</span></button>`;
+  const ya = playedHistory.length;
+  document.getElementById("pref-hist").textContent = ya
+    ? `${plural(ya, "ya sonó", "ya sonaron")} y no se repiten hasta agotar la playlist`
+    : "Todavía no sonó ninguna";
+  syncPenalty();
+}
+
+/* ============================================================
+   ARMAR PARTIDA: géneros, modo, equipos y opciones
+   ============================================================ */
+function elegirModo(m){
+  setModo(m);
+  // Arranca con los géneros de la última partida, si había
+  if(selectedGenres.size===0) generosDeUltima().forEach(id=> selectedGenres.add(id));
+  show("s-setup");
+}
+function renderSetup(){
+  renderGenres(); renderTeams(); renderMaxSongs(); syncPenalty(); updatePoolWarn();
+}
+// Canciones que pueden sonar de cada género (con link precargado o propio)
+function cuantasDe(g){
+  return g.songs.filter(([t,,yt])=> effId(g.id, t, yt)).length;
+}
 function renderGenres(){
   const el = document.getElementById("genres");
-  let html = GENRES.map(g=>{
-    const sel = selectedGenres.has(g.id) ? "sel":"";
-    return `<div class="genre ${sel}" onclick="toggleGenre('${g.id}')">
-      <div class="tick">✓</div>
-      <div class="em">${g.em}</div>
-      <div class="gn">${esc(g.name)}</div>
-    </div>`;
-  }).join("");
+  const ficha = (id, em, nombre, detalle, extra)=>{
+    const sel = selectedGenres.has(id);
+    return `<button type="button" class="genre ${extra||""} ${sel?"sel":""}" aria-pressed="${sel}" onclick="toggleGenre('${id}')">
+      <span class="em" aria-hidden="true">${em}</span>
+      <span class="gn">${esc(nombre)}<span class="gc">${detalle}</span></span>
+      <span class="tick" aria-hidden="true">✓</span>
+    </button>`;
+  };
   // Playlist de audios locales (siempre visible; destaca porque suena seguro)
-  const selL = selectedGenres.has("local") ? "sel":"";
-  html += `<div class="genre ${selL}" onclick="toggleGenre('local')" style="border-color:var(--lime)">
-      <div class="tick">✓</div>
-      <div class="em">🎵</div>
-      <div class="gn">Mis canciones</div>
-      <div class="gc">${localTracks.length} archivo${localTracks.length!==1?'s':''} · <b style="color:var(--lime)">suena seguro</b></div>
-    </div>`;
-  el.innerHTML = html;
+  el.innerHTML = GENRES.map(g=> ficha(g.id, g.em, nombreGenero(g.id), plural(cuantasDe(g), "canción", "canciones"))).join("") +
+    ficha("local", "🎵", "Mis canciones", plural(localTracks.length, "archivo", "archivos") + ` · <b style="color:var(--lime)">suena seguro</b>`, "local");
 }
 function toggleGenre(id){
   selectedGenres.has(id) ? selectedGenres.delete(id) : selectedGenres.add(id);
   renderGenres(); updatePoolWarn();
+}
+// "Elegir todos" suma Mis canciones solo si hay audios cargados
+function todosLosGeneros(){
+  return GENRES.map(g=> g.id).concat(localTracks.length ? ["local"] : []);
+}
+function toggleTodos(){
+  const todos = todosLosGeneros();
+  const estanTodos = todos.every(id=> selectedGenres.has(id));
+  selectedGenres = estanTodos ? new Set() : new Set(todos);
+  renderGenres(); updatePoolWarn();
+}
+function renderMaxSongs(){
+  document.getElementById("opt-maxsongs").innerHTML = OPCIONES_CANCIONES.map(n=>
+    `<button type="button" aria-pressed="${n===opts.maxSongs}" onclick="setMaxSongs(${n})"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
+}
+function setMaxSongs(n){
+  if(!OPCIONES_CANCIONES.includes(n)) return;
+  opts.maxSongs = n;
+  renderMaxSongs();
+}
+// Restar un punto: se cambia en Armar partida o en Mi cuenta, y se recuerda
+function setPenalty(v){
+  opts.penalty = !!v;
+  try{ save(LS_PENALTY, opts.penalty); }catch(_){}
+  syncPenalty();
+}
+function syncPenalty(){
+  ["opt-penalty", "pref-penalty"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.checked = opts.penalty;
+  });
 }
 // Los nombres de los equipos se recuerdan entre partidas y entre sesiones.
 function loadTeams(){
@@ -171,6 +377,7 @@ function setModo(m){
   const solo = modo === "solo";
   document.getElementById("modo-grupo").setAttribute("aria-pressed", String(!solo));
   document.getElementById("modo-solo").setAttribute("aria-pressed", String(solo));
+  document.getElementById("setup-titulo").textContent = solo ? "Un jugador" : "Con amigos";
   document.getElementById("teams-box").hidden = solo;
   document.getElementById("solo-box").hidden = !solo;
   document.getElementById("opt-penalty-box").hidden = solo;
@@ -189,18 +396,28 @@ function buildPool(){
     if(id) pool.push({...s, id, key});
   });
 }
+// Abajo de "¡A jugar!": cuántas canciones hay con lo elegido y cuántas todavía
+// no sonaron en este navegador. Si no hay ninguna, el aviso de qué hacer.
 function updatePoolWarn(){
   buildPool();
   const el=document.getElementById("pool-warn");
-  if(selectedGenres.size===0){ el.innerHTML=""; return; }
+  const info=document.getElementById("pool-info");
+  const n = selectedGenres.size;
+  document.getElementById("gen-info").textContent = n ? "· " + plural(n, "elegido", "elegidos") : "";
+  document.getElementById("gen-todos").textContent =
+    todosLosGeneros().every(id=> selectedGenres.has(id)) ? "Ninguno" : "Elegir todos";
+  el.innerHTML = "";
+  if(n===0){ info.textContent = "Elegí al menos un género"; return; }
   if(pool.length===0){
-    const onlyLocal = selectedGenres.has("local") && selectedGenres.size===1;
-    el.innerHTML=`<div class="card" style="border-color:var(--no)">
+    const onlyLocal = selectedGenres.has("local") && n===1;
+    info.textContent = "";
+    el.innerHTML=`<div class="aviso">
       <b>⚠️ No hay canciones para jugar</b> en lo que elegiste.
-      Entrá a <a href="#" onclick="show('s-armar');return false">🔗 Armar canciones</a> y ${onlyLocal?'cargá tus archivos de audio':'cargá tus audios o pegá links de YouTube'} para poder jugar.</div>`;
-  } else {
-    el.innerHTML=`<div class="pill" style="display:block;text-align:center">🎶 Playlist lista para sortear</div><div style="height:12px"></div>`;
+      Entrá a <a href="#" onclick="show('s-armar');return false">📂 Mis canciones</a> y ${onlyLocal?'cargá tus archivos de audio':'cargá tus audios o pegá links de YouTube'} para poder jugar.</div>`;
+    return;
   }
+  const sinEscuchar = pool.filter(s=> !playedHistory.includes(s.key)).length;
+  info.textContent = plural(pool.length, "canción disponible", "canciones disponibles") + " · " + sinEscuchar + " sin escuchar";
 }
 
 /* ============================================================
@@ -596,10 +813,10 @@ function startGame(){
     saveTeams();   // los nombres quedan guardados para la próxima partida
   }
   opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
-  const ms = document.getElementById("opt-maxsongs");
-  opts.maxSongs = ms ? parseInt(ms.value,10) : 0;
-  const pen = document.getElementById("opt-penalty");
-  opts.penalty = !!(pen && pen.checked);
+  ultima = { modo, generos:[...selectedGenres], canciones:opts.maxSongs };
+  try{ save(LS_ULTIMA, ultima); }catch(_){}
+  // con amigos, en la compu ancha el marcador va al costado (lo hace el CSS)
+  document.getElementById("s-game").classList.toggle("grupo", modo==='grupo');
   played=[]; brokenIds=new Set(); songNo=1;
   if(modo==='solo') soloEmpezar(opts.maxSongs);
   track("partida_iniciada", {
@@ -655,6 +872,7 @@ function resetHistory(){
   playedHistory = [];
   save(LS_HISTORY, playedHistory);
   alert("Listo, se reinició el historial. Las canciones ya escuchadas pueden volver a salir desde la próxima partida.");
+  renderCuentaLocal(); updatePoolWarn();
 }
 
 function setCover(txt, paused){
@@ -678,7 +896,7 @@ function newSong(){
   phase='ready';
   prepareMedia(s);   // se carga mientras leen la pantalla, no cuando aprietan play
   const tot = totalSongs();
-  document.getElementById("round-pill").textContent = tot ? ("Canción "+songNo+" / "+tot) : ("Canción "+songNo);
+  document.getElementById("round-pill").textContent = tot ? ("Canción "+songNo+" de "+tot) : ("Canción "+songNo);
   setCover("Listo para sonar 🎧", true);
   renderPhase(); renderBoard();
 }
@@ -1048,10 +1266,23 @@ function renderSolo(c, t, sub){
   }
 }
 
+// Un jugador: los seis valores a la vista, tachados los que ya pasaron y
+// resaltado lo que vale acertar ahora.
+function renderLadder(){
+  const el = document.getElementById("ladder");
+  const ver = modo==='solo' && phase!=='answering';
+  el.hidden = !ver;
+  if(!ver) return;
+  const ahora = Math.max(0, segundos-1);
+  el.innerHTML = PUNTOS_SOLO.map((p,i)=>
+    `<div class="${i<ahora ? 'used' : i===ahora ? 'now' : ''}"><b>${p}</b><span>${i+1} s</span></div>`).join("");
+}
+
 function renderPhase(){
   const c=document.getElementById("controls");
   const t=document.getElementById("phase-title");
   const sub=document.getElementById("phase-sub");
+  renderLadder();
   if(modo==='solo'){ renderSolo(c, t, sub); return; }
   if(phase==='ready'){
     t.textContent="🎧 Escuchen todos";
@@ -1141,24 +1372,50 @@ function renderPhase(){
   }
 }
 
-function renderBoard(){
+// Cuadrito de una canción de Un jugador (mismos tramos que la imagen final)
+function claseCuadrito(r){
+  if(!r.ok) return "k";
+  return r.seg===1 ? "g" : r.seg<=3 ? "y" : "o";
+}
+// Arriba de la partida: con amigos, un segmento por canción (las jugadas en
+// magenta, la actual en blanco); en un jugador, los cuadritos de las que ya
+// salieron y el punteado de la que suena. Sin límite o con más de 30 no hay
+// segmentos: no entrarían.
+function renderProg(){
+  const el = document.getElementById("prog");
+  const tot = totalSongs();
   if(modo==='solo'){
-    // las últimas canciones como cuadritos de color, para ver cómo viene
-    const tira = soloResultados.slice(-8).map(r=> soloTramo(r).emoji).join("");
-    document.getElementById("board").innerHTML = `
-      <div class="brow">
-        <span>🎧 Tus puntos ${tira ? `<span class="tira">${tira}</span>` : ""}</span>
-        <span class="pts">${soloPuntos}</span>
-      </div>`;
+    el.className = "prog sqs";
+    const hechas = soloResultados.slice(-30);
+    const actual = soloResultados.length < songNo ? 1 : 0;
+    const faltan = tot && tot <= 30 ? Math.max(0, tot - soloResultados.length - actual) : 0;
+    el.innerHTML = hechas.map(r=> `<span class="sq ${claseCuadrito(r)}"></span>`).join("") +
+      (actual ? `<span class="sq cur"></span>` : "") + `<span class="sq"></span>`.repeat(faltan);
     return;
   }
+  el.className = "prog";
+  el.innerHTML = tot && tot <= 30
+    ? Array.from({length:tot}, (_,i)=> `<span class="${i < songNo-1 ? 'd' : i===songNo-1 ? 'c' : ''}"></span>`).join("")
+    : "";
+}
+
+function renderBoard(){
+  renderProg();
+  const solo = modo==='solo';
+  document.getElementById("solo-pts").hidden = !solo;
+  if(solo){
+    document.getElementById("solo-pts-n").textContent = soloPuntos;
+    document.getElementById("board").innerHTML = "";
+    return;
+  }
+  // Una ficha por equipo: la del que va ganando en amarillo, la del que canta en verde
   const cur = (i)=> answeringTeam==='all' || i===answeringTeam;
-  const board = teams.map((p,i)=>`
-    <div class="brow ${cur(i)?'cur':''}">
-      <span>${cur(i)?'🎤 ':''}${esc(p.name)}</span>
-      <span class="pts">${p.score}</span>
+  const max = Math.max(...teams.map(p=> p.score));
+  const lider = max > 0 && teams.filter(p=> p.score===max).length === 1;
+  document.getElementById("board").innerHTML = teams.map((p,i)=>`
+    <div class="chip ${cur(i)?'cur':''} ${lider && p.score===max ? 'lead' : ''}">
+      <b>${p.score}</b><span>${cur(i)?'🎤 ':''}${esc(p.name)}</span>
     </div>`).join("");
-  document.getElementById("board").innerHTML = board;
 }
 
 function endGame(reason){
@@ -1178,11 +1435,13 @@ function endGame(reason){
     jugado.partidas++; jugado.canciones += lastGameSongs;
     try{ save(LS_JUGADO, jugado); }catch(_){}
   }
-  const head = document.querySelector("#s-results h2");
-  if(head) head.textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
   const solo = modo==='solo';
-  document.getElementById("rematch-btn").textContent = solo ? "🔁 Jugar otra vez" : "🔁 Revancha (mismos equipos)";
+  document.getElementById("res-titulo").textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
+  document.getElementById("res-sub").textContent =
+    (solo ? "Un jugador" : "Con amigos") + " · " + plural(lastGameSongs, "canción", "canciones");
+  document.getElementById("rematch-btn").textContent = solo ? "🔁 Jugar otra vez" : "🔁 Revancha";
   if(solo) finSolo(); else finGrupo();
+  document.getElementById("res-record").hidden = !(solo && nuevoRecord);
   mostrarTarjeta();
   pedirCafecito();
   show("s-results");
@@ -1289,8 +1548,7 @@ function goHome(){
   resetSolo();
   played=[]; brokenIds=new Set(); songNo=1;
   currentSong=null; phase='ready'; answeringTeam=-1; revealed=false;
-  renderTeams(); renderGenres(); updatePoolWarn();
-  show("s-setup");
+  show("s-inicio");
 }
 
 /* ============================================================
@@ -1401,7 +1659,8 @@ async function sendFeedback(ev){
    así que exponemos los handlers en window.
    ============================================================ */
 Object.assign(window, {
-  show, toggleGenre, setModo, addTeam, removeTeam, setTeamName, setLink,
+  show, irA, volver, elegirModo, repetirUltima, toggleTodos, setMaxSongs, setPenalty,
+  toggleGenre, setModo, addTeam, removeTeam, setTeamName, setLink,
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
   startGame, playSnippet, playContinuous, stopPlayback,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
@@ -1429,10 +1688,14 @@ function boot(){
   else renderTeams();
   setModo(modo);
   wireAudio();
-  renderGenres();
   renderLocalList();
-  updatePoolWarn();
-  iniciarCuentas({ show });
+  show("s-inicio");
+  // Al entrar o salir de la cuenta cambian el saludo, el récord con su puesto
+  // y lo que muestra Mi cuenta
+  iniciarCuentas({ show, alCambiar: ()=>{
+    if(pantalla==="s-inicio") renderInicio();
+    if(pantalla==="s-cuenta") renderCuentaLocal();
+  }});
 }
 boot();
 

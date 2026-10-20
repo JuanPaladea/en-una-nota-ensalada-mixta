@@ -24,7 +24,7 @@ const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];  // las mismas que el select 
 const LIMITE_RANKING = 20;
 
 let usuario = null;          // { id, nombre } con la sesión abierta
-let partidaFinal = null;     // { canciones, segundos } de la partida que se acaba de terminar
+let partidaFinal = null;     // { id, canciones } de la partida que se acaba de terminar, si entra al ranking
 let rankingVisto = 10;
 let mostrar = ()=>{};        // show() de main.js
 
@@ -152,20 +152,69 @@ function renderCuenta(){
 
 /* ============================================================
    PARTIDAS
-   segundos: uno por canción resuelta, los que hicieron falta para sacarla
-   (1 a 6) o 0 si no salió. Los puntos los calcula la base con eso.
+   La partida se va anotando en la base mientras se juega, con o sin cuenta:
+   qué video sonó y cuándo, y con cuántos segundos salió (1 a 6, 0 si no
+   salió). La base comprueba que el video sea del catálogo, que el título sea
+   el suyo y que haya pasado el tiempo de esos fragmentos; si algo no cierra,
+   la descarta. Al terminar, con cuenta, la pasa al historial y al ranking.
    ============================================================ */
+let enCurso = null;   // { canciones, id, valida, propias, cola }
+
+// Sin cuenta no hace falta supabase-js: alcanza un POST con la clave publicable.
+async function rpc(nombre, args){
+  if(clientePromesa){
+    const sb = await cliente();
+    const { data, error } = await sb.rpc(nombre, args);
+    if(error) throw error;
+    return data;
+  }
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nombre}`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  if(!r.ok) throw new Error(nombre + ": " + r.status);
+  return r.json();
+}
+// Los pasos van en orden: cada uno sale recién cuando volvió el anterior.
+function paso(p, nombre, args){
+  p.cola = p.cola.then(async ()=>{
+    if(!p.valida) return;
+    if(!await rpc(nombre, { p_partida: p.id, ...args })) p.valida = false;
+  }).catch(()=>{ p.valida = false; });
+}
+
+export function soloEmpezar(canciones){
+  enCurso = null;
+  if(!cuentasActivas) return;
+  const p = { canciones, id: null, valida: true, propias: false };
+  p.cola = rpc("solo_empezar", { p_canciones: canciones })
+    .then(id=>{ p.id = id; if(!id) p.valida = false; })
+    .catch(()=>{ p.valida = false; });
+  enCurso = p;
+}
+// Empezó a sonar una canción (o la reemplazó otra porque YouTube no la pasó).
+// Las propias (audios o links cargados a mano) no están en el catálogo.
+export function soloSono(video, propia){
+  const p = enCurso;
+  if(!p || !p.valida) return;
+  if(propia){ p.propias = true; p.valida = false; return; }
+  paso(p, "solo_sonar", { p_video: video });
+}
+// titulo: el que eligió, normalizado como en el catálogo; null si no salió.
+export function soloResolvio(segundos, titulo){
+  const p = enCurso;
+  if(p && p.valida) paso(p, "solo_resolver", { p_segundos: segundos, p_titulo: titulo });
+}
+
 async function guardarPartida(p){
-  const sb = await cliente();
-  const { data, error } = await sb.from("partidas_solo")
-    .insert({ canciones: p.canciones, segundos: p.segundos })
-    .select("puntos").single();
-  if(error) throw error;
+  const puntos = await rpc("solo_terminar", { p_partida: p.id });
+  if(puntos === null) throw new Error("partida vencida");
   const mio = await miFilaDelRanking(p.canciones);
   track("partida_guardada", {
-    canciones_por_partida: p.canciones, puntos: data.puntos, puesto: mio ? Number(mio.puesto) : 0,
+    canciones_por_partida: p.canciones, puntos, puesto: mio ? Number(mio.puesto) : 0,
   });
-  return { puntos: data.puntos, mio };
+  return { puntos, mio };
 }
 async function miFilaDelRanking(canciones){
   const sb = await cliente();
@@ -177,29 +226,41 @@ async function miFilaDelRanking(canciones){
 async function guardarPendiente(){
   let p = null;
   try{ p = JSON.parse(localStorage.getItem(LS_PENDIENTE)); localStorage.removeItem(LS_PENDIENTE); }catch(_){}
-  if(!p || !Array.isArray(p.segundos) || Date.now() - (p.cuando || 0) > PENDIENTE_VENCE_MS) return;
+  if(!p || !p.id || Date.now() - (p.cuando || 0) > PENDIENTE_VENCE_MS) return;
   try{
     await guardarPartida(p);
     verRanking(p.canciones, "Guardamos tu partida 🎧");
   }catch(e){ console.warn("[cuenta]", e); }
 }
 
-// Pantalla final. canciones = null en el modo con amigos (no hay ranking).
+// Pantalla final. resueltas = null en el modo con amigos (no hay ranking).
 let turnoFinal = 0;
-export async function rankingFinal(canciones, segundos){
+export async function rankingFinal(resueltas){
   const el = document.getElementById("ranking-final");
   const turno = ++turnoFinal;
+  const p = enCurso;
+  enCurso = null;
   partidaFinal = null;
   el.hidden = true;
-  if(!cuentasActivas || canciones === null || !segundos.length) return;
-  partidaFinal = { canciones, segundos };
+  if(!cuentasActivas || !p || !resueltas) return;
   el.hidden = false;
+  el.innerHTML = `<p class="hint" style="margin:0">Guardando en el ranking…</p>`;
+  await p.cola;
+  if(turno !== turnoFinal) return;          // ya arrancó otra partida
+  if(!p.valida){
+    track("partida_descartada", { canciones_por_partida: p.canciones, por: p.propias ? "propias" : "base" });
+    el.innerHTML = `<p class="hint" style="margin:0">${p.propias
+      ? "Las partidas con canciones propias no entran al ranking."
+      : "Esta partida no pudo entrar al ranking 😕"}</p>`;
+    return;
+  }
+  const canciones = p.canciones;
+  partidaFinal = { id: p.id, canciones };
   if(!usuario){
     el.innerHTML = `<p class="hint" style="margin:0 0 10px">¿Querés aparecer en el ranking? Entrá y guardamos esta partida.</p>
       ${botonGoogle("final", "Entrar con Google y guardarla")}`;
     return;
   }
-  el.innerHTML = `<p class="hint" style="margin:0">Guardando en el ranking…</p>`;
   try{
     const { puntos, mio } = await guardarPartida(partidaFinal);
     if(turno !== turnoFinal) return;          // ya arrancó otra partida

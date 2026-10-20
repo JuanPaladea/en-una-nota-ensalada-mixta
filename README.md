@@ -28,9 +28,11 @@ Después se **revela** la canción y el grupo decide si la pegó.
   compartir. El modo elegido se recuerda.
 - **Cuentas con Google y ranking** (opcional, con Supabase): entrando con Google, cada partida de un
   jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno entra a un **ranking por
-  cantidad de canciones** (5, 10, 15, 20, 30 y sin límite). Se guardan los segundos de cada canción y
-  los puntos los calcula la base, no el navegador. Si se entra desde la pantalla final, esa partida
-  se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se puede cambiar;
+  cantidad de canciones** (5, 10, 15, 20, 30 y sin límite). El ranking es **verificado**: la partida
+  se va anotando en la base mientras se juega y la base comprueba cada paso (que el video sea del
+  catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
+  sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
+  entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se puede cambiar;
   el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
   el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
@@ -100,15 +102,20 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── utils.js         # helpers puros (localStorage, escape, parseo de links)
 │   ├── idb.js           # persistencia de audios en IndexedDB
 │   └── styles.css       # estilos
-├── supabase/migrations/ # tablas, reglas de acceso y ranking de la base
+├── supabase/
+│   ├── migrations/      # tablas, reglas de acceso y ranking de la base
+│   └── catalogo_solo.sql # catálogo contra el que la base verifica las partidas (generado)
+├── scripts/
+│   └── catalogo-solo.mjs # genera catalogo_solo.sql desde src/data.js (npm run catalogo)
 ├── vite.config.js
 └── netlify.toml         # build de Netlify (npm run build → dist/)
 ```
 
 ## 👤 Cuentas y ranking (Supabase)
 
-1. Crear un proyecto en [supabase.com](https://supabase.com) y aplicarle
-   `supabase/migrations/20261020000000_cuentas_y_ranking.sql` (SQL Editor, o `supabase db push`).
+1. Crear un proyecto en [supabase.com](https://supabase.com), aplicarle las migraciones de
+   `supabase/migrations/` en orden (SQL Editor, o `supabase db push`) y después ejecutar
+   `supabase/catalogo_solo.sql`.
 2. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crear un
    **ID de cliente OAuth** (aplicación web) con URI de redireccionamiento autorizado
    `https://<proyecto>.supabase.co/auth/v1/callback`.
@@ -118,6 +125,10 @@ npm run preview # sirve el build de dist/ para probarlo
    `https://en-una-nota-ensalada-mixta.netlify.app/**` y `http://localhost:5173/**`.
 5. Copiar la URL del proyecto y la clave publicable (Project Settings → API) en las constantes
    del principio de `src/cuenta.js`. Vacías, las cuentas quedan apagadas.
+
+**Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y ejecutar el
+`supabase/catalogo_solo.sql` que genera en el SQL Editor. Si no, las partidas en las que suene una
+canción nueva se descartan del ranking.
 
 ## 🌐 Deploy
 

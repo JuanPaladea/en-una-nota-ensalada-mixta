@@ -12,7 +12,7 @@
 // son las reglas de la base. Vaciarlas apaga las cuentas y el ranking.
 import { esc } from "./utils.js";
 import { soloTramo } from "./sharecard.js";
-import { track, propiedadesUsuario } from "./analytics.js";
+import { track, propiedadesUsuario, usuarioAnalytics } from "./analytics.js";
 import { contarVideos, favoritosHtml } from "./favoritos.js";
 
 const SUPABASE_URL = "https://cebmgdrrfagsbrfyeqqm.supabase.co";
@@ -176,11 +176,14 @@ function iniciales(nombre){
   return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase();
 }
 
-// Lo que depende de la sesión: el avatar de arriba, Mi cuenta y la propiedad
-// de usuario con_cuenta de Analytics. Con una sesión guardada que todavía no
-// se confirmó no se marca: si no, sus primeros eventos irían como "no".
+// Lo que depende de la sesión: el avatar de arriba, Mi cuenta y, en Analytics,
+// el ID de la cuenta y la propiedad con_cuenta. Con una sesión guardada que
+// todavía no se confirmó no se marca: si no, sus primeros eventos irían como "no".
 function renderCuenta(){
-  if(usuario || !haySesionGuardada()) propiedadesUsuario({ con_cuenta: usuario ? "si" : "no" });
+  if(usuario || !haySesionGuardada()){
+    usuarioAnalytics(usuario ? usuario.id : null);
+    propiedadesUsuario({ con_cuenta: usuario ? "si" : "no" });
+  }
   const nav = document.getElementById("nav-cuenta");
   if(nav){
     nav.innerHTML = !cuentasActivas ? ""

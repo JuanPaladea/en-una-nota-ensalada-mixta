@@ -180,7 +180,10 @@ La medición está en `src/analytics.js` (ID de la propiedad al principio; vací
 | `cafecito_visto` / `cafecito` | Pedido al final / clic en un botón | `partidas`, `canciones` / `desde`, `pantalla`, `partidas` |
 | `comentario` | Se manda el formulario | `estado` (enviado · error) |
 
-Propiedad de usuario: `con_cuenta` (si · no).
+Propiedad de usuario: `con_cuenta` (si · no). Con sesión abierta va además el `user_id` (el ID
+de la cuenta en Supabase, nunca el nombre ni el mail), que junta en una persona lo que hace en
+distintos dispositivos. Para verlo en los informes, en Administrar → Recopilación de datos →
+Identidad para los informes usar "Combinada" u "Observada".
 
 **Para que los parámetros aparezcan en los informes** hay que darlos de alta una vez en
 Administrar → Definiciones personalizadas: como **dimensión de evento** `modo_juego`, `desde`,

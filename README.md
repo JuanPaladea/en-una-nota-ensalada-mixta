@@ -26,6 +26,13 @@ Después se **revela** la canción y el grupo decide si la pegó.
   como un intento. Se guarda el récord por cantidad de canciones y la imagen final muestra un
   cuadrito por canción (🟩 1 s, 🟨 2–3 s, 🟧 4–6 s, ⬛ no salió), que también va en el texto al
   compartir. El modo elegido se recuerda.
+- **Cuentas con Google y ranking** (opcional, con Supabase): entrando con Google, cada partida de un
+  jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno entra a un **ranking por
+  cantidad de canciones** (5, 10, 15, 20, 30 y sin límite). Se guardan los segundos de cada canción y
+  los puntos los calcula la base, no el navegador. Si se entra desde la pantalla final, esa partida
+  se guarda al volver de Google. En el ranking sale un nombre corto ("Juan P.") que se puede cambiar;
+  el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
+  el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
   evitan en partidas siguientes hasta agotar la playlist elegida (se puede reiniciar el
@@ -87,14 +94,30 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── main.js          # estado, lógica de juego, render y arranque
 │   ├── data.js          # las playlists (título, artista, id de YouTube)
 │   ├── sharecard.js     # dibuja y comparte la imagen del resultado
+│   ├── cuenta.js        # cuentas con Google, partidas guardadas y ranking (Supabase)
 │   ├── share.js         # compartir el link del juego (lo usan las dos páginas)
 │   ├── como-se-juega.js # arranque de la página de Cómo se juega
 │   ├── utils.js         # helpers puros (localStorage, escape, parseo de links)
 │   ├── idb.js           # persistencia de audios en IndexedDB
 │   └── styles.css       # estilos
+├── supabase/migrations/ # tablas, reglas de acceso y ranking de la base
 ├── vite.config.js
 └── netlify.toml         # build de Netlify (npm run build → dist/)
 ```
+
+## 👤 Cuentas y ranking (Supabase)
+
+1. Crear un proyecto en [supabase.com](https://supabase.com) y aplicarle
+   `supabase/migrations/20261020000000_cuentas_y_ranking.sql` (SQL Editor, o `supabase db push`).
+2. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crear un
+   **ID de cliente OAuth** (aplicación web) con URI de redireccionamiento autorizado
+   `https://<proyecto>.supabase.co/auth/v1/callback`.
+3. En Supabase, **Authentication → Sign In / Providers → Google**: activarlo y pegar el ID y el secreto.
+4. **Authentication → URL Configuration**: Site URL `https://enunanota.com.ar` y en Redirect URLs
+   `https://enunanota.com.ar/**`, `https://www.enunanota.com.ar/**`,
+   `https://en-una-nota-ensalada-mixta.netlify.app/**` y `http://localhost:5173/**`.
+5. Copiar la URL del proyecto y la clave publicable (Project Settings → API) en las constantes
+   del principio de `src/cuenta.js`. Vacías, las cuentas quedan apagadas.
 
 ## 🌐 Deploy
 

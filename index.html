@@ -73,6 +73,9 @@
     <!-- ===================== SETUP ===================== -->
     <section id="s-setup" class="screen on">
 
+      <!-- Cuenta con Google (opcional): la arma src/cuenta.js -->
+      <div id="cuenta-bar" class="cuenta-bar" hidden></div>
+
       <div class="card">
         <h3>1 · Elegí los géneros</h3>
         <div id="genres" class="genres"></div>
@@ -132,6 +135,8 @@
       <div style="height:12px"></div>
       <!-- Las reglas y las preguntas frecuentes tienen su propia página -->
       <a class="btn ghost big" href="como-se-juega/">🎤 Cómo se juega</a>
+      <div style="height:12px"></div>
+      <button class="btn ghost big" id="ranking-btn" onclick="verRanking(document.getElementById('opt-maxsongs').value)" hidden>🏆 Ranking</button>
 
     <div class="info">
       <button class="btn cyan big" onclick="shareGame()">📲 Compartir con tus amigos</button>
@@ -142,7 +147,7 @@
          el que ya vuelve a jugar, sin competirle a "¡A jugar!". -->
     <section class="card support">
       <h3>☕ Bancá el proyecto</h3>
-      <p class="support-txt"><b>En una nota</b> es gratis, sin anuncios y sin registro, y lo hago solo en mis
+      <p class="support-txt"><b>En una nota</b> es gratis, sin anuncios y no hace falta registrarse, y lo hago solo en mis
         ratos libres. El dominio, el hosting y el tiempo de armar cada playlist nueva salen de mi bolsillo.</p>
       <p class="support-txt">Si el juego les alegró alguna juntada, <b>un cafecito ayuda a mantenerlo vivo</b>
         y a seguir sumando canciones 💛</p>
@@ -176,6 +181,27 @@
         <div id="songlist" class="songlist"></div>
       </div>
       <button class="btn mag big" onclick="show('s-setup')">Listo</button>
+    </section>
+
+    <!-- ===================== RANKING ===================== -->
+    <!-- Modo un jugador: una tabla por cantidad de canciones (src/cuenta.js) -->
+    <section id="s-ranking" class="screen">
+      <div class="row spread" style="margin-bottom:14px">
+        <h2>🏆 Ranking</h2>
+        <button class="btn ghost mini" onclick="show('s-setup')">← Volver</button>
+      </div>
+      <p class="hint" id="rk-aviso" role="status" style="color:var(--lime)"></p>
+      <div class="rk-tabs" id="rk-tabs" role="group" aria-label="Canciones por partida"></div>
+      <div class="card">
+        <h3 id="rk-titulo">🎧 Un jugador</h3>
+        <p class="hint">El mejor puntaje de cada cuenta. A igual puntaje, queda arriba el que lo hizo primero.</p>
+        <div id="rk-lista" class="board"></div>
+      </div>
+      <div class="card">
+        <h3>Tus partidas</h3>
+        <div id="rk-mias" class="board"></div>
+      </div>
+      <button class="btn mag big" onclick="show('s-setup')">▶ Volver a jugar</button>
     </section>
 
     <!-- ===================== GAME ===================== -->
@@ -229,6 +255,8 @@
         <button class="btn cyan big" id="share-btn" onclick="shareResult(this, 'boton')">📲 Compartir el resultado</button>
         <p class="hint" id="share-hint" style="margin:8px 0 0">Manda una imagen con el marcador al grupo</p>
         <div style="height:14px"></div>
+        <!-- Un jugador con cuentas activas: dónde quedó en el ranking, o entrar para guardarla -->
+        <div id="ranking-final" class="ranking-final" hidden></div>
         <button class="btn mag big" id="rematch-btn" onclick="rematch()">🔁 Revancha (mismos equipos)</button>
         <div style="height:10px"></div>
         <!-- Al terminar es cuando más ganas hay de bancar el juego: el botón va
@@ -272,6 +300,7 @@
     <div class="footer-note">
       Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
       Tus links y canciones quedan guardados solo en este navegador.<br>
+      Si entrás con Google, guardamos solo un nombre corto (que podés cambiar) y tus partidas de un jugador, para el ranking: ni tu mail ni tu foto se muestran. <a href="privacidad/" style="color:inherit">Privacidad</a><br>
       Para saber cuánta gente juega usamos Google Analytics, que mide el uso de forma anónima: no guardamos datos personales ni los vendemos.
     </div>
   </div>

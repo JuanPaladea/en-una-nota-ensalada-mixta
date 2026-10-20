@@ -6,6 +6,7 @@ import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
+import { iniciarCuentas, rankingFinal } from "./cuenta.js";
 
 /* ============================================================
    ESTADO
@@ -1182,6 +1183,7 @@ function endGame(reason){
 }
 function finGrupo(){
   document.getElementById("share-hint").textContent = "Manda una imagen con el marcador al grupo";
+  rankingFinal(null);   // con amigos no hay ranking
   const sorted = [...teams].sort((a,b)=>b.score-a.score);
   const top = sorted[0];
   const winners = sorted.filter(p=>p.score===top.score);
@@ -1219,6 +1221,8 @@ function finSolo(){
     <div class="pill" style="margin-top:8px">de ${posibles} posibles${nuevoRecord ? " · 🏅 ¡nuevo récord!" : ""}</div>`;
   document.getElementById("final-board").innerHTML =
     `<div class="tira-fin">${soloResultados.map(r=> soloTramo(r).emoji).join("")}</div>`;
+  // Con cuenta se guarda en el ranking: los segundos de cada canción, 0 si no salió
+  rankingFinal(opts.maxSongs, soloResultados.map(r=> r.ok ? r.seg : 0));
 }
 
 // El pedido de Cafecito sale al terminar cualquier partida con canciones (el
@@ -1421,6 +1425,7 @@ function boot(){
   renderGenres();
   renderLocalList();
   updatePoolWarn();
+  iniciarCuentas({ show });
 }
 boot();
 

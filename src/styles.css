@@ -99,6 +99,24 @@
   .modo[aria-pressed="true"]{border-color:var(--cyan);background:rgba(37,224,214,.12);
     box-shadow:0 0 0 3px rgba(37,224,214,.15) inset}
 
+  /* Cuenta con Google y ranking (src/cuenta.js) */
+  .cuenta-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    border:1px dashed var(--line);border-radius:16px;padding:10px 12px;margin-bottom:18px;font-size:14px}
+  .cuenta-txt{color:var(--muted);flex:1 1 200px}
+  .btn.google{background:#fff;color:#1f1f1f;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    padding:10px 16px;font-size:15px;border-radius:12px}
+  .ranking-final{margin-bottom:14px}
+  .ranking-final .btn.google{width:100%;padding:14px 16px}
+  .linkish{background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:2px 4px}
+  .rk-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:16px}
+  .rk-tab{border:2px solid var(--line);background:rgba(255,255,255,.03);color:var(--paper);border-radius:12px;
+    padding:10px 4px;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
+  .rk-tab[aria-pressed="true"]{border-color:var(--cyan);background:rgba(37,224,214,.12)}
+  .rk-n{display:inline-block;min-width:1.6em;color:var(--muted)}
+  .rk-salto{text-align:center;color:var(--muted);line-height:1}
+  .rk-fecha{color:var(--muted);display:inline-block;min-width:4.2em}
+  .brow small{color:var(--muted);font-weight:400}
+
   .toggle{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;cursor:pointer;user-select:none}
   .toggle input{width:20px;height:20px;accent-color:var(--magenta)}
   select{background:var(--ink);border:2px solid var(--line);color:var(--paper);border-radius:10px;
@@ -340,8 +358,9 @@
   /* Ahí el logo es un link que vuelve al juego */
   a.brand{color:inherit;text-decoration:none}
   .info p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 12px}
-  .info ol{color:var(--muted);font-size:14.5px;line-height:1.8;padding-left:20px;margin:0 0 8px}
+  .info ol,.info ul{color:var(--muted);font-size:14.5px;line-height:1.8;padding-left:20px;margin:0 0 8px}
   .info li b,.info p b{color:var(--paper)}
+  .info p a,.info li a{color:var(--cyan)}
   .faq{border-top:1px solid var(--line);padding:12px 0 0;margin-top:8px}
   .faq summary{cursor:pointer;font-weight:800;font-size:15px;padding:8px 0;list-style:none;display:flex;
     justify-content:space-between;gap:10px;align-items:center}

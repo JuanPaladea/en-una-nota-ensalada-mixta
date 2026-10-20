@@ -61,7 +61,8 @@ Después se **revela** la canción y el grupo decide si la pegó.
   muestra el pedido final (`cafecito_visto`) y los clics (`cafecito`, con `desde`: `final`, `inicio` o `cuenta`).
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.
-- Página aparte **Cómo se juega** (`/como-se-juega/`, con un botón desde el inicio): las
+- Página aparte **Cómo se juega** (`/como-se-juega/`, con un botón desde el inicio y desde Mi cuenta),
+  con la misma barra de secciones que el juego (y lo mismo **Privacidad**): las
   reglas a la vista y las preguntas frecuentes plegadas, con datos estructurados `FAQPage`;
   imagen de OpenGraph en **PNG** (WhatsApp y Facebook no muestran previews en SVG) y
   `manifest.webmanifest` para instalarla desde el celular.

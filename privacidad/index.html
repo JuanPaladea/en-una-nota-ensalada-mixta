@@ -14,62 +14,98 @@
   <link rel="manifest" href="/manifest.webmanifest" />
 </head>
 <body>
-  <div class="wrap">
+  <!-- La misma barra que el juego: las secciones llevan a cada parte de la app.
+       Esta página está en Mi cuenta → Ayuda. -->
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="../" aria-label="En una nota · Ensalada mixta, volver al juego">
+        <span class="note">🎵</span>
+        <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
+      </a>
+      <span class="tagline">🥗 ensalada mixta</span>
+      <nav class="tabs" aria-label="Secciones">
+        <a class="tab" data-tab="jugar" href="../">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+          <span>Jugar</span>
+        </a>
+        <a class="tab" data-tab="ranking" href="../#ranking">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+          <span>Ranking</span>
+        </a>
+        <a class="tab" data-tab="cuenta" href="../#cuenta" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span>Mi cuenta</span>
+        </a>
+      </nav>
+    </div>
+  </header>
 
-    <!-- El logo lleva de vuelta al juego. El <h1> de esta página es el título de abajo. -->
-    <a class="brand" href="../" aria-label="En una nota · volver al juego">
-      <span class="note">🎵</span>
-      <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
-    </a>
-    <div class="tagline">🥗 ensalada mixta</div>
-    <div class="sub">El juego para cantar con amigos · edición casera</div>
-
+  <main class="wrap app">
     <!-- La enlaza la pantalla de consentimiento de Google (Google Cloud →
          Google Auth Platform → Información de la marca): si cambia la URL,
          hay que cambiarla también ahí. -->
-    <section class="card info">
-      <h1>🔒 Privacidad</h1>
-      <p><b>En una nota</b> lo hago yo, Juan Paladea, en mis ratos libres. Se juega sin cuenta y sin dar
-        ningún dato. Acá está todo lo que usa el juego y para qué. Última actualización: 20 de octubre de 2026.</p>
+    <div class="hdr">
+      <a class="back" href="../" onclick="return volverAtras()" aria-label="Volver">‹</a>
+      <h1 class="hdr-t"><small>Ayuda · actualizada el 20 de octubre de 2026</small>Privacidad</h1>
+    </div>
 
-      <h2>🎵 Sin cuenta</h2>
-      <p>Lo que configurás — los links de YouTube, los audios que cargás, los nombres de los equipos, las
-        canciones que ya sonaron y tu récord — queda <b>guardado solo en tu navegador</b> (localStorage e
-        IndexedDB). No viaja a ningún servidor y lo borrás borrando los datos del sitio.</p>
-      <p>Las canciones suenan con el reproductor de <b>YouTube</b>, que se rige por la política de privacidad
-        de Google. Para saber cuánta gente juega usamos <b>Google Analytics</b>, que mide el uso de forma
-        anónima (qué se toca, no quién lo toca). Si mandás un <b>comentario</b>, me llega lo que escribas en el
-        formulario, a través de Netlify.</p>
+    <p class="ayuda-intro"><b>En una nota</b> lo hago yo, Juan Paladea, en mis ratos libres. Se juega sin cuenta y sin dar
+      ningún dato. Acá está todo lo que usa el juego y para qué.</p>
 
-      <h2>👤 Si entrás con Google</h2>
-      <p>Entrar es opcional y sirve para una sola cosa: guardar tus partidas de <b>Un jugador</b> y aparecer
-        en el <b>ranking</b>. Al entrar, Google nos pasa tu <b>nombre, tu mail y tu foto de perfil</b>.</p>
-      <ul>
-        <li>En el ranking se muestra solo un <b>nombre corto</b> (por ejemplo “Juan P.”), que podés cambiar. Tu
-          mail y tu foto <b>no se muestran</b> a nadie.</li>
-        <li>De cada partida se guarda cuántos segundos hicieron falta en cada canción, los puntos, cuántas
-          canciones tenía y la fecha. Nada más.</li>
-        <li>Las cuentas y las partidas están en <b>Supabase</b>, con servidores en San Pablo, Brasil. Supabase
-          guarda los datos que manda Google para reconocerte la próxima vez que entres.</li>
-        <li>No vendemos ni compartimos tus datos con nadie, no los usamos para publicidad y no le pedimos a
-          Google acceso a nada más que tu perfil básico.</li>
-      </ul>
-      <p>El uso de la información recibida de las APIs de Google se ajusta a la
-        <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer" target="_blank">Política
-        de Datos del Usuario de los Servicios de las APIs de Google</a>, incluidos los requisitos de Uso Limitado.</p>
+    <!-- Lo esencial en tres tarjetas; el detalle, abajo -->
+    <ul class="resumen" aria-label="En resumen">
+      <li><span aria-hidden="true">🎵</span><b>Sin cuenta</b>Lo que configurás queda solo en tu navegador.</li>
+      <li><span aria-hidden="true">👤</span><b>Con Google</b>Se ve solo un nombre corto; tu mail y tu foto, nunca.</li>
+      <li><span aria-hidden="true">🚫</span><b>Nada se vende</b>No vendemos ni compartimos tus datos, ni los usamos para publicidad.</li>
+    </ul>
 
-      <h2>🗑️ Borrar tu cuenta</h2>
-      <p>Escribime a <a href="mailto:juanpaladea5@gmail.com">juanpaladea5@gmail.com</a> desde el mail de tu
-        cuenta y borro la cuenta con todas sus partidas. También podés quitarle el acceso al juego desde
-        <a href="https://myaccount.google.com/connections" rel="noopener noreferrer" target="_blank">tu cuenta de Google</a>.</p>
-    </section>
+    <div class="priv">
+      <div class="priv-col">
+        <section class="bloque bloque-card" aria-labelledby="t-sin">
+          <h2 class="bloque-t" id="t-sin"><span aria-hidden="true">🎵</span> Sin cuenta</h2>
+          <p>Lo que configurás — los links de YouTube, los audios que cargás, los nombres de los equipos, las
+            canciones que ya sonaron y tu récord — queda <b>guardado solo en tu navegador</b> (localStorage e
+            IndexedDB). No viaja a ningún servidor y lo borrás borrando los datos del sitio.</p>
+          <p>Las canciones suenan con el reproductor de <b>YouTube</b>, que se rige por la política de privacidad
+            de Google. Para saber cuánta gente juega usamos <b>Google Analytics</b>, que mide el uso de forma
+            anónima (qué se toca, no quién lo toca). Si mandás un <b>comentario</b>, me llega lo que escribas en el
+            formulario, a través de Netlify.</p>
+        </section>
+        <section class="bloque bloque-card" aria-labelledby="t-borrar">
+          <h2 class="bloque-t" id="t-borrar"><span aria-hidden="true">🗑️</span> Borrar tu cuenta</h2>
+          <p>Escribime a <a href="mailto:juanpaladea5@gmail.com">juanpaladea5@gmail.com</a> desde el mail de tu
+            cuenta y borro la cuenta con todas sus partidas. También podés quitarle el acceso al juego desde
+            <a href="https://myaccount.google.com/connections" rel="noopener noreferrer" target="_blank">tu cuenta de Google</a>.</p>
+        </section>
+      </div>
+      <section class="bloque bloque-card" aria-labelledby="t-google">
+        <h2 class="bloque-t" id="t-google"><span aria-hidden="true">👤</span> Si entrás con Google</h2>
+          <p>Entrar es opcional y sirve para una sola cosa: guardar tus partidas de <b>Un jugador</b> y aparecer
+            en el <b>ranking</b>. Al entrar, Google nos pasa tu <b>nombre, tu mail y tu foto de perfil</b>.</p>
+          <ul>
+            <li>En el ranking se muestra solo un <b>nombre corto</b> (por ejemplo “Juan P.”), que podés cambiar. Tu
+              mail y tu foto <b>no se muestran</b> a nadie.</li>
+            <li>De cada partida se guarda cuántos segundos hicieron falta en cada canción, los puntos, cuántas
+              canciones tenía y la fecha. Nada más.</li>
+            <li>Las cuentas y las partidas están en <b>Supabase</b>, con servidores en San Pablo, Brasil. Supabase
+              guarda los datos que manda Google para reconocerte la próxima vez que entres.</li>
+            <li>No vendemos ni compartimos tus datos con nadie, no los usamos para publicidad y no le pedimos a
+              Google acceso a nada más que tu perfil básico.</li>
+          </ul>
+          <p>El uso de la información recibida de las APIs de Google se ajusta a la
+            <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer" target="_blank">Política
+            de Datos del Usuario de los Servicios de las APIs de Google</a>, incluidos los requisitos de Uso Limitado.</p>
+      </section>
+    </div>
 
-    <a class="btn mag big" href="../">▶ ¡A jugar!</a>
+    <div class="cta-fila">
+      <a class="btn mag big" href="../">▶ ¡A jugar!</a>
+    </div>
 
     <div class="footer-note">
       Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).
     </div>
-  </div>
+  </main>
 
   <script type="module" src="/src/como-se-juega.js"></script>
 </body>

@@ -287,23 +287,21 @@ function elegirModo(m){
 function renderSetup(){
   renderGenres(); renderTeams(); renderMaxSongs(); syncPenalty(); updatePoolWarn();
 }
-// Canciones que pueden sonar de cada género (con link precargado o propio)
-function cuantasDe(g){
-  return g.songs.filter(([t,,yt])=> effId(g.id, t, yt)).length;
-}
 function renderGenres(){
   const el = document.getElementById("genres");
   const ficha = (id, em, nombre, detalle, extra)=>{
     const sel = selectedGenres.has(id);
     return `<button type="button" class="genre ${extra||""} ${sel?"sel":""}" aria-pressed="${sel}" onclick="toggleGenre('${id}')">
       <span class="em" aria-hidden="true">${em}</span>
-      <span class="gn">${esc(nombre)}<span class="gc">${detalle}</span></span>
+      <span class="gn">${esc(nombre)}${detalle ? `<span class="gc">${detalle}</span>` : ""}</span>
       <span class="tick" aria-hidden="true">✓</span>
     </button>`;
   };
   // Playlist de audios locales (siempre visible; destaca porque suena seguro)
-  el.innerHTML = GENRES.map(g=> ficha(g.id, g.em, nombreGenero(g.id), plural(cuantasDe(g), "canción", "canciones"))).join("") +
-    ficha("local", "🎵", "Mis canciones", plural(localTracks.length, "archivo", "archivos") + ` · <b style="color:var(--lime)">suena seguro</b>`, "local");
+  // Sin la cantidad de canciones de cada género: solo el nombre
+  el.innerHTML = GENRES.map(g=> ficha(g.id, g.em, nombreGenero(g.id), "")).join("") +
+    ficha("local", "🎵", "Mis canciones", localTracks.length
+      ? `<b style="color:var(--lime)">suena seguro</b>` : "Cargá tus audios", "local");
 }
 function toggleGenre(id){
   selectedGenres.has(id) ? selectedGenres.delete(id) : selectedGenres.add(id);
@@ -1705,6 +1703,13 @@ function boot(){
     if(pantalla==="s-inicio") renderInicio();
     if(pantalla==="s-cuenta") renderCuentaLocal();
   }});
+  // Las páginas de ayuda enlazan a ../#ranking y ../#cuenta: se abre esa
+  // sección y el #… se saca de la barra (no queda en un link compartido)
+  const desde = { "#ranking":"ranking", "#cuenta":"cuenta" }[location.hash];
+  if(desde){
+    history.replaceState(history.state, "", location.pathname + location.search);
+    irA(desde);
+  }
 }
 boot();
 

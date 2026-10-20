@@ -5,3 +5,9 @@ import "./analytics.js";
 import { shareGame } from "./share.js";
 
 window.shareGame = shareGame;
+// "‹" vuelve a donde estaba si vino del juego; si entró directo (desde Google,
+// por ejemplo), el link lleva al juego.
+window.volverAtras = ()=>{
+  if(document.referrer.startsWith(location.origin) && history.length > 1){ history.back(); return false; }
+  return true;
+};

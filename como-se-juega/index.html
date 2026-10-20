@@ -68,81 +68,121 @@
   </script>
 </head>
 <body>
-  <div class="wrap">
+  <!-- La misma barra que el juego: las secciones llevan a cada parte de la app.
+       Esta página está en Mi cuenta → Ayuda. -->
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="../" aria-label="En una nota · Ensalada mixta, volver al juego">
+        <span class="note">🎵</span>
+        <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
+      </a>
+      <span class="tagline">🥗 ensalada mixta</span>
+      <nav class="tabs" aria-label="Secciones">
+        <a class="tab" data-tab="jugar" href="../">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+          <span>Jugar</span>
+        </a>
+        <a class="tab" data-tab="ranking" href="../#ranking">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+          <span>Ranking</span>
+        </a>
+        <a class="tab" data-tab="cuenta" href="../#cuenta" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span>Mi cuenta</span>
+        </a>
+      </nav>
+    </div>
+  </header>
 
-    <!-- El logo lleva de vuelta al juego. El <h1> de esta página es el título de abajo. -->
-    <a class="brand" href="../" aria-label="En una nota · volver al juego">
-      <span class="note">🎵</span>
-      <span class="logo"><span class="en">EN</span> <span class="una">UNA</span> <span class="nota">NOTA</span></span>
-    </a>
-    <div class="tagline">🥗 ensalada mixta</div>
-    <div class="sub">El juego para cantar con amigos · edición casera</div>
+  <main class="wrap app">
+    <div class="hdr">
+      <a class="back" href="../" onclick="return volverAtras()" aria-label="Volver">‹</a>
+      <h1 class="hdr-t"><small>Ayuda</small>Cómo se juega</h1>
+    </div>
 
-    <!-- Todo a la vista: las instrucciones van desplegadas y solo las
-         preguntas frecuentes quedan plegadas, como en el inicio. -->
-    <section class="card info">
-      <h1>🎤 Cómo se juega</h1>
-      <p><b>En una nota</b> es el clásico juego de las juntadas con amigos: suena un pedacito de una canción,
-        se corta, y hay que <b>seguir cantando la parte que sigue</b>. Esta versión sortea los temas
-        sola y los mantiene tapados, así que <b>nadie sabe qué suena</b> hasta que se revela.</p>
-      <ol>
-        <li>Elegí los <b>géneros</b> (rock nacional, cumbia, pop, folklore, RKT, K-pop, infantiles y más).</li>
-        <li>Cargá los <b>equipos</b> con sus nombres.</li>
-        <li>Tocá <b>reproducir 1 segundo</b>: suena y se corta solo.</li>
-        <li>El equipo que grita <b>“¡YO!”</b> primero canta la parte que sigue.</li>
-        <li>Si <b>erra</b>, otro equipo puede tirar otro nombre y quedarse con el punto.</li>
-        <li>Se <b>revela</b> la canción, con su imagen, y el grupo define <b>quién se lleva el punto</b>.</li>
-        <li>Opcional: se puede activar que el que arriesga y <b>erra pierda un punto</b> (nunca baja de cero).</li>
-      </ol>
-      <h2>🎧 Un jugador</h2>
-      <p>En el inicio elegí <b>Un jugador</b>. Suena 1 segundo y escribís el título: aparece una lista para elegir,
-        así no importan los acentos ni los errores de tipeo. Si la sacás con <b>1 segundo valen 10 puntos</b>.
-        Si no, se repite desde el mismo punto pero más largo (2 segundos, 3… hasta 6) y vale menos:
-        7, 5, 3, 2 y 1. Errar también suma un segundo. Al final te queda una imagen con tus puntos y un
-        cuadrito por canción para desafiar a alguien, y se guarda tu récord.</p>
-      <p>Se juega desde el celular, la compu o la tele: no hay que instalar nada ni crear una cuenta. Si querés
-        guardar tus partidas y aparecer en el <b>ranking</b>, podés entrar con Google (es opcional).</p>
+    <div class="ayuda">
+      <div class="ayuda-main">
+        <p class="ayuda-intro"><b>En una nota</b> es el clásico juego de las juntadas con amigos: suena un pedacito de una canción,
+          se corta, y hay que <b>seguir cantando la parte que sigue</b>. Esta versión sortea los temas
+          sola y los mantiene tapados, así que <b>nadie sabe qué suena</b> hasta que se revela.</p>
 
-      <h2>❓ Preguntas frecuentes</h2>
-      <details class="faq">
-        <summary>¿Es gratis?</summary>
-        <p>Sí, totalmente gratis y sin anuncios. No hace falta registrarse: entrar con Google es opcional y
-          solo sirve para el ranking de Un jugador (<a href="../privacidad/">qué se guarda</a>).</p>
-      </details>
-      <details class="faq">
-        <summary>¿Cuántas canciones tiene?</summary>
-        <p>Más de 500 canciones repartidas en 16 playlists: rock nacional, cumbia y cuarteto,
-          pop y reggaetón, internacional, clásicos, Disney, fiesta, rock en español, trap urbano,
-          baladas, folklore argentino, infantiles, pop nacional, boy bands y pop 2000s,
-          cachengue y RKT, y K-pop. Además podés sumar las tuyas.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Se pueden usar mis propias canciones?</summary>
-        <p>Sí. En <b>Armar / vincular canciones</b> podés cargar archivos MP3 o M4A desde tu
-          dispositivo (suenan incluso sin internet) o pegar links de YouTube.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Se repiten las canciones?</summary>
-        <p>No. Dentro de una partida nunca se repiten, y entre partidas se recuerda lo que ya sonó
-          hasta agotar las playlists elegidas. Podés reiniciar ese historial cuando quieras.</p>
-      </details>
-      <details class="faq">
-        <summary>¿Cuántos pueden jugar?</summary>
-        <p>Los que quieras: se juega por equipos, con un solo dispositivo para todo el grupo.
-          Ideal para una juntada con amigos, un asado, un cumpleaños o un viaje en auto. Y si jugás
-          sin compañía, está el modo <b>Un jugador</b>: escribís el título y sumás puntos según lo rápido que la saques.</p>
-      </details>
-    </section>
+        <section class="bloque" aria-labelledby="t-amigos">
+          <h2 class="bloque-t" id="t-amigos"><span aria-hidden="true">👥</span> Con amigos</h2>
+          <ol class="reglas">
+            <li><b>Elegí los géneros</b>Rock nacional, cumbia, pop, folklore, RKT, K-pop, infantiles y más.</li>
+            <li><b>Cargá los equipos</b>Con sus nombres: se recuerdan para la próxima.</li>
+            <li><b>Tocá reproducir 1 segundo</b>Suena y se corta solo.</li>
+            <li><b>¡YO!</b>El equipo que lo grita primero canta la parte que sigue.</li>
+            <li><b>Si erra, otro puede robar</b>Otro equipo tira otro nombre y se queda con el punto.</li>
+            <li><b>Se revela</b>Aparece la canción, con su imagen, y el grupo define quién se lleva el punto.</li>
+            <li class="opc"><b>Opcional: errar resta</b>Se puede activar que el que arriesga y erra pierda un punto (nunca baja de cero).</li>
+          </ol>
+        </section>
 
-    <a class="btn mag big" href="../">▶ ¡A jugar!</a>
-    <div style="height:12px"></div>
-    <button class="btn cyan big" onclick="shareGame('como-se-juega')">📲 Compartir con tus amigos</button>
+        <section class="bloque bloque-card" aria-labelledby="t-solo">
+          <h2 class="bloque-t" id="t-solo"><span aria-hidden="true">🎧</span> Un jugador</h2>
+          <p>En el inicio elegí <b>Un jugador</b>. Suena 1 segundo y escribís el título: aparece una lista para elegir,
+            así no importan los acentos ni los errores de tipeo. Si la sacás con <b>1 segundo valen 10 puntos</b>.
+            Si no, se repite desde el mismo punto pero más largo (2 segundos, 3… hasta 6) y vale menos:
+            7, 5, 3, 2 y 1. Errar también suma un segundo.</p>
+          <div class="ladder" aria-hidden="true">
+              <div><b>10</b><span>1 s</span></div><div><b>7</b><span>2 s</span></div><div><b>5</b><span>3 s</span></div>
+              <div><b>3</b><span>4 s</span></div><div><b>2</b><span>5 s</span></div><div><b>1</b><span>6 s</span></div>
+            </div>
+          <p>Al final te queda una imagen con tus puntos y un cuadrito por canción para desafiar a alguien
+            (<span class="sq g"></span> 1 s, <span class="sq y"></span> 2–3 s, <span class="sq o"></span> 4–6 s,
+            <span class="sq k"></span> no salió), y se guarda tu récord.</p>
+          <p>Se juega desde el celular, la compu o la tele: no hay que instalar nada ni crear una cuenta. Si querés
+            guardar tus partidas y aparecer en el <b>ranking</b>, podés entrar con Google (es opcional).</p>
+        </section>
+      </div>
+
+      <aside class="ayuda-side">
+        <h2 class="bloque-t"><span aria-hidden="true">❓</span> Preguntas frecuentes</h2>
+        <div class="list">
+          <details class="list-det">
+            <summary class="list-row"><span>¿Es gratis?</span><span class="ch" aria-hidden="true">›</span></summary>
+            <p class="faq-a">Sí, totalmente gratis y sin anuncios. No hace falta registrarse: entrar con Google es opcional y
+              solo sirve para el ranking de Un jugador (<a href="../privacidad/">qué se guarda</a>).</p>
+          </details>
+          <details class="list-det">
+            <summary class="list-row"><span>¿Cuántas canciones tiene?</span><span class="ch" aria-hidden="true">›</span></summary>
+            <p class="faq-a">Más de 500 canciones repartidas en 16 playlists: rock nacional, cumbia y cuarteto,
+              pop y reggaetón, internacional, clásicos, Disney, fiesta, rock en español, trap urbano,
+              baladas, folklore argentino, infantiles, pop nacional, boy bands y pop 2000s,
+              cachengue y RKT, y K-pop. Además podés sumar las tuyas.</p>
+          </details>
+          <details class="list-det">
+            <summary class="list-row"><span>¿Se pueden usar mis propias canciones?</span><span class="ch" aria-hidden="true">›</span></summary>
+            <p class="faq-a">Sí. En <b>Mi cuenta → Mis canciones</b> podés cargar archivos MP3 o M4A desde tu
+              dispositivo (suenan incluso sin internet) o pegar links de YouTube.</p>
+          </details>
+          <details class="list-det">
+            <summary class="list-row"><span>¿Se repiten las canciones?</span><span class="ch" aria-hidden="true">›</span></summary>
+            <p class="faq-a">No. Dentro de una partida nunca se repiten, y entre partidas se recuerda lo que ya sonó
+              hasta agotar las playlists elegidas. Podés reiniciar ese historial cuando quieras.</p>
+          </details>
+          <details class="list-det">
+            <summary class="list-row"><span>¿Cuántos pueden jugar?</span><span class="ch" aria-hidden="true">›</span></summary>
+            <p class="faq-a">Los que quieras: se juega por equipos, con un solo dispositivo para todo el grupo.
+              Ideal para una juntada con amigos, un asado, un cumpleaños o un viaje en auto. Y si jugás
+              sin compañía, está el modo <b>Un jugador</b>: escribís el título y sumás puntos según lo rápido que la saques.</p>
+          </details>
+        </div>
+
+        <div class="cta-card">
+          <div class="bloque-t">¿Listos para cantar?</div>
+          <a class="btn mag big" href="../">▶ ¡A jugar!</a>
+          <button type="button" class="btn ghost big" onclick="shareGame('como-se-juega')">📲 Compartir con tus amigos</button>
+        </div>
+      </aside>
+    </div>
 
     <div class="footer-note">
       Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
       Para saber cuánta gente juega usamos Google Analytics, que mide el uso de forma anónima: no guardamos datos personales ni los vendemos.
     </div>
-  </div>
+  </main>
 
   <script type="module" src="/src/como-se-juega.js"></script>
 </body>

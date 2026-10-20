@@ -237,14 +237,15 @@
     </section>
 
     <!-- ===================== RANKING ===================== -->
-    <!-- Modo un jugador: una tabla por cantidad de canciones (src/cuenta.js) -->
+    <!-- Modo un jugador: semana, mes o histórico, y una tabla por cantidad de canciones (src/cuenta.js) -->
     <section id="s-ranking" class="screen">
       <div class="hdr">
-        <h2 class="hdr-t"><small>Un jugador · el mejor puntaje de cada cuenta</small><span id="rk-titulo">Ranking</span></h2>
+        <h2 class="hdr-t"><small id="rk-sub">Un jugador · el mejor puntaje de cada cuenta</small><span id="rk-titulo">Ranking</span></h2>
       </div>
       <p class="hint" id="rk-aviso" role="status" style="color:var(--lime)"></p>
       <div class="rk-grid">
         <div class="rk-main">
+          <div class="chips periodos" id="rk-periodos" role="group" aria-label="Período"></div>
           <div class="chips" id="rk-tabs" role="group" aria-label="Canciones por partida"></div>
           <div id="rk-podio" class="podium"></div>
           <div id="rk-lista" class="rk"></div>
@@ -262,7 +263,7 @@
               <span class="sq g"></span> 1 s, <span class="sq y"></span> 2–3 s, <span class="sq o"></span> 4–6 s y
               <span class="sq k"></span> no salió.</p>
           </div>
-          <p class="hint rk-nota">A igual puntaje queda arriba el que lo hizo primero. En el ranking se ve solo un nombre corto.</p>
+          <p class="hint rk-nota">El semanal arranca de cero cada lunes y el mensual cada día 1. A igual puntaje queda arriba el que lo hizo primero. En el ranking se ve solo un nombre corto.</p>
           <button type="button" class="btn ghost big rk-jugar" onclick="elegirModo('solo')">🎧 Jugar un jugador</button>
         </div>
       </div>

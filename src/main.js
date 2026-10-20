@@ -216,7 +216,7 @@ async function renderRecordCard(){
     const cuerpo = `<span class="grow"><span class="eyebrow" style="color:var(--cyan)">Récord · ${de}</span>
       <span class="big-pts">${pts} <small>pts</small></span></span>${pill}`;
     return cuentasActivas
-      ? `<button type="button" class="tarjeta" onclick="verRanking(${n})">${cuerpo}</button>`
+      ? `<button type="button" class="tarjeta" onclick="verRanking(${n}, '', 'siempre')">${cuerpo}</button>`
       : `<div class="tarjeta">${cuerpo}</div>`;
   };
   const local = record[String(n)] || 0;
@@ -235,7 +235,7 @@ async function renderRecordCard(){
   const mio = await miPuesto(n);
   if(turno !== turnoRecord) return;
   const pts = Math.max(local, mio ? mio.puntos : 0);
-  el.innerHTML = pts ? tarjeta(pts, `<span class="pill amber">${mio ? "#" + mio.puesto + " en el ranking" : "Ranking"} ›</span>`) : "";
+  el.innerHTML = pts ? tarjeta(pts, `<span class="pill amber">${mio ? "#" + mio.puesto + " histórico" : "Ranking"} ›</span>`) : "";
 }
 
 /* ============================================================

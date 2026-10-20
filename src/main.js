@@ -1,5 +1,6 @@
 import "./styles.css";
 import { GENRES } from "./data.js";
+import { RELLENO } from "./relleno.js";
 import { load, save, songKey, esc, extractVideoId, norm } from "./utils.js";
 import { idbPut, idbGet, idbDel } from "./idb.js";
 import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
@@ -877,33 +878,64 @@ function resetSolo(){ soloPuntos = 0; soloResultados = []; nuevoRecord = false; 
 
 // Se autocompleta con todo el catálogo, no solo con los géneros elegidos: si
 // no, jugando con una playlist chica la lista de opciones ya era media pista.
+// Encima se suman canciones que la app no tiene (RELLENO), para que figurar en
+// la lista no delate que puede sonar. Las que repiten un título del catálogo
+// se saltean: se acierta por título y no tienen que contar como acierto.
 function armarCatalogo(){
-  const vistos = new Set();
+  const vistos = new Set(), titulos = new Set();
   catalogo = [];
   allSongs().forEach(s=>{
     const nt = norm(s.t), na = norm(s.a);
     if(!nt || vistos.has(nt+"|"+na)) return;
-    vistos.add(nt+"|"+na);
+    vistos.add(nt+"|"+na); titulos.add(nt);
     catalogo.push({ t:s.t, a:s.a, nt, na });
   });
+  RELLENO.forEach(([t,a])=>{
+    const nt = norm(t);
+    if(!nt || titulos.has(nt)) return;
+    titulos.add(nt);
+    catalogo.push({ t, a, nt, na:norm(a) });
+  });
+}
+const MAX_SUGERENCIAS = 6;
+// Hash chico para mezclar el relleno siempre igual para lo mismo escrito.
+function hashStr(s){
+  let h = 2166136261;
+  for(let i=0; i<s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
 }
 // Primero los títulos que empiezan con lo escrito, después los que lo tienen
 // al principio de una palabra, en el medio, y al final los que coinciden
 // palabra por palabra contando el artista ("persiana soda").
+// Si coinciden pocos, se completa la lista con parecidos (del mismo artista,
+// con palabras que empiezan igual): con dos letras no tiene que quedar una
+// sola opción a la vista. El relleno sale solo de lo escrito, nunca de la
+// canción que suena, así que no da pistas.
 function buscarTitulos(q){
   const n = norm(q);
   if(n.length < 2) return [];
   const palabras = n.split(" ");
-  const hits = [];
+  const hits = [], resto = [];
   for(const s of catalogo){
     const rank = s.nt.startsWith(n) ? 0
       : (" "+s.nt).includes(" "+n) ? 1
       : s.nt.includes(n) ? 2
       : palabras.every(p=> (s.nt+" "+s.na).includes(p)) ? 3 : -1;
-    if(rank >= 0) hits.push([rank, s]);
+    (rank >= 0 ? hits : resto).push([rank, s]);
   }
   hits.sort((a,b)=> a[0]-b[0] || a[1].t.localeCompare(b[1].t));
-  return hits.slice(0, 4).map(h=> h[1]);
+  const lista = hits.slice(0, MAX_SUGERENCIAS).map(h=> h[1]);
+  if(!lista.length || lista.length >= MAX_SUGERENCIAS) return lista;
+  const artistas = new Set(lista.map(s=> s.na));
+  const empiezaCon = (s, pre)=> (" "+s.nt).includes(" "+pre);
+  const relleno = resto.map(([, s])=>{
+    const rank = artistas.has(s.na) ? 0
+      : palabras.some(p=> empiezaCon(s, p.slice(0, 2))) ? 1
+      : empiezaCon(s, n[0]) ? 2 : 3;
+    return [rank, hashStr(n+"|"+s.nt), s];
+  });
+  relleno.sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
+  return lista.concat(relleno.slice(0, MAX_SUGERENCIAS - lista.length).map(r=> r[2]));
 }
 function renderSugerencias(q){
   const el = document.getElementById("guess-list");

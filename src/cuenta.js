@@ -12,7 +12,7 @@
 // son las reglas de la base. Vaciarlas apaga las cuentas y el ranking.
 import { esc } from "./utils.js";
 import { soloTramo } from "./sharecard.js";
-import { track } from "./analytics.js";
+import { track, propiedadesUsuario } from "./analytics.js";
 
 const SUPABASE_URL = "https://cebmgdrrfagsbrfyeqqm.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GK8qADTCcOrWDGWit99ubQ_P6d52nWh";
@@ -85,6 +85,8 @@ export async function iniciarCuentas(opciones){
       const fallo = new URLSearchParams(location.search).get("error_description");
       limpiarUrl();
       track("cuenta", { accion: data.session ? "entro" : "cancelo", detalle: fallo || "" });
+      // El evento recomendado de GA4: aparece solo en los informes de usuarios
+      if(data.session) track("login", { method: "Google" });
     }
     await tomarSesion(data.session);
     // supabase-js pide no llamarse a sí mismo dentro de este aviso: va al próximo turno
@@ -126,6 +128,7 @@ async function entrar(desde){
     });
     if(error) throw error;
   }catch(e){
+    track("error_cuenta", { donde: "google", desde });
     alert("No pudimos abrir el ingreso con Google. Probá de nuevo en un rato.");
   }
 }
@@ -156,7 +159,7 @@ async function guardarNombre(ev){
   const sb = await cliente();
   const { error } = await sb.from("perfiles").update({ nombre: nuevo }).eq("id", usuario.id);
   if(btn) btn.disabled = false;
-  if(error){ alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
+  if(error){ track("error_cuenta", { donde: "nombre" }); alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
   usuario.nombre = nuevo;
   track("cuenta", { accion: "renombrar" });
   renderCuenta();
@@ -172,8 +175,11 @@ function iniciales(nombre){
   return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase();
 }
 
-// Lo que depende de la sesión: el avatar de arriba y Mi cuenta
+// Lo que depende de la sesión: el avatar de arriba, Mi cuenta y la propiedad
+// de usuario con_cuenta de Analytics. Con una sesión guardada que todavía no
+// se confirmó no se marca: si no, sus primeros eventos irían como "no".
 function renderCuenta(){
+  if(usuario || !haySesionGuardada()) propiedadesUsuario({ con_cuenta: usuario ? "si" : "no" });
   const nav = document.getElementById("nav-cuenta");
   if(nav){
     nav.innerHTML = !cuentasActivas ? ""
@@ -293,6 +299,7 @@ export async function renderMiCuenta(){
       if(celda) celda.textContent = mio ? "#" + mio.puesto : "";
     });
   }catch(e){
+    track("error_cuenta", { donde: "mis_partidas" });
     if(turno !== turnoCuenta) return;
     document.getElementById("cuenta-datos").innerHTML = `<p class="cargando">No pudimos cargar tus partidas.</p>`;
   }
@@ -378,7 +385,7 @@ async function guardarPendiente(){
   if(!p || !p.id || Date.now() - (p.cuando || 0) > PENDIENTE_VENCE_MS) return;
   try{
     await guardarPartida(p);
-    verRanking(p.canciones, "Guardamos tu partida 🎧", "semana");
+    verRanking(p.canciones, "Guardamos tu partida 🎧", "semana", "guardado");
   }catch(e){ console.warn("[cuenta]", e); }
 }
 
@@ -406,6 +413,8 @@ export async function rankingFinal(resueltas){
   const canciones = p.canciones;
   partidaFinal = { id: p.id, canciones };
   if(!usuario){
+    // Contra cuenta/entrar desde final da cuántos aceptan la invitación
+    track("invitacion_cuenta", { desde: "final", canciones_por_partida: canciones });
     el.innerHTML = `<p class="hint" style="margin:0 0 10px">¿Querés aparecer en el ranking? Entrá y guardamos esta partida.</p>
       ${botonGoogle("final", "Entrar con Google y guardarla")}`;
     return;
@@ -421,10 +430,11 @@ export async function rankingFinal(resueltas){
       : semana.puntos === puntos ? `Quedaste <b style="color:var(--amber)">#${semana.puesto}</b> esta semana`
       : `Tu mejor de la semana (${semana.puntos} puntos) está <b style="color:var(--amber)">#${semana.puesto}</b>`;
     const historico = mio ? `<span class="tarjeta-d">Histórico: #${mio.puesto}${mio.puntos === puntos ? "" : ` con ${mio.puntos} puntos`}</span>` : "";
-    el.innerHTML = `<button type="button" class="tarjeta" style="border:0;padding:0;background:none" onclick="verRanking(${canciones}, '', 'semana')">
+    el.innerHTML = `<button type="button" class="tarjeta" style="border:0;padding:0;background:none" onclick="verRanking(${canciones}, '', 'semana', 'final')">
         <span class="grow"><span class="eyebrow">Ranking${de}</span><span class="tarjeta-t">${txt}</span>${historico}</span>
         <span class="pill amber">Ver ›</span></button>`;
   }catch(e){
+    track("error_cuenta", { donde: "guardar" });
     if(turno !== turnoFinal) return;
     el.innerHTML = `<p class="hint">No pudimos guardar la partida en el ranking 😕</p>`;
   }
@@ -443,19 +453,20 @@ const deQue = ()=> (rankingVisto ? "con " + rankingVisto + " canciones" : "sin l
 
 let turnoRanking = 0;
 // per: semana | mes | siempre; sin él queda el último que se miró
-export async function verRanking(canciones, aviso, per){
+// desde (para Analytics): seccion | inicio | final | guardado | periodo | cantidad
+export async function verRanking(canciones, aviso, per, desde){
   if(!cuentasActivas) return;
   rankingVisto = OPCIONES_CANCIONES.includes(Number(canciones)) ? Number(canciones) : 10;
   if(PERIODOS.some(p=> p.id === per)) periodoVisto = per;
   if(!document.getElementById("s-ranking").classList.contains("on")) mostrar("s-ranking");
-  track("ranking_visto", { canciones_por_partida: rankingVisto, periodo: periodoVisto });
+  track("ranking_visto", { canciones_por_partida: rankingVisto, periodo: periodoVisto, desde: desde || "" });
   const turno = ++turnoRanking;
   document.getElementById("rk-aviso").textContent = aviso || "";
   document.getElementById("rk-aviso").hidden = !aviso;
   document.getElementById("rk-periodos").innerHTML = PERIODOS.map(p=>
-    `<button type="button" aria-pressed="${p.id === periodoVisto}" onclick="verRanking(${rankingVisto}, '', '${p.id}')">${p.boton}</button>`).join("");
+    `<button type="button" aria-pressed="${p.id === periodoVisto}" onclick="verRanking(${rankingVisto}, '', '${p.id}', 'periodo')">${p.boton}</button>`).join("");
   document.getElementById("rk-tabs").innerHTML = OPCIONES_CANCIONES.map(n=>
-    `<button type="button" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n})"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
+    `<button type="button" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n}, '', undefined, 'cantidad')"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
   document.getElementById("rk-titulo").textContent = `Ranking ${periodo(periodoVisto).titulo} · ` + nombreOpcion(rankingVisto).toLowerCase();
   document.getElementById("rk-sub").textContent = "Un jugador · el mejor puntaje de cada cuenta"
     + (periodo(periodoVisto).cuando ? " " + periodo(periodoVisto).cuando : "");
@@ -491,6 +502,7 @@ export async function verRanking(canciones, aviso, per){
         <span class="pt">${f.puntos}</span>
       </div>`).join("");
   }catch(e){
+    track("error_cuenta", { donde: "ranking" });
     if(turno !== turnoRanking) return;
     lista.innerHTML = `<p class="rk-vacio">No pudimos cargar el ranking. Probá de nuevo en un rato.</p>`;
   }

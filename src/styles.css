@@ -546,6 +546,8 @@
     font:inherit;font-weight:900;font-size:15px;cursor:pointer}
   .chips button:hover{color:var(--paper)}
   .chips button[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:var(--ink)}
+  .chips.periodos{grid-template-columns:repeat(3,1fr);margin-bottom:8px}
+  .chips.periodos button[aria-pressed="true"]{background:var(--cyan);border-color:var(--cyan)}
   .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin:10px 0 14px}
   .podium:empty{display:none}
   .pod{display:grid;justify-items:center;gap:4px;text-align:center;min-width:0}
@@ -629,6 +631,15 @@
   .login-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;max-width:42ch}
   .login-card .btn.google{padding:12px 18px}
   .cargando{color:var(--muted);font-size:14px;margin:4px 0 0}
+  /* Géneros favoritos: los que más sonaron, con su parte del total */
+  .favs{display:grid;gap:10px;border-radius:16px;border:1px solid var(--line);background:var(--card);padding:12px 14px}
+  .fav-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:5px 10px}
+  .fav-row .em{grid-row:span 2;font-size:22px;line-height:1;text-align:center}
+  .fav-row .gn{font-weight:800;font-size:14.5px;min-width:0}
+  .fav-row b{font-family:var(--f-display);font-size:18px;color:var(--amber);line-height:1}
+  .fav-bar{grid-column:2 / 4;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .fav-bar span{display:block;height:100%;border-radius:3px;background:var(--amber)}
+  .fav-hint{margin:8px 0 0}
   /* Listas planas, separadas por líneas */
   .list{display:grid;border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--card)}
   .list-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:0;border-top:1px solid var(--line);

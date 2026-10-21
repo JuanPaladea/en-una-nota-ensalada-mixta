@@ -3,7 +3,8 @@
 // Entrar es opcional: sin cuenta se juega igual que siempre. Con cuenta, cada
 // partida de un jugador se guarda (el historial) y el mejor puntaje de cada uno
 // entra al ranking, que hay uno por cantidad de canciones — 40 puntos en 5
-// canciones no se comparan con 40 en 20. Las tablas y las reglas de acceso
+// canciones no se comparan con 40 en 20 — y por período: la semana (desde el
+// lunes), el mes (desde el 1) o de siempre. Las tablas y las reglas de acceso
 // están en supabase/migrations/.
 //
 // URL y clave publicable salen del proyecto en supabase.com (Project Settings →
@@ -11,7 +12,8 @@
 // son las reglas de la base. Vaciarlas apaga las cuentas y el ranking.
 import { esc } from "./utils.js";
 import { soloTramo } from "./sharecard.js";
-import { track } from "./analytics.js";
+import { track, propiedadesUsuario, usuarioAnalytics } from "./analytics.js";
+import { contarVideos, favoritosHtml } from "./favoritos.js";
 
 const SUPABASE_URL = "https://cebmgdrrfagsbrfyeqqm.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GK8qADTCcOrWDGWit99ubQ_P6d52nWh";
@@ -22,10 +24,18 @@ const LS_PENDIENTE = "eun_partida_pendiente_v1";
 const PENDIENTE_VENCE_MS = 60 * 60 * 1000;    // una partida sin guardar de hace más de una hora ya no va
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];  // las mismas que el select de Opciones; 0 = sin límite
 const LIMITE_RANKING = 20;
+// Los de ranking_solo(): la semana arranca el lunes y el mes el 1, a las 0 h de Argentina
+const PERIODOS = [
+  { id: "semana",  boton: "Semana",    titulo: "semanal",   cuando: "esta semana" },
+  { id: "mes",     boton: "Mes",       titulo: "mensual",   cuando: "este mes" },
+  { id: "siempre", boton: "Histórico", titulo: "histórico", cuando: "" },
+];
+const periodo = (id)=> PERIODOS.find(p=> p.id === id) || PERIODOS[2];
 
 let usuario = null;          // { id, nombre } con la sesión abierta
 let partidaFinal = null;     // { id, canciones } de la partida que se acaba de terminar, si entra al ranking
 let rankingVisto = 10;
+let periodoVisto = "semana";
 let mostrar = ()=>{};        // show() de main.js
 
 // supabase-js pesa: se baja recién cuando hace falta (ya hay sesión, se vuelve
@@ -76,6 +86,8 @@ export async function iniciarCuentas(opciones){
       const fallo = new URLSearchParams(location.search).get("error_description");
       limpiarUrl();
       track("cuenta", { accion: data.session ? "entro" : "cancelo", detalle: fallo || "" });
+      // El evento recomendado de GA4: aparece solo en los informes de usuarios
+      if(data.session) track("login", { method: "Google" });
     }
     await tomarSesion(data.session);
     // supabase-js pide no llamarse a sí mismo dentro de este aviso: va al próximo turno
@@ -117,6 +129,7 @@ async function entrar(desde){
     });
     if(error) throw error;
   }catch(e){
+    track("error_cuenta", { donde: "google", desde });
     alert("No pudimos abrir el ingreso con Google. Probá de nuevo en un rato.");
   }
 }
@@ -147,7 +160,7 @@ async function guardarNombre(ev){
   const sb = await cliente();
   const { error } = await sb.from("perfiles").update({ nombre: nuevo }).eq("id", usuario.id);
   if(btn) btn.disabled = false;
-  if(error){ alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
+  if(error){ track("error_cuenta", { donde: "nombre" }); alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
   usuario.nombre = nuevo;
   track("cuenta", { accion: "renombrar" });
   renderCuenta();
@@ -163,8 +176,14 @@ function iniciales(nombre){
   return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase();
 }
 
-// Lo que depende de la sesión: el avatar de arriba y Mi cuenta
+// Lo que depende de la sesión: el avatar de arriba, Mi cuenta y, en Analytics,
+// el ID de la cuenta y la propiedad con_cuenta. Con una sesión guardada que
+// todavía no se confirmó no se marca: si no, sus primeros eventos irían como "no".
 function renderCuenta(){
+  if(usuario || !haySesionGuardada()){
+    usuarioAnalytics(usuario ? usuario.id : null);
+    propiedadesUsuario({ con_cuenta: usuario ? "si" : "no" });
+  }
   const nav = document.getElementById("nav-cuenta");
   if(nav){
     nav.innerHTML = !cuentasActivas ? ""
@@ -187,26 +206,26 @@ function renderSalir(){
    sale de las partidas propias (las reglas de la base no dejan leer otras)
    y los puestos de ranking_solo().
    ============================================================ */
-let misPartidas = null;        // cache: [{ canciones, segundos, puntos, jugada }], más nuevas primero
-let puestos = {};              // cache: { canciones: fila de ranking_solo con es_mio, o null }
+let misPartidas = null;        // cache: [{ canciones, segundos, puntos, jugada, videos }], más nuevas primero
+let puestos = {};              // cache: { "canciones/período": fila de ranking_solo con es_mio, o null }
 function olvidarCache(){ misPartidas = null; puestos = {}; }
 
 async function cargarMisPartidas(){
   if(misPartidas) return misPartidas;
   const sb = await cliente();
   const { data, error } = await sb.from("partidas_solo")
-    .select("canciones, segundos, puntos, jugada")
+    .select("canciones, segundos, puntos, jugada, videos")
     .order("jugada", { ascending: false }).limit(500);
   if(error) throw error;
   misPartidas = data || [];
   return misPartidas;
 }
-// Tu fila en el ranking de esa cantidad (puesto y mejor puntaje), o null
-export async function miPuesto(canciones){
+// Tu fila en el ranking de esa cantidad y período (puesto y mejor puntaje), o null
+export async function miPuesto(canciones, per = "siempre"){
   if(!cuentasActivas || !usuario) return null;
-  const k = String(canciones);
+  const k = canciones + "/" + per;
   if(!(k in puestos)){
-    puestos[k] = miFilaDelRanking(canciones).catch(()=> null);
+    puestos[k] = miFilaDelRanking(canciones, per).catch(()=> null);
   }
   return puestos[k];
 }
@@ -269,6 +288,7 @@ export async function renderMiCuenta(){
         <div class="tile"><b>${canciones}</b><span>canciones</span></div>
         <div class="tile"><b>${promedio ? promedio.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " s" : "—"}</b><span>promedio para sacarla</span></div>
       </div>
+      ${favoritosHtml(contarVideos(partidas.flatMap(p=> p.videos || [])), "tus partidas de Un jugador")}
       <div class="lbl">Tus récords</div>
       <div class="rec">${OPCIONES_CANCIONES.map(n=> `<div class="${mejores[n] ? "" : "none"}" data-rec="${n}">
           ${n ? n + " canciones" : "Sin límite"}<b>${mejores[n] || "—"}</b><span class="pos">${mejores[n] ? "…" : ""}</span></div>`).join("")}</div>
@@ -284,6 +304,7 @@ export async function renderMiCuenta(){
       if(celda) celda.textContent = mio ? "#" + mio.puesto : "";
     });
   }catch(e){
+    track("error_cuenta", { donde: "mis_partidas" });
     if(turno !== turnoCuenta) return;
     document.getElementById("cuenta-datos").innerHTML = `<p class="cargando">No pudimos cargar tus partidas.</p>`;
   }
@@ -356,9 +377,9 @@ async function guardarPartida(p){
   });
   return { puntos, mio };
 }
-async function miFilaDelRanking(canciones){
+async function miFilaDelRanking(canciones, per){
   const sb = await cliente();
-  const { data } = await sb.rpc("ranking_solo", { p_canciones: canciones, p_limite: 1 });
+  const { data } = await sb.rpc("ranking_solo", { p_canciones: canciones, p_limite: 1, p_periodo: per });
   return (data || []).find(f=> f.es_mio) || null;
 }
 
@@ -369,7 +390,7 @@ async function guardarPendiente(){
   if(!p || !p.id || Date.now() - (p.cuando || 0) > PENDIENTE_VENCE_MS) return;
   try{
     await guardarPartida(p);
-    verRanking(p.canciones, "Guardamos tu partida 🎧");
+    verRanking(p.canciones, "Guardamos tu partida 🎧", "semana", "guardado");
   }catch(e){ console.warn("[cuenta]", e); }
 }
 
@@ -397,21 +418,28 @@ export async function rankingFinal(resueltas){
   const canciones = p.canciones;
   partidaFinal = { id: p.id, canciones };
   if(!usuario){
+    // Contra cuenta/entrar desde final da cuántos aceptan la invitación
+    track("invitacion_cuenta", { desde: "final", canciones_por_partida: canciones });
     el.innerHTML = `<p class="hint" style="margin:0 0 10px">¿Querés aparecer en el ranking? Entrá y guardamos esta partida.</p>
       ${botonGoogle("final", "Entrar con Google y guardarla")}`;
     return;
   }
   try{
+    // La partida recién guardada siempre entra en la semana: ese puesto va
+    // grande y el histórico debajo
     const { puntos, mio } = await guardarPartida(partidaFinal);
+    const semana = await miPuesto(canciones, "semana");
     if(turno !== turnoFinal) return;          // ya arrancó otra partida
     const de = canciones ? ` · ${canciones} canciones` : " · sin límite";
-    const txt = !mio ? "Partida guardada."
-      : mio.puntos === puntos ? `Quedaste <b style="color:var(--amber)">#${mio.puesto}</b>`
-      : `Tu mejor (${mio.puntos} puntos) está <b style="color:var(--amber)">#${mio.puesto}</b>`;
-    el.innerHTML = `<button type="button" class="tarjeta" style="border:0;padding:0;background:none" onclick="verRanking(${canciones})">
-        <span class="grow"><span class="eyebrow">Ranking${de}</span><span class="tarjeta-t">${txt}</span></span>
+    const txt = !semana ? "Partida guardada."
+      : semana.puntos === puntos ? `Quedaste <b style="color:var(--amber)">#${semana.puesto}</b> esta semana`
+      : `Tu mejor de la semana (${semana.puntos} puntos) está <b style="color:var(--amber)">#${semana.puesto}</b>`;
+    const historico = mio ? `<span class="tarjeta-d">Histórico: #${mio.puesto}${mio.puntos === puntos ? "" : ` con ${mio.puntos} puntos`}</span>` : "";
+    el.innerHTML = `<button type="button" class="tarjeta" style="border:0;padding:0;background:none" onclick="verRanking(${canciones}, '', 'semana', 'final')">
+        <span class="grow"><span class="eyebrow">Ranking${de}</span><span class="tarjeta-t">${txt}</span>${historico}</span>
         <span class="pill amber">Ver ›</span></button>`;
   }catch(e){
+    track("error_cuenta", { donde: "guardar" });
     if(turno !== turnoFinal) return;
     el.innerHTML = `<p class="hint">No pudimos guardar la partida en el ranking 😕</p>`;
   }
@@ -419,23 +447,34 @@ export async function rankingFinal(resueltas){
 
 /* ============================================================
    RANKING
-   Podio para los tres primeros, lista corta debajo y tu fila aparte (fija
-   abajo en el celular), aunque estés lejos del podio.
+   Semana, mes o histórico, y una tabla por cantidad de canciones. Podio para
+   los tres primeros, lista corta debajo y tu fila aparte (fija abajo en el
+   celular), aunque estés lejos del podio.
    ============================================================ */
 const nombreOpcion = (n)=> n ? n + " canciones" : "Sin límite";
+// "con 10 canciones esta semana", "sin límite este mes", "con 5 canciones"
+const deQue = ()=> (rankingVisto ? "con " + rankingVisto + " canciones" : "sin límite")
+  + (periodo(periodoVisto).cuando ? " " + periodo(periodoVisto).cuando : "");
 
 let turnoRanking = 0;
-export async function verRanking(canciones, aviso){
+// per: semana | mes | siempre; sin él queda el último que se miró
+// desde (para Analytics): seccion | inicio | final | guardado | periodo | cantidad
+export async function verRanking(canciones, aviso, per, desde){
   if(!cuentasActivas) return;
   rankingVisto = OPCIONES_CANCIONES.includes(Number(canciones)) ? Number(canciones) : 10;
+  if(PERIODOS.some(p=> p.id === per)) periodoVisto = per;
   if(!document.getElementById("s-ranking").classList.contains("on")) mostrar("s-ranking");
-  track("ranking_visto", { canciones_por_partida: rankingVisto });
+  track("ranking_visto", { canciones_por_partida: rankingVisto, periodo: periodoVisto, desde: desde || "" });
   const turno = ++turnoRanking;
   document.getElementById("rk-aviso").textContent = aviso || "";
   document.getElementById("rk-aviso").hidden = !aviso;
+  document.getElementById("rk-periodos").innerHTML = PERIODOS.map(p=>
+    `<button type="button" aria-pressed="${p.id === periodoVisto}" onclick="verRanking(${rankingVisto}, '', '${p.id}', 'periodo')">${p.boton}</button>`).join("");
   document.getElementById("rk-tabs").innerHTML = OPCIONES_CANCIONES.map(n=>
-    `<button type="button" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n})"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
-  document.getElementById("rk-titulo").textContent = "Ranking · " + nombreOpcion(rankingVisto).toLowerCase();
+    `<button type="button" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n}, '', undefined, 'cantidad')"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
+  document.getElementById("rk-titulo").textContent = `Ranking ${periodo(periodoVisto).titulo} · ` + nombreOpcion(rankingVisto).toLowerCase();
+  document.getElementById("rk-sub").textContent = "Un jugador · el mejor puntaje de cada cuenta"
+    + (periodo(periodoVisto).cuando ? " " + periodo(periodoVisto).cuando : "");
   const podio = document.getElementById("rk-podio");
   const lista = document.getElementById("rk-lista");
   const yo = document.getElementById("rk-yo");
@@ -444,12 +483,12 @@ export async function verRanking(canciones, aviso){
   yo.innerHTML = "";
   try{
     const sb = await cliente();
-    const { data, error } = await sb.rpc("ranking_solo", { p_canciones: rankingVisto, p_limite: LIMITE_RANKING });
+    const { data, error } = await sb.rpc("ranking_solo", { p_canciones: rankingVisto, p_limite: LIMITE_RANKING, p_periodo: periodoVisto });
     if(error) throw error;
     if(turno !== turnoRanking) return;       // cambiaron de pestaña mientras cargaba
     renderYo(data);
     if(!data.length){
-      lista.innerHTML = `<p class="rk-vacio">Todavía nadie jugó${rankingVisto ? " con " + rankingVisto + " canciones" : " sin límite"}. ¡Podés ser el primero!</p>`;
+      lista.innerHTML = `<p class="rk-vacio">Todavía nadie jugó ${deQue()}. ¡Podés ser el primero!</p>`;
       return;
     }
     const tres = [2, 1, 3].map(p=> data.find(f=> Number(f.puesto) === p)).filter(Boolean);
@@ -468,6 +507,7 @@ export async function verRanking(canciones, aviso){
         <span class="pt">${f.puntos}</span>
       </div>`).join("");
   }catch(e){
+    track("error_cuenta", { donde: "ranking" });
     if(turno !== turnoRanking) return;
     lista.innerHTML = `<p class="rk-vacio">No pudimos cargar el ranking. Probá de nuevo en un rato.</p>`;
   }
@@ -481,7 +521,7 @@ function renderYo(data){
   }
   const mio = data.find(f=> f.es_mio);
   if(!mio){
-    yo.innerHTML = `<div class="rk-yo fuera">Todavía no jugaste${rankingVisto ? " con " + rankingVisto + " canciones" : " sin límite"} con tu cuenta.</div>`;
+    yo.innerHTML = `<div class="rk-yo fuera">Todavía no jugaste ${deQue()} con tu cuenta.</div>`;
     return;
   }
   const puesto = Number(mio.puesto);

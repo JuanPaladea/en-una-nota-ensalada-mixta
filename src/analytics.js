@@ -48,3 +48,27 @@ export function track(evento, props){
   if(!activo || typeof window.gtag !== "function") return;
   try{ window.gtag("event", evento, props || {}); }catch(_){}
 }
+
+// Lo mismo, para cuando la página se está cerrando: va por sendBeacon, que el
+// navegador termina de mandar aunque la pestaña ya no exista.
+export function trackAlSalir(evento, props){
+  track(evento, { ...(props || {}), transport_type: "beacon" });
+}
+
+// El ID de la cuenta (el de Supabase, un número al azar que no dice quién es):
+// con él GA4 junta en una sola persona lo que hace en el celular y en la compu.
+// Sin sesión va null, que lo borra para los eventos que siguen.
+export function usuarioAnalytics(id){
+  if(enDesarrollo){ console.debug("[analytics] user_id", id); return; }
+  if(!activo || typeof window.gtag !== "function") return;
+  try{ window.gtag("set", { user_id: id || null }); }catch(_){}
+}
+
+// Propiedades de usuario: viajan con todos los eventos que siguen, así cualquier
+// informe se puede partir por ellas (por ejemplo, con cuenta y sin cuenta). En
+// la propiedad hay que darlas de alta como dimensiones de alcance "Usuario".
+export function propiedadesUsuario(props){
+  if(enDesarrollo){ console.debug("[analytics] usuario", props); return; }
+  if(!activo || typeof window.gtag !== "function") return;
+  try{ window.gtag("set", "user_properties", props); }catch(_){}
+}

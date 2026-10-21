@@ -37,12 +37,16 @@ Después se **revela** la canción y el grupo decide si la pegó.
   compartir. El modo elegido se recuerda.
 - **Cuentas con Google y ranking** (opcional, con Supabase): entrando con Google, cada partida de un
   jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno entra a un **ranking por
-  cantidad de canciones** (5, 10, 15, 20, 30 y sin límite). El ranking es **verificado**: la partida
+  cantidad de canciones** (5, 10, 15, 20, 30 y sin límite), que se mira **semanal** (arranca cada
+  lunes), **mensual** (cada día 1) o **histórico**. El ranking es **verificado**: la partida
   se va anotando en la base mientras se juega y la base comprueba cada paso (que el video sea del
   catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
   sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
   entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Ana G.") que se cambia en Mi cuenta;
-  el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta. Sin configurar,
+  el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta.
+  En Mi cuenta salen tus **géneros favoritos**: los tres que más sonaron en tus partidas, con su
+  porcentaje (`src/favoritos.js`). Con cuenta se cuentan los videos de tus partidas de Un jugador;
+  sin cuenta, las canciones que sonaron en este navegador en los dos modos. Sin configurar,
   el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
@@ -139,6 +143,53 @@ npm run preview # sirve el build de dist/ para probarlo
 **Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y ejecutar el
 `supabase/catalogo_solo.sql` que genera en el SQL Editor. Si no, las partidas en las que suene una
 canción nueva se descartan del ranking.
+
+## 📊 Medición (Google Analytics 4)
+
+La medición está en `src/analytics.js` (ID de la propiedad al principio; vacío, se apaga). En
+`localhost` no se manda nada: cada evento se ve en la consola como `[analytics] …`. Con
+`?interno=1` un navegador queda marcado como tráfico interno.
+
+| Evento | Cuándo | Parámetros |
+|---|---|---|
+| `seccion` | Se toca Jugar, Ranking o Mi cuenta | `seccion` |
+| `armar_partida` | Se abre Armar partida | `modo_juego`, `desde` (inicio · ranking) |
+| `modo_elegido` | Se cambia entre Con amigos y Un jugador | `modo_juego` |
+| `repetir_ultima` | Se toca Repetir la última | `modo_juego`, `canciones_por_partida` |
+| `partida_iniciada` | Arranca una partida | `modo_juego`, `generos`, `cantidad_generos`, `equipos`, `canciones_por_partida`, `resta_puntos`, `canciones_disponibles` |
+| `cancion_sonada` | Suena por primera vez una canción | `modo` (corte · continuo), `modo_juego`, `numero`, `tipo` (youtube · propia) |
+| `ronda_grupo` | Con amigos: se anota una canción | `resultado` (acierto · robo · erro · todos · algunos · ninguno · salteada), `segundos`, `sin_cortar`, `numero`, `equipos` |
+| `solo_respuesta` | Un jugador: se resuelve una canción | `respuesta` (acierto · error · no_se), `segundos`, `errados`, `puntos`, `numero` |
+| `partida_terminada` | Termina una partida | `modo_juego`, `motivo` (limit · agotada · manual), `canciones`, `equipos`, `puntos_ganador`, `duracion_seg` |
+| `partida_abandonada` | Se cierra la pestaña en plena partida | `modo_juego`, `numero`, `canciones_por_partida`, `duracion_seg` |
+| `record_nuevo` | Un jugador: récord del navegador | `puntos`, `anterior`, `canciones_por_partida` |
+| `revancha` | Revancha / Jugar otra vez | `canciones`, `modo_juego` |
+| `error_youtube` | Un video no se pudo reproducir | `momento`, `codigo`, `video`, `cancion` |
+| `ranking_visto` | Se abre o se cambia el ranking | `canciones_por_partida`, `periodo`, `desde` (seccion · inicio · final · guardado · periodo · cantidad) |
+| `partida_guardada` | La partida entra al ranking | `canciones_por_partida`, `puntos`, `puesto` |
+| `partida_descartada` | La base no la acepta | `canciones_por_partida`, `por` (propias · base) |
+| `invitacion_cuenta` | Al final, sin cuenta, se ofrece entrar | `desde`, `canciones_por_partida` |
+| `cuenta` | Entrar, volver de Google, salir, renombrar | `accion` (entrar · entro · cancelo · salir · renombrar), `desde`, `detalle` |
+| `login` | Entró con Google (evento recomendado de GA4) | `method` |
+| `error_cuenta` | Falló algo de la cuenta o el ranking | `donde` (google · nombre · guardar · ranking · mis_partidas) |
+| `mis_canciones` | Mis canciones | `accion` (abrir · cancion_agregada · cancion_quitada · link_pegado · link_borrado · audio_quitado), `desde`, `total` |
+| `audio_propio_cargado` | Se cargan audios de la compu | `cantidad`, `fallidos`, `total` |
+| `preferencia_cambiada` | Se cambia "Restar un punto" | `resta_puntos`, `desde` (setup · cuenta) |
+| `historial_reiniciado` | Se reinicia el historial de sonadas | `canciones` |
+| `compartir` | Link del juego o imagen del resultado | `que` (link · resultado), `desde`, `resultado`, `canciones`, `modo_juego` |
+| `cafecito_visto` / `cafecito` | Pedido al final / clic en un botón | `partidas`, `canciones` / `desde`, `pantalla`, `partidas` |
+| `comentario` | Se manda el formulario | `estado` (enviado · error) |
+
+Propiedad de usuario: `con_cuenta` (si · no). Con sesión abierta va además el `user_id` (el ID
+de la cuenta en Supabase, nunca el nombre ni el mail), que junta en una persona lo que hace en
+distintos dispositivos. Para verlo en los informes, en Administrar → Recopilación de datos →
+Identidad para los informes usar "Combinada" u "Observada".
+
+**Para que los parámetros aparezcan en los informes** hay que darlos de alta una vez en
+Administrar → Definiciones personalizadas: como **dimensión de evento** `modo_juego`, `desde`,
+`resultado`, `respuesta`, `accion`, `motivo`, `periodo`, `donde`, `tipo`, `que`, `seccion`
+(y los que se quieran mirar); como **métrica** `segundos`, `puntos`, `duracion_seg`, `numero` y
+`canciones`; y `con_cuenta` como **dimensión de usuario**. Los eventos se cuentan solos sin esto.
 
 ## 🌐 Deploy
 

@@ -38,7 +38,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - **Cuentas con Google y ranking** (opcional, con Supabase): entrando con Google, cada partida de un
   jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno entra a un **ranking por
   cantidad de canciones** (5, 10, 15, 20, 30 y sin límite), que se mira **semanal** (arranca cada
-  lunes), **mensual** (cada día 1) o **histórico**. El ranking es **verificado**: la partida
+  viernes), **mensual** (cada día 1) o **histórico**. El ranking es **verificado**: la partida
   se va anotando en la base mientras se juega y la base comprueba cada paso (que el video sea del
   catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
   sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no

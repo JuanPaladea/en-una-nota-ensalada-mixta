@@ -4,7 +4,7 @@
 // partida de un jugador se guarda (el historial) y el mejor puntaje de cada uno
 // entra al ranking, que hay uno por cantidad de canciones — 40 puntos en 5
 // canciones no se comparan con 40 en 20 — y por período: la semana (desde el
-// lunes), el mes (desde el 1) o de siempre. Las tablas y las reglas de acceso
+// viernes), el mes (desde el 1) o de siempre. Las tablas y las reglas de acceso
 // están en supabase/migrations/.
 //
 // URL y clave publicable salen del proyecto en supabase.com (Project Settings →
@@ -24,7 +24,7 @@ const LS_PENDIENTE = "eun_partida_pendiente_v1";
 const PENDIENTE_VENCE_MS = 60 * 60 * 1000;    // una partida sin guardar de hace más de una hora ya no va
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];  // las mismas que el select de Opciones; 0 = sin límite
 const LIMITE_RANKING = 20;
-// Los de ranking_solo(): la semana arranca el lunes y el mes el 1, a las 0 h de Argentina
+// Los de ranking_solo(): la semana arranca el viernes y el mes el 1, a las 0 h de Argentina
 const PERIODOS = [
   { id: "semana",  boton: "Semana",    titulo: "semanal",   cuando: "esta semana" },
   { id: "mes",     boton: "Mes",       titulo: "mensual",   cuando: "este mes" },

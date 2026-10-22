@@ -18,6 +18,10 @@ import { contarVideos, favoritosHtml } from "./favoritos.js";
 const SUPABASE_URL = "https://cebmgdrrfagsbrfyeqqm.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GK8qADTCcOrWDGWit99ubQ_P6d52nWh";
 export const cuentasActivas = Boolean(SUPABASE_URL && SUPABASE_KEY);
+// El ID de cliente OAuth de Google Cloud, el mismo que tiene Supabase en
+// Authentication → Providers → Google. También es público. Vacío, se entra
+// solo por redirección (y Google muestra el dominio de supabase.co).
+const GOOGLE_CLIENT_ID = "790742708415-p6r2dinuf89fa51ket66imcct7vd02db.apps.googleusercontent.com";
 
 const LS_SESION = "eun_sesion_v1";             // donde supabase-js guarda la sesión
 const LS_PENDIENTE = "eun_partida_pendiente_v1";
@@ -90,12 +94,19 @@ export async function iniciarCuentas(opciones){
       if(data.session) track("login", { method: "Google" });
     }
     await tomarSesion(data.session);
-    // supabase-js pide no llamarse a sí mismo dentro de este aviso: va al próximo turno
-    sb.auth.onAuthStateChange((_ev, sesion)=>{ setTimeout(()=> tomarSesion(sesion), 0); });
+    escuchar(sb);
     if(usuario) await guardarPendiente();
   }catch(e){
     console.warn("[cuenta]", e);
   }
+}
+
+let escuchando = false;
+function escuchar(sb){
+  if(escuchando) return;
+  escuchando = true;
+  // supabase-js pide no llamarse a sí mismo dentro de este aviso: va al próximo turno
+  sb.auth.onAuthStateChange((_ev, sesion)=>{ setTimeout(()=> tomarSesion(sesion), 0); });
 }
 
 export const usuarioActual = ()=> usuario;
@@ -114,13 +125,19 @@ async function tomarSesion(sesion){
   renderCuenta();
 }
 
-// desde: inicio | final | ranking | cuenta
-async function entrar(desde){
-  track("cuenta", { accion: "entrar", desde });
-  // Desde la pantalla final, la partida que acaban de jugar se guarda al volver
+// Desde la pantalla final, la partida que acaban de jugar se guarda al entrar
+function marcarPendiente(desde){
   if(desde === "final" && partidaFinal){
     try{ localStorage.setItem(LS_PENDIENTE, JSON.stringify({ ...partidaFinal, cuando: Date.now() })); }catch(_){}
   }
+}
+
+// Entrar por redirección: se va a Google y vuelve con ?code=. Es el botón
+// propio, que queda mientras carga el de Google o si no carga (un bloqueador).
+// desde: final | ranking | cuenta
+async function entrar(desde){
+  track("cuenta", { accion: "entrar", desde });
+  marcarPendiente(desde);
   try{
     const sb = await cliente();
     const { error } = await sb.auth.signInWithOAuth({
@@ -131,6 +148,80 @@ async function entrar(desde){
   }catch(e){
     track("error_cuenta", { donde: "google", desde });
     alert("No pudimos abrir el ingreso con Google. Probá de nuevo en un rato.");
+  }
+}
+
+/* El botón de Google (Google Identity Services): abre la ventanita de Google
+   sin salir de la página y devuelve un token que se canjea en Supabase. Como
+   no pasa por supabase.co, Google muestra nuestro dominio. Se baja recién
+   cuando hay un botón para entrar en pantalla. */
+let gisPromesa = null;
+let nonce = "";              // el de este intento; a Google va su SHA-256
+let desdeGoogle = "cuenta";  // dónde se tocó el botón (para Analytics y la partida pendiente)
+function cargarGis(){
+  if(!gisPromesa){
+    gisPromesa = new Promise((ok, mal)=>{
+      const s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client";
+      s.async = true;
+      s.onload = ()=> window.google && google.accounts ? ok(google.accounts.id) : mal(new Error("gis"));
+      s.onerror = ()=> mal(new Error("gis"));
+      document.head.appendChild(s);
+    }).then(async gis=>{
+      const azar = crypto.getRandomValues(new Uint8Array(24));
+      nonce = Array.from(azar, b=> b.toString(16).padStart(2, "0")).join("");
+      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce));
+      gis.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: alVolverDeGoogle,
+        nonce: Array.from(new Uint8Array(hash), b=> b.toString(16).padStart(2, "0")).join(""),
+        context: "signin",
+        itp_support: true,
+      });
+      return gis;
+    });
+  }
+  return gisPromesa;
+}
+
+// Cambia los botones propios que haya en pantalla por el de Google
+function pintarBotonesGoogle(){
+  if(!GOOGLE_CLIENT_ID) return;
+  const huecos = [...document.querySelectorAll(".g-entrar:not([data-listo])")];
+  if(!huecos.length) return;
+  cargarGis().then(gis=>{
+    huecos.forEach(h=>{
+      if(!h.isConnected || h.dataset.listo) return;
+      h.dataset.listo = "1";
+      const ancho = Math.round(h.getBoundingClientRect().width) || 260;
+      h.innerHTML = "";
+      gis.renderButton(h, {
+        theme: "outline", size: "large", shape: "pill", text: h.dataset.texto,
+        locale: "es-419", width: Math.min(400, Math.max(200, ancho)),
+        click_listener: ()=>{
+          desdeGoogle = h.dataset.desde;
+          track("cuenta", { accion: "entrar", desde: desdeGoogle });
+          marcarPendiente(desdeGoogle);
+        },
+      });
+    });
+  }).catch(()=>{ /* sin el script de Google queda el botón propio */ });
+}
+
+async function alVolverDeGoogle(respuesta){
+  try{
+    const sb = await cliente();
+    const { data, error } = await sb.auth.signInWithIdToken({ provider: "google", token: respuesta.credential, nonce });
+    if(error) throw error;
+    track("cuenta", { accion: "entro", detalle: "" });
+    track("login", { method: "Google" });
+    await tomarSesion(data.session);
+    escuchar(sb);
+    await guardarPendiente();
+  }catch(e){
+    console.warn("[cuenta]", e);
+    track("error_cuenta", { donde: "google", desde: desdeGoogle });
+    alert("No pudimos entrar con Google. Probá de nuevo en un rato.");
   }
 }
 
@@ -167,8 +258,10 @@ async function guardarNombre(ev){
 }
 
 const LOGO_G = `<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
-function botonGoogle(desde, texto){
-  return `<button type="button" class="btn google" onclick="entrarConGoogle('${desde}')">${LOGO_G}<span>${texto}</span></button>`;
+// El botón propio, adentro del hueco donde pintarBotonesGoogle() pone el de
+// Google. gis: el texto del de Google (signin_with | continue_with)
+function botonGoogle(desde, texto, gis = "signin_with"){
+  return `<div class="g-entrar" data-desde="${desde}" data-texto="${gis}"><button type="button" class="btn google" onclick="entrarConGoogle('${desde}')">${LOGO_G}<span>${texto}</span></button></div>`;
 }
 // "Ana G." → "AG"
 function iniciales(nombre){
@@ -189,7 +282,9 @@ function renderCuenta(){
     nav.innerHTML = !cuentasActivas ? ""
       : usuario
         ? `<button type="button" class="av" onclick="irA('cuenta')" aria-label="Mi cuenta: ${esc(usuario.nombre)}">${esc(iniciales(usuario.nombre))}</button>`
-        : botonGoogle("inicio", "Entrar");
+        // Lleva a Mi cuenta, donde está el botón de Google: así el script de
+        // Google no se baja en cada visita
+        : `<button type="button" class="btn google" onclick="irA('cuenta')">${LOGO_G}<span>Entrar</span></button>`;
   }
   if(document.getElementById("s-cuenta").classList.contains("on")) renderMiCuenta();
   else renderSalir();
@@ -250,6 +345,7 @@ export async function renderMiCuenta(){
           Solo se muestra un nombre corto que podés cambiar.</p>
         ${botonGoogle("cuenta", "Entrar con Google")}
       </div>`;
+    pintarBotonesGoogle();
     return;
   }
   const turno = ++turnoCuenta;
@@ -421,7 +517,8 @@ export async function rankingFinal(resueltas){
     // Contra cuenta/entrar desde final da cuántos aceptan la invitación
     track("invitacion_cuenta", { desde: "final", canciones_por_partida: canciones });
     el.innerHTML = `<p class="hint" style="margin:0 0 10px">¿Querés aparecer en el ranking? Entrá y guardamos esta partida.</p>
-      ${botonGoogle("final", "Entrar con Google y guardarla")}`;
+      ${botonGoogle("final", "Entrar con Google y guardarla", "continue_with")}`;
+    pintarBotonesGoogle();
     return;
   }
   try{
@@ -517,6 +614,7 @@ function renderYo(data){
   const yo = document.getElementById("rk-yo");
   if(!usuario){
     yo.innerHTML = `<div class="rk-yo fuera">Entrá con Google para aparecer acá${botonGoogle("ranking", "Entrar con Google")}</div>`;
+    pintarBotonesGoogle();
     return;
   }
   const mio = data.find(f=> f.es_mio);

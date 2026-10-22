@@ -132,13 +132,18 @@ npm run preview # sirve el build de dist/ para probarlo
    `supabase/catalogo_solo.sql`.
 2. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crear un
    **ID de cliente OAuth** (aplicación web) con URI de redireccionamiento autorizado
-   `https://<proyecto>.supabase.co/auth/v1/callback`.
+   `https://<proyecto>.supabase.co/auth/v1/callback` y, en **Orígenes autorizados de JavaScript**,
+   `https://enunanota.com.ar`, `https://www.enunanota.com.ar`,
+   `https://en-una-nota-ensalada-mixta.netlify.app`, `http://localhost` y `http://localhost:5173`
+   (los pide el botón de Google, que entra sin salir de la página y muestra nuestro dominio en vez
+   del de supabase.co; la redirección queda de respaldo si el botón no carga).
 3. En Supabase, **Authentication → Sign In / Providers → Google**: activarlo y pegar el ID y el secreto.
 4. **Authentication → URL Configuration**: Site URL `https://enunanota.com.ar` y en Redirect URLs
    `https://enunanota.com.ar/**`, `https://www.enunanota.com.ar/**`,
    `https://en-una-nota-ensalada-mixta.netlify.app/**` y `http://localhost:5173/**`.
 5. Copiar la URL del proyecto y la clave publicable (Project Settings → API) en las constantes
-   del principio de `src/cuenta.js`. Vacías, las cuentas quedan apagadas.
+   del principio de `src/cuenta.js`. Vacías, las cuentas quedan apagadas. Ahí también va el ID de
+   cliente de Google (`GOOGLE_CLIENT_ID`).
 
 **Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y ejecutar el
 `supabase/catalogo_solo.sql` que genera en el SQL Editor. Si no, las partidas en las que suene una

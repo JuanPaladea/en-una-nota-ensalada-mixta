@@ -197,7 +197,7 @@ function pintarBotonesGoogle(){
       const grande = h.dataset.tam !== "medium";   // el de la barra de arriba va a su medida
       h.innerHTML = "";
       gis.renderButton(h, {
-        theme: "outline", size: h.dataset.tam, shape: "pill", text: h.dataset.texto, locale: "es-419",
+        theme: "filled_black", size: h.dataset.tam, shape: "pill", text: h.dataset.texto, locale: "es-419",
         ...(grande ? { width: Math.min(400, Math.max(200, ancho)) } : {}),
         click_listener: ()=>{
           desdeGoogle = h.dataset.desde;

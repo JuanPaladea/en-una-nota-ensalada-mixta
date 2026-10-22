@@ -398,8 +398,8 @@ function buildPool(){
     if(id) pool.push({...s, id, key});
   });
 }
-// Abajo de "¡A jugar!": cuántas canciones hay con lo elegido y cuántas todavía
-// no sonaron en este navegador. Si no hay ninguna, el aviso de qué hacer.
+// Abajo de "¡A jugar!": si con lo elegido no hay ninguna canción, el aviso de
+// qué hacer. No se muestra cuántas hay, para no dar pistas del catálogo.
 function updatePoolWarn(){
   buildPool();
   const el=document.getElementById("pool-warn");
@@ -418,8 +418,7 @@ function updatePoolWarn(){
       Entrá a <a href="#" onclick="show('s-armar');return false">📂 Mis canciones</a> y ${onlyLocal?'cargá tus archivos de audio':'cargá tus audios o pegá links de YouTube'} para poder jugar.</div>`;
     return;
   }
-  const sinEscuchar = pool.filter(s=> !playedHistory.includes(s.key)).length;
-  info.textContent = plural(pool.length, "canción disponible", "canciones disponibles") + " · " + sinEscuchar + " sin escuchar";
+  info.textContent = "";
 }
 
 /* ============================================================
@@ -818,10 +817,11 @@ function startGame(){
   show("s-game");
   newSong();
 }
-// total de canciones que durará la partida (para el contador "X / Y")
+// total de canciones que durará la partida (para el contador "X / Y"). Es solo
+// el límite elegido: nunca el tamaño de la playlist, para no dar pistas de
+// cuántas canciones tiene. 0 = sin límite, el contador va sin total.
 function totalSongs(){
-  if(opts.maxSongs) return opts.noRepeat ? Math.min(opts.maxSongs, pool.length) : opts.maxSongs;
-  return opts.noRepeat ? pool.length : 0;   // 0 = ilimitado
+  return opts.maxSongs;
 }
 
 // Devuelve una canción nueva, o null si se agotaron (con "no repetir" activo).

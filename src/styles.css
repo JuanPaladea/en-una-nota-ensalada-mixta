@@ -243,7 +243,8 @@
   .cafe-usos span{font-size:20px}
   .cafecito .btn.big{margin-top:2px}
   .cafe-after{margin:0;text-align:center;color:var(--muted);font-size:13px}
-  .cafe-after .linkish{color:var(--cyan);padding:0;font-size:13px;font-weight:800}
+  /* va dentro de la frase: inline aunque otra hoja ponga los botones en bloque */
+  .cafe-after .linkish{display:inline;vertical-align:baseline;margin:0;color:var(--cyan);padding:0;font-size:13px;font-weight:800}
   /* el mismo aire que hay entre secciones (22px), contando el gap de cada columna */
   .inicio-side .cafecito{margin-top:10px}
   .cuenta-col .cafecito{margin-top:26px}

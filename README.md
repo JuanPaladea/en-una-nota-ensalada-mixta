@@ -18,7 +18,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
   (mismos géneros, modo y cantidad) y se ve tu récord con tu puesto en el ranking.
 - Letras **Baloo 2** (títulos) y **Nunito** (texto), servidas desde el sitio con `@fontsource-variable`.
 
-- **16 playlists** con +500 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
+- **16 playlists** con +1000 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
   Pop/Reggaetón, Internacional, Clásicos, Disney, Fiesta, Rock en Español, Trap/Urbano,
   Baladas, Folklore, Infantiles, Pop Nacional, Boy Bands y Pop 2000s, Cachengue y RKT y
   K-Pop). Se pueden combinar géneros.

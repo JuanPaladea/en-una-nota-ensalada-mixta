@@ -101,6 +101,7 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── favicon.svg      # ícono
 │   ├── icon-192.png     # íconos del manifest (generados desde favicon.svg)
 │   ├── icon-512.png
+│   ├── icon-maskable-512.png # el mismo dibujo con margen, para Android
 │   ├── og.svg           # fuente de la imagen para redes
 │   ├── og.png           # imagen para redes (la que leen WhatsApp/Facebook/X)
 │   ├── manifest.webmanifest

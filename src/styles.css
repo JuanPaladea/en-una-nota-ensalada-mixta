@@ -57,11 +57,11 @@
   .logo .en{color:var(--cyan)}
   .logo .una{color:var(--paper)}
   .logo .nota{color:var(--amber)}
-  .note{
-    display:inline-grid;place-items:center;width:clamp(46px,10vw,72px);height:clamp(46px,10vw,72px);
-    background:var(--magenta);border-radius:50%;box-shadow:var(--sh);font-size:clamp(24px,6vw,40px);
-    transform:rotate(6deg)
-  }
+  /* el dibujo de la ensaladera (el mismo del favicon); la sombra sigue su
+     forma en vez de un círculo, como la de los botones */
+  .note{display:inline-block;flex:none;width:clamp(53px,11.6vw,84px);height:clamp(46px,10vw,72px);
+    filter:drop-shadow(0 5px 0 rgba(0,0,0,.35))}
+  .note svg{display:block;width:100%;height:100%}
   .tagline{display:block;width:fit-content;margin:8px auto 0;text-align:center;
     font-weight:900;font-size:clamp(15px,4vw,20px);letter-spacing:.5px;color:var(--ink);
     background:var(--lime);padding:4px 16px;border-radius:20px;transform:rotate(-1.5deg);box-shadow:var(--sh)}
@@ -85,7 +85,7 @@
     padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right))}
   .topnav .brand{display:block;margin:0;flex:none}
   .topnav .brand a,.topnav a.brand{display:flex;align-items:center;gap:9px;color:inherit;text-decoration:none}
-  .topnav .note{width:36px;height:36px;font-size:18px;box-shadow:var(--sh-sm)}
+  .topnav .note{width:42px;height:36px;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
   .topnav .logo{font-size:27px;letter-spacing:-.3px;line-height:1}
   .topnav .tagline{margin:0;font-size:12px;padding:2px 10px;box-shadow:0 4px 0 rgba(0,0,0,.35);flex:none}
   .tabs{display:flex;gap:4px;margin-left:auto}
@@ -122,7 +122,7 @@
     :root{--tabs-h:62px}
     .topnav{position:static;background:none;border:0;-webkit-backdrop-filter:none;backdrop-filter:none}
     .topnav-in{height:auto;padding-top:12px;padding-bottom:2px;gap:10px}
-    .topnav .note{width:32px;height:32px;font-size:16px}
+    .topnav .note{width:37px;height:32px}
     .topnav .logo{font-size:23px}
     .topnav .tagline{font-size:11px;padding:2px 8px}
     .nav-cuenta{margin-left:auto}

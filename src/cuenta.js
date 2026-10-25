@@ -1,29 +1,25 @@
-// Cuentas con Google y ranking del modo un jugador, sobre Supabase.
+// Cuentas con Google y ranking del modo un jugador.
 //
 // Entrar es opcional: sin cuenta se juega igual que siempre. Con cuenta, cada
 // partida de un jugador se guarda (el historial) y el mejor puntaje de cada uno
 // entra al ranking, que hay uno por cantidad de canciones — 40 puntos en 5
 // canciones no se comparan con 40 en 20 — y por período: la semana (desde el
-// viernes), el mes (desde el 1) o de siempre. Las tablas y las reglas de acceso
-// están en supabase/migrations/.
+// viernes), el mes (desde el 1) o de siempre.
 //
-// URL y clave publicable salen del proyecto en supabase.com (Project Settings →
-// API). La clave publicable es pública a propósito: lo que protege los datos
-// son las reglas de la base. Vaciarlas apaga las cuentas y el ranking.
+// Todo pasa por /api (netlify/functions/api.mjs): verifica el token de Google,
+// lleva la sesión en una cookie y habla con la base (db/esquema.sql). Esta
+// página nunca ve la clave de la base.
 import { esc } from "./utils.js";
 import { soloTramo } from "./sharecard.js";
 import { track, propiedadesUsuario, usuarioAnalytics } from "./analytics.js";
 import { contarVideos, favoritosHtml } from "./favoritos.js";
 
-const SUPABASE_URL = "https://cebmgdrrfagsbrfyeqqm.supabase.co";
-const SUPABASE_KEY = "sb_publishable_GK8qADTCcOrWDGWit99ubQ_P6d52nWh";
-export const cuentasActivas = Boolean(SUPABASE_URL && SUPABASE_KEY);
-// El ID de cliente OAuth de Google Cloud, el mismo que tiene Supabase en
-// Authentication → Providers → Google. También es público. Vacío, se entra
-// solo por redirección (y Google muestra el dominio de supabase.co).
+export const cuentasActivas = true;
+// El ID de cliente OAuth de Google Cloud, el mismo que usa la función de /api.
+// También es público. Vacío, se entra solo por redirección.
 const GOOGLE_CLIENT_ID = "790742708415-p6r2dinuf89fa51ket66imcct7vd02db.apps.googleusercontent.com";
 
-const LS_SESION = "eun_sesion_v1";             // donde supabase-js guarda la sesión
+const LS_SESION = "eun_sesion_v1";             // "1" si acá hubo una sesión abierta (la cookie de verdad no se lee desde la página)
 const LS_PENDIENTE = "eun_partida_pendiente_v1";
 const PENDIENTE_VENCE_MS = 60 * 60 * 1000;    // una partida sin guardar de hace más de una hora ya no va
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];  // las mismas que el select de Opciones; 0 = sin límite
@@ -42,30 +38,31 @@ let rankingVisto = 10;
 let periodoVisto = "semana";
 let mostrar = ()=>{};        // show() de main.js
 
-// supabase-js pesa: se baja recién cuando hace falta (ya hay sesión, se vuelve
-// de Google, o se abre el ranking). El que nunca entra no lo descarga.
-let clientePromesa = null;
-function cliente(){
-  if(!clientePromesa){
-    clientePromesa = import("@supabase/supabase-js").then(({ createClient }) =>
-      createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: { flowType: "pkce", storageKey: LS_SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-      }));
-  }
-  return clientePromesa;
+// Una llamada a la API. Sin cuerpo es un GET; con cuerpo, un POST de JSON.
+// Cualquier respuesta que no sea 2xx tira un error.
+async function api(ruta, cuerpo){
+  const r = await fetch("/api" + ruta, cuerpo === undefined
+    ? { credentials: "same-origin" }
+    : { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
+  if(!r.ok) throw new Error(ruta + ": " + r.status);
+  return r.json();
 }
 function haySesionGuardada(){
   try{ return Boolean(localStorage.getItem(LS_SESION)); }catch(_){ return false; }
 }
-function volviendoDeGoogle(){
-  const q = new URLSearchParams(location.search);
-  return q.has("code") || q.has("error_description");
+function recordarSesion(hay){
+  try{ hay ? localStorage.setItem(LS_SESION, "1") : localStorage.removeItem(LS_SESION); }catch(_){}
 }
-// Google vuelve con ?code=… (o ?error=…): se saca de la barra para que no quede
-// en un link compartido ni en el historial. Los demás parámetros (?interno=1) quedan.
+// Al volver de Google por redirección, /api manda de vuelta con ?entro=1 (o =0
+// si no se pudo entrar o se canceló)
+function volviendoDeGoogle(){
+  return new URLSearchParams(location.search).has("entro");
+}
+// Se saca de la barra para que no quede en un link compartido ni en el
+// historial. Los demás parámetros (?interno=1) quedan.
 function limpiarUrl(){
   const q = new URLSearchParams(location.search);
-  ["code", "error", "error_code", "error_description"].forEach(k=> q.delete(k));
+  q.delete("entro");
   const resto = q.toString();
   history.replaceState(history.state, "", location.pathname + (resto ? "?" + resto : "") + location.hash);
 }
@@ -84,43 +81,31 @@ export async function iniciarCuentas(opciones){
   const vuelve = volviendoDeGoogle();
   if(!vuelve && !haySesionGuardada()) return;
   try{
-    const sb = await cliente();
-    const { data } = await sb.auth.getSession();   // espera el canje del ?code=
+    const { usuario: yo } = await api("/yo");
     if(vuelve){
-      const fallo = new URLSearchParams(location.search).get("error_description");
       limpiarUrl();
-      track("cuenta", { accion: data.session ? "entro" : "cancelo", detalle: fallo || "" });
+      track("cuenta", { accion: yo ? "entro" : "cancelo", detalle: "" });
       // El evento recomendado de GA4: aparece solo en los informes de usuarios
-      if(data.session) track("login", { method: "Google" });
+      if(yo) track("login", { method: "Google" });
     }
-    await tomarSesion(data.session);
-    escuchar(sb);
+    await tomarSesion(yo);
     if(usuario) await guardarPendiente();
   }catch(e){
     console.warn("[cuenta]", e);
   }
 }
 
-let escuchando = false;
-function escuchar(sb){
-  if(escuchando) return;
-  escuchando = true;
-  // supabase-js pide no llamarse a sí mismo dentro de este aviso: va al próximo turno
-  sb.auth.onAuthStateChange((_ev, sesion)=>{ setTimeout(()=> tomarSesion(sesion), 0); });
-}
-
 export const usuarioActual = ()=> usuario;
 
-async function tomarSesion(sesion){
-  const id = sesion && sesion.user ? sesion.user.id : null;
-  if(!id){
+// yo: { id, nombre } de la sesión, o null si no hay
+async function tomarSesion(yo){
+  recordarSesion(Boolean(yo));
+  if(!yo){
     if(!usuario) return;
     usuario = null; olvidarCache(); renderCuenta(); return;
   }
-  if(usuario && usuario.id === id) return;
-  const sb = await cliente();
-  const { data } = await sb.from("perfiles").select("nombre").eq("id", id).maybeSingle();
-  usuario = { id, nombre: data ? data.nombre : "Jugador" };
+  if(usuario && usuario.id === yo.id) return;
+  usuario = { id: yo.id, nombre: yo.nombre };
   olvidarCache();
   renderCuenta();
 }
@@ -132,28 +117,17 @@ function marcarPendiente(desde){
   }
 }
 
-// Entrar por redirección: se va a Google y vuelve con ?code=. Es el botón
+// Entrar por redirección: se va a Google y vuelve con ?entro=. Es el botón
 // propio, que queda mientras carga el de Google o si no carga (un bloqueador).
 // desde: inicio | final | ranking | cuenta
-async function entrar(desde){
+function entrar(desde){
   track("cuenta", { accion: "entrar", desde });
   marcarPendiente(desde);
-  try{
-    const sb = await cliente();
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: location.origin + location.pathname },
-    });
-    if(error) throw error;
-  }catch(e){
-    track("error_cuenta", { donde: "google", desde });
-    alert("No pudimos abrir el ingreso con Google. Probá de nuevo en un rato.");
-  }
+  location.href = "/api/auth/entrar?vuelta=" + encodeURIComponent(location.pathname);
 }
 
 /* El botón de Google (Google Identity Services): abre la ventanita de Google
-   sin salir de la página y devuelve un token que se canjea en Supabase. Como
-   no pasa por supabase.co, Google muestra nuestro dominio. Se baja recién
+   sin salir de la página y devuelve un token que /api verifica. Se baja recién
    cuando hay un botón para entrar en pantalla. */
 let gisPromesa = null;
 let nonce = "";              // el de este intento; a Google va su SHA-256
@@ -211,13 +185,10 @@ function pintarBotonesGoogle(){
 
 async function alVolverDeGoogle(respuesta){
   try{
-    const sb = await cliente();
-    const { data, error } = await sb.auth.signInWithIdToken({ provider: "google", token: respuesta.credential, nonce });
-    if(error) throw error;
+    const { usuario: yo } = await api("/auth/google", { credential: respuesta.credential, nonce });
     track("cuenta", { accion: "entro", detalle: "" });
     track("login", { method: "Google" });
-    await tomarSesion(data.session);
-    escuchar(sb);
+    await tomarSesion(yo);
     await guardarPendiente();
   }catch(e){
     console.warn("[cuenta]", e);
@@ -228,7 +199,8 @@ async function alVolverDeGoogle(respuesta){
 
 async function salir(){
   track("cuenta", { accion: "salir" });
-  try{ const sb = await cliente(); await sb.auth.signOut(); }catch(_){}
+  try{ await api("/auth/salir", {}); }catch(_){}
+  recordarSesion(false);
   usuario = null;
   olvidarCache();
   renderCuenta();
@@ -249,11 +221,11 @@ async function guardarNombre(ev){
   if(!nuevo || nuevo === usuario.nombre){ editarNombre(false); return; }
   const btn = ev.target.querySelector("button[type=submit]");
   if(btn) btn.disabled = true;
-  const sb = await cliente();
-  const { error } = await sb.from("perfiles").update({ nombre: nuevo }).eq("id", usuario.id);
+  let guardado = null;
+  try{ guardado = (await api("/yo/nombre", { nombre: nuevo })).nombre; }catch(_){}
   if(btn) btn.disabled = false;
-  if(error){ track("error_cuenta", { donde: "nombre" }); alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
-  usuario.nombre = nuevo;
+  if(!guardado){ track("error_cuenta", { donde: "nombre" }); alert("No pudimos cambiar el nombre. Probá de nuevo."); return; }
+  usuario.nombre = guardado;
   track("cuenta", { accion: "renombrar" });
   renderCuenta();
 }
@@ -311,12 +283,7 @@ function olvidarCache(){ misPartidas = null; puestos = {}; }
 
 async function cargarMisPartidas(){
   if(misPartidas) return misPartidas;
-  const sb = await cliente();
-  const { data, error } = await sb.from("partidas_solo")
-    .select("canciones, segundos, puntos, jugada, videos")
-    .order("jugada", { ascending: false }).limit(500);
-  if(error) throw error;
-  misPartidas = data || [];
+  misPartidas = await api("/partidas");
   return misPartidas;
 }
 // Tu fila en el ranking de esa cantidad y período (puesto y mejor puntaje), o null
@@ -420,27 +387,11 @@ export async function renderMiCuenta(){
    ============================================================ */
 let enCurso = null;   // { canciones, id, valida, propias, cola }
 
-// Sin cuenta no hace falta supabase-js: alcanza un POST con la clave publicable.
-async function rpc(nombre, args){
-  if(clientePromesa){
-    const sb = await cliente();
-    const { data, error } = await sb.rpc(nombre, args);
-    if(error) throw error;
-    return data;
-  }
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nombre}`, {
-    method: "POST",
-    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-  });
-  if(!r.ok) throw new Error(nombre + ": " + r.status);
-  return r.json();
-}
 // Los pasos van en orden: cada uno sale recién cuando volvió el anterior.
 function paso(p, nombre, args){
   p.cola = p.cola.then(async ()=>{
     if(!p.valida) return;
-    if(!await rpc(nombre, { p_partida: p.id, ...args })) p.valida = false;
+    if(!await api("/solo/" + nombre, { partida: p.id, ...args })) p.valida = false;
   }).catch(()=>{ p.valida = false; });
 }
 
@@ -448,7 +399,7 @@ export function soloEmpezar(canciones){
   enCurso = null;
   if(!cuentasActivas) return;
   const p = { canciones, id: null, valida: true, propias: false };
-  p.cola = rpc("solo_empezar", { p_canciones: canciones })
+  p.cola = api("/solo/empezar", { canciones })
     .then(id=>{ p.id = id; if(!id) p.valida = false; })
     .catch(()=>{ p.valida = false; });
   enCurso = p;
@@ -459,16 +410,16 @@ export function soloSono(video, propia){
   const p = enCurso;
   if(!p || !p.valida) return;
   if(propia){ p.propias = true; p.valida = false; return; }
-  paso(p, "solo_sonar", { p_video: video });
+  paso(p, "sonar", { video });
 }
 // titulo: el que eligió, normalizado como en el catálogo; null si no salió.
 export function soloResolvio(segundos, titulo){
   const p = enCurso;
-  if(p && p.valida) paso(p, "solo_resolver", { p_segundos: segundos, p_titulo: titulo });
+  if(p && p.valida) paso(p, "resolver", { segundos, titulo });
 }
 
 async function guardarPartida(p){
-  const puntos = await rpc("solo_terminar", { p_partida: p.id });
+  const puntos = await api("/solo/terminar", { partida: p.id });
   if(puntos === null) throw new Error("partida vencida");
   olvidarCache();
   const mio = await miPuesto(p.canciones);
@@ -478,8 +429,7 @@ async function guardarPartida(p){
   return { puntos, mio };
 }
 async function miFilaDelRanking(canciones, per){
-  const sb = await cliente();
-  const { data } = await sb.rpc("ranking_solo", { p_canciones: canciones, p_limite: 1, p_periodo: per });
+  const data = await api(`/ranking?canciones=${canciones}&limite=1&periodo=${per}`);
   return (data || []).find(f=> f.es_mio) || null;
 }
 
@@ -583,9 +533,7 @@ export async function verRanking(canciones, aviso, per, desde){
   lista.innerHTML = `<p class="rk-vacio">Cargando…</p>`;
   yo.innerHTML = "";
   try{
-    const sb = await cliente();
-    const { data, error } = await sb.rpc("ranking_solo", { p_canciones: rankingVisto, p_limite: LIMITE_RANKING, p_periodo: periodoVisto });
-    if(error) throw error;
+    const data = await api(`/ranking?canciones=${rankingVisto}&limite=${LIMITE_RANKING}&periodo=${periodoVisto}`);
     if(turno !== turnoRanking) return;       // cambiaron de pestaña mientras cargaba
     renderYo(data);
     if(!data.length){

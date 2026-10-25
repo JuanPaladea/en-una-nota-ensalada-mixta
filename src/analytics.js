@@ -55,7 +55,7 @@ export function trackAlSalir(evento, props){
   track(evento, { ...(props || {}), transport_type: "beacon" });
 }
 
-// El ID de la cuenta (el de Supabase, un número al azar que no dice quién es):
+// El ID de la cuenta (el de la base, un número al azar que no dice quién es):
 // con él GA4 junta en una sola persona lo que hace en el celular y en la compu.
 // Sin sesión va null, que lo borra para los eventos que siguen.
 export function usuarioAnalytics(id){

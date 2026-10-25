@@ -15,3 +15,8 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+
+# secretos locales (conexión a la base, etc.)
+.env
+.env.*
+!.env.example

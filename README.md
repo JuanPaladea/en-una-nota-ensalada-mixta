@@ -35,7 +35,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
   como un intento. Se guarda el récord por cantidad de canciones y la imagen final muestra un
   cuadrito por canción (🟩 1 s, 🟨 2–3 s, 🟧 4–6 s, ⬛ no salió), que también va en el texto al
   compartir. El modo elegido se recuerda.
-- **Cuentas con Google y ranking** (opcional, con Supabase): entrando con Google, cada partida de un
+- **Cuentas con Google y ranking** (opcional): entrando con Google, cada partida de un
   jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno entra a un **ranking por
   cantidad de canciones** (5, 10, 15, 20, 30 y sin límite), que se mira **semanal** (arranca cada
   viernes), **mensual** (cada día 1) o **histórico**. El ranking es **verificado**: la partida
@@ -43,7 +43,7 @@ Después se **revela** la canción y el grupo decide si la pegó.
   catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
   sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
   entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Ana G.") que se cambia en Mi cuenta;
-  el mail y la foto no se muestran. supabase-js se baja recién cuando hace falta.
+  el mail y la foto no se muestran ni se guardan.
   En Mi cuenta salen tus **géneros favoritos**: los tres que más sonaron en tus partidas, con su
   porcentaje (`src/favoritos.js`). Con cuenta se cuentan los videos de tus partidas de Un jugador;
   sin cuenta, las canciones que sonaron en este navegador en los dos modos. Sin configurar,
@@ -111,44 +111,60 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── main.js          # estado, lógica de juego, render y arranque
 │   ├── data.js          # las playlists (título, artista, id de YouTube)
 │   ├── sharecard.js     # dibuja y comparte la imagen del resultado
-│   ├── cuenta.js        # cuentas con Google, partidas guardadas y ranking (Supabase)
+│   ├── cuenta.js        # cuentas con Google, partidas guardadas y ranking (habla con /api)
 │   ├── share.js         # compartir el link del juego (lo usan las dos páginas)
 │   ├── como-se-juega.js # arranque de la página de Cómo se juega
 │   ├── utils.js         # helpers puros (localStorage, escape, parseo de links)
 │   ├── idb.js           # persistencia de audios en IndexedDB
 │   └── styles.css       # estilos
-├── supabase/
-│   ├── migrations/      # tablas, reglas de acceso y ranking de la base
+├── netlify/functions/
+│   └── api.mjs          # /api: verifica el token de Google, lleva la sesión y habla con la base
+├── db/
+│   ├── esquema.sql      # tablas y funciones de la base (Postgres en Neon)
 │   └── catalogo_solo.sql # catálogo contra el que la base verifica las partidas (generado)
 ├── scripts/
-│   └── catalogo-solo.mjs # genera catalogo_solo.sql desde src/data.js (npm run catalogo)
+│   ├── catalogo-solo.mjs # genera db/catalogo_solo.sql desde src/data.js (npm run catalogo)
+│   └── db.mjs           # ejecuta un .sql contra la base (npm run db -- <archivo>)
 ├── vite.config.js
 └── netlify.toml         # build de Netlify (npm run build → dist/)
 ```
 
-## 👤 Cuentas y ranking (Supabase)
+## 👤 Cuentas y ranking
 
-1. Crear un proyecto en [supabase.com](https://supabase.com), aplicarle las migraciones de
-   `supabase/migrations/` en orden (SQL Editor, o `supabase db push`) y después ejecutar
-   `supabase/catalogo_solo.sql`.
-2. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crear un
-   **ID de cliente OAuth** (aplicación web) con URI de redireccionamiento autorizado
-   `https://<proyecto>.supabase.co/auth/v1/callback` y, en **Orígenes autorizados de JavaScript**,
-   `https://enunanota.com.ar`, `https://www.enunanota.com.ar`,
-   `https://en-una-nota-ensalada-mixta.netlify.app`, `http://localhost` y `http://localhost:5173`
-   (los pide el botón de Google, que entra sin salir de la página y muestra nuestro dominio en vez
-   del de supabase.co; la redirección queda de respaldo si el botón no carga).
-3. En Supabase, **Authentication → Sign In / Providers → Google**: activarlo y pegar el ID y el secreto.
-4. **Authentication → URL Configuration**: Site URL `https://enunanota.com.ar` y en Redirect URLs
-   `https://enunanota.com.ar/**`, `https://www.enunanota.com.ar/**`,
-   `https://en-una-nota-ensalada-mixta.netlify.app/**` y `http://localhost:5173/**`.
-5. Copiar la URL del proyecto y la clave publicable (Project Settings → API) en las constantes
-   del principio de `src/cuenta.js`. Vacías, las cuentas quedan apagadas. Ahí también va el ID de
-   cliente de Google (`GOOGLE_CLIENT_ID`).
+La base es Postgres en [Neon](https://neon.tech) y la API es una Netlify Function
+(`netlify/functions/api.mjs`, en `/api/*`). El navegador nunca ve la clave de la base: la página
+le manda a la función el token de Google, la función lo verifica, abre la sesión con una cookie
+(`HttpOnly`, 30 días) y llama a las funciones SQL de `db/esquema.sql`, que son las que cuidan el
+ranking.
 
-**Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y ejecutar el
-`supabase/catalogo_solo.sql` que genera en el SQL Editor. Si no, las partidas en las que suene una
-canción nueva se descartan del ranking.
+1. Crear un proyecto en Neon (región **AWS São Paulo**) y copiar la cadena de conexión.
+2. Copiar `.env.example` a `.env` y completar `DATABASE_URL` y `SESSION_SECRET`. Después crear
+   las tablas y subir el catálogo:
+
+   ```bash
+   npm run db -- db/esquema.sql
+   npm run catalogo:subir
+   ```
+
+3. En Netlify (Site configuration → Environment variables) cargar las mismas `DATABASE_URL` y
+   `SESSION_SECRET`.
+4. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials), en el **ID de
+   cliente OAuth** (aplicación web):
+   - **Orígenes autorizados de JavaScript** (los pide el botón de Google, que entra sin salir de la
+     página): `https://enunanota.com.ar`, `https://www.enunanota.com.ar`,
+     `https://en-una-nota-ensalada-mixta.netlify.app`, `http://localhost` y `http://localhost:8888`.
+   - **URI de redireccionamiento autorizados** (la redirección que queda de respaldo si el botón no
+     carga): `https://enunanota.com.ar/api/auth/google-vuelta` y las mismas para `www.` y
+     `netlify.app`.
+
+   El ID de cliente es público y está en `src/cuenta.js` y en la función (`GOOGLE_CLIENT_ID`).
+
+Para probarlo en local hace falta correr la función: `npx netlify dev` (con `npm run dev` solo,
+las cuentas y el ranking no responden; el juego anda igual).
+
+**Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y después
+`npm run catalogo:subir`. Si no, las partidas en las que suene una canción nueva se descartan del
+ranking.
 
 ## 📊 Medición (Google Analytics 4)
 
@@ -186,8 +202,8 @@ La medición está en `src/analytics.js` (ID de la propiedad al principio; vací
 | `cafecito_visto` / `cafecito` | Pedido al final / clic en un botón | `partidas`, `canciones` / `desde`, `pantalla`, `partidas` |
 | `comentario` | Se manda el formulario | `estado` (enviado · error) |
 
-Propiedad de usuario: `con_cuenta` (si · no). Con sesión abierta va además el `user_id` (el ID
-de la cuenta en Supabase, nunca el nombre ni el mail), que junta en una persona lo que hace en
+Propiedad de usuario: `con_cuenta` (si · no). Con sesión abierta va además el `user_id` (el ID interno
+de la cuenta, nunca el nombre ni el mail), que junta en una persona lo que hace en
 distintos dispositivos. Para verlo en los informes, en Administrar → Recopilación de datos →
 Identidad para los informes usar "Combinada" u "Observada".
 

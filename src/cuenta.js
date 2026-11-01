@@ -23,6 +23,7 @@ const LS_SESION = "eun_sesion_v1";             // "1" si acá hubo una sesión a
 const LS_PENDIENTE = "eun_partida_pendiente_v1";
 const PENDIENTE_VENCE_MS = 60 * 60 * 1000;    // una partida sin guardar de hace más de una hora ya no va
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];  // las mismas que el select de Opciones; 0 = sin límite
+const RANKING_CANCIONES = 10;   // el ranking es solo el de partidas de 10 canciones
 const LIMITE_RANKING = 20;
 // Los de ranking_solo(): la semana arranca el viernes y el mes el 1, a las 0 h de Argentina
 const PERIODOS = [
@@ -34,7 +35,7 @@ const periodo = (id)=> PERIODOS.find(p=> p.id === id) || PERIODOS[2];
 
 let usuario = null;          // { id, nombre } con la sesión abierta
 let partidaFinal = null;     // { id, canciones } de la partida que se acaba de terminar, si entra al ranking
-let rankingVisto = 10;
+const rankingVisto = RANKING_CANCIONES;
 let periodoVisto = "semana";
 let mostrar = ()=>{};        // show() de main.js
 
@@ -364,7 +365,7 @@ export async function renderMiCuenta(){
           ${cuadritos(p.segundos, true)}<b>${p.puntos}</b>
           <small>${fechaCorta(p.jugada)} · ${p.canciones ? p.canciones + " canciones" : "sin límite"}</small></div>`).join("")}</div>`;
     // el puesto de cada récord, de a uno a medida que llegan
-    OPCIONES_CANCIONES.filter(n=> mejores[n]).forEach(async n=>{
+    OPCIONES_CANCIONES.filter(n=> mejores[n] && n === RANKING_CANCIONES).forEach(async n=>{
       const mio = await miPuesto(n);
       if(turno !== turnoCuenta) return;
       const celda = box.querySelector(`[data-rec="${n}"] .pos`);
@@ -467,6 +468,15 @@ export async function rankingFinal(resueltas){
   }
   const canciones = p.canciones;
   partidaFinal = { id: p.id, canciones };
+  if(canciones !== RANKING_CANCIONES){
+    // Se guarda en el historial igual, pero el ranking es solo el de 10 canciones
+    if(usuario){
+      try{ await guardarPartida(partidaFinal); }catch(_){ track("error_cuenta", { donde: "guardar" }); }
+      if(turno !== turnoFinal) return;
+    }
+    el.innerHTML = `<p class="hint" style="margin:0">El ranking es solo con ${RANKING_CANCIONES} canciones${usuario ? ". Tu partida quedó en tu historial." : "."}</p>`;
+    return;
+  }
   if(!usuario){
     // Contra cuenta/entrar desde final da cuántos aceptan la invitación
     track("invitacion_cuenta", { desde: "final", canciones_por_partida: canciones });
@@ -509,10 +519,10 @@ const deQue = ()=> (rankingVisto ? "con " + rankingVisto + " canciones" : "sin l
 
 let turnoRanking = 0;
 // per: semana | mes | siempre; sin él queda el último que se miró
-// desde (para Analytics): seccion | inicio | final | guardado | periodo | cantidad
-export async function verRanking(canciones, aviso, per, desde){
+// desde (para Analytics): seccion | inicio | final | guardado | periodo
+// La cantidad de canciones ya no se elige: solo hay ranking de 10 (_canciones se ignora)
+export async function verRanking(_canciones, aviso, per, desde){
   if(!cuentasActivas) return;
-  rankingVisto = OPCIONES_CANCIONES.includes(Number(canciones)) ? Number(canciones) : 10;
   if(PERIODOS.some(p=> p.id === per)) periodoVisto = per;
   if(!document.getElementById("s-ranking").classList.contains("on")) mostrar("s-ranking");
   track("ranking_visto", { canciones_por_partida: rankingVisto, periodo: periodoVisto, desde: desde || "" });
@@ -521,8 +531,6 @@ export async function verRanking(canciones, aviso, per, desde){
   document.getElementById("rk-aviso").hidden = !aviso;
   document.getElementById("rk-periodos").innerHTML = PERIODOS.map(p=>
     `<button type="button" aria-pressed="${p.id === periodoVisto}" onclick="verRanking(${rankingVisto}, '', '${p.id}', 'periodo')">${p.boton}</button>`).join("");
-  document.getElementById("rk-tabs").innerHTML = OPCIONES_CANCIONES.map(n=>
-    `<button type="button" aria-pressed="${n === rankingVisto}" onclick="verRanking(${n}, '', undefined, 'cantidad')"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
   document.getElementById("rk-titulo").textContent = `Ranking ${periodo(periodoVisto).titulo} · ` + nombreOpcion(rankingVisto).toLowerCase();
   document.getElementById("rk-sub").textContent = "Un jugador · el mejor puntaje de cada cuenta"
     + (periodo(periodoVisto).cuando ? " " + periodo(periodoVisto).cuando : "");

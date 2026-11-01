@@ -231,7 +231,7 @@ async function renderRecordCard(){
     return;
   }
   if(local) el.innerHTML = tarjeta(local, `<span class="pill amber">Ranking ›</span>`);
-  const mio = await miPuesto(n);
+  const mio = n === 10 ? await miPuesto(n) : null;   // el ranking es solo el de 10 canciones
   if(turno !== turnoRecord) return;
   const pts = Math.max(local, mio ? mio.puntos : 0);
   el.innerHTML = pts ? tarjeta(pts, `<span class="pill amber">${mio ? "#" + mio.puesto + " histórico" : "Ranking"} ›</span>`) : "";

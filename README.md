@@ -36,19 +36,27 @@ Después se **revela** la canción y el grupo decide si la pegó.
   cuadrito por canción (🟩 1 s, 🟨 2–3 s, 🟧 4–6 s, ⬛ no salió), que también va en el texto al
   compartir. El modo elegido se recuerda.
 - **Cuentas con Google y ranking** (opcional): entrando con Google, cada partida de un
-  jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno entra a un **ranking por
-  cantidad de canciones** (5, 10, 15, 20, 30 y sin límite), que se mira **semanal** (arranca cada
-  viernes), **mensual** (cada día 1) o **histórico**. El ranking es **verificado**: la partida
-  se va anotando en la base mientras se juega y la base comprueba cada paso (que el video sea del
-  catálogo, que el título acertado sea el suyo y que haya pasado el tiempo de los fragmentos que
-  sonaron); los puntos los calcula ella, no el navegador. Las partidas con canciones propias no
+  jugador se guarda en la cuenta (historial) y el mejor puntaje de cada uno **con 10 canciones** entra
+  al **ranking**, que se mira **semanal** (arranca cada viernes), **mensual** (cada día 1) o
+  **histórico**. Las partidas con otra cantidad quedan en el historial pero no compiten. El ranking es
+  **verificado**: la partida se va anotando en la base mientras se juega y la base comprueba cada paso
+  (que el video sea del catálogo, que el título acertado sea el suyo y que la partida no se haya
+  resuelto más rápido de lo que juega una persona); los puntos los calcula ella, no el navegador. Si
+  se corta la red, cada paso se reintenta. Las partidas con canciones propias no
   entran. Si se entra desde la pantalla final, esa partida se guarda al volver de Google. En el ranking sale un nombre corto ("Ana G.") que se cambia en Mi cuenta;
-  el mail y la foto no se muestran ni se guardan.
+  el mail y la foto no se muestran ni se guardan. La cuenta se borra, con todas sus partidas, desde
+  Mi cuenta → **Borrar mi cuenta**.
   En Mi cuenta salen tus **géneros favoritos**: los tres que más sonaron en tus partidas, con su
   porcentaje (`src/favoritos.js`). Con cuenta se cuentan los videos de tus partidas de Un jugador;
   sin cuenta, las canciones que sonaron en este navegador en los dos modos. Sin configurar,
   el juego queda igual que antes.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
+- **No se pierde la partida**: en el celular, el gesto de atrás en plena partida pregunta antes de
+  salir; la pantalla no se apaga mientras se juega (Wake Lock), y una partida con amigos que se cortó
+  (se recargó la página) se puede **retomar** desde el inicio con el marcador como estaba.
+- **Abre sin internet**: un service worker (`public/sw.js`) guarda la app la primera vez, así que
+  después se puede abrir sin conexión y jugar con los audios propios. Las páginas se piden siempre
+  primero a la red, así que una versión nueva llega apenas hay conexión.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
   evitan en partidas siguientes hasta agotar la playlist elegida (se puede reiniciar el
   historial manualmente).
@@ -77,14 +85,19 @@ Después se **revela** la canción y el grupo decide si la pegó.
 
 ## 🚀 Desarrollo
 
-Requiere [Node.js](https://nodejs.org) 18+.
+Requiere [Node.js](https://nodejs.org) 22+.
 
 ```bash
 npm install     # instala dependencias
 npm run dev     # servidor de desarrollo (http://localhost:5173)
+npm test        # pruebas (node --test): utilidades, autocompletado y catálogo
 npm run build   # genera la versión de producción en dist/
 npm run preview # sirve el build de dist/ para probarlo
 ```
+
+`npm run build` corre antes `npm run catalogo:verificar`: si `db/catalogo_solo.sql` quedó viejo
+respecto de `src/data.js`, el build falla (y el deploy no sale) en vez de publicar canciones que el
+ranking descartaría.
 
 > **Importante:** el juego usa el reproductor de YouTube, que **solo funciona servido
 > por http(s)** (con `npm run dev`, `npm run preview` o ya deployado). Abrir el HTML
@@ -105,11 +118,14 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── og.svg           # fuente de la imagen para redes
 │   ├── og.png           # imagen para redes (la que leen WhatsApp/Facebook/X)
 │   ├── manifest.webmanifest
+│   ├── sw.js            # service worker: la app abre sin internet
 │   ├── robots.txt
 │   └── sitemap.xml
 ├── src/
 │   ├── main.js          # estado, lógica de juego, render y arranque
 │   ├── data.js          # las playlists (título, artista, id de YouTube)
+│   ├── titulos.js       # autocompletado de Un jugador: armar la lista, buscar y comprobar
+│   ├── relleno.js       # títulos que solo aparecen como opciones del autocompletado
 │   ├── sharecard.js     # dibuja y comparte la imagen del resultado
 │   ├── cuenta.js        # cuentas con Google, partidas guardadas y ranking (habla con /api)
 │   ├── share.js         # compartir el link del juego (lo usan las dos páginas)
@@ -125,8 +141,9 @@ npm run preview # sirve el build de dist/ para probarlo
 ├── scripts/
 │   ├── catalogo-solo.mjs # genera db/catalogo_solo.sql desde src/data.js (npm run catalogo)
 │   └── db.mjs           # ejecuta un .sql contra la base (npm run db -- <archivo>)
+├── tests/               # pruebas con node --test (npm test)
 ├── vite.config.js
-└── netlify.toml         # build de Netlify (npm run build → dist/)
+└── netlify.toml         # build de Netlify (npm run build → dist/) y cabeceras
 ```
 
 ## 👤 Cuentas y ranking
@@ -164,7 +181,21 @@ las cuentas y el ranking no responden; el juego anda igual).
 
 **Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y después
 `npm run catalogo:subir`. Si no, las partidas en las que suene una canción nueva se descartan del
-ranking.
+ranking. Lo primero lo controla el build (`catalogo:verificar`); subirlo a la base sigue siendo a mano.
+
+**Al cambiar `db/esquema.sql`**: volver a correr `npm run db -- db/esquema.sql` (se puede ejecutar
+las veces que haga falta).
+
+**Moderación**: para sacar del ranking un nombre ofensivo o un puntaje hecho con trampa, marcar la
+cuenta como oculta en la consola SQL de Neon — deja de figurar para los demás, pero ella se sigue
+viendo:
+
+```sql
+update public.usuarios set oculto = true where nombre = 'El nombre';
+```
+
+La función de `/api` tiene además un límite de 120 pedidos por minuto por IP (`rateLimit` en
+`api.mjs`); pasado eso Netlify responde 429 sin ejecutarla.
 
 ## 📊 Medición (Google Analytics 4)
 
@@ -187,13 +218,14 @@ La medición está en `src/analytics.js` (ID de la propiedad al principio; vací
 | `record_nuevo` | Un jugador: récord del navegador | `puntos`, `anterior`, `canciones_por_partida` |
 | `revancha` | Revancha / Jugar otra vez | `canciones`, `modo_juego` |
 | `error_youtube` | Un video no se pudo reproducir | `momento`, `codigo`, `video`, `cancion` |
-| `ranking_visto` | Se abre o se cambia el ranking | `canciones_por_partida`, `periodo`, `desde` (seccion · inicio · final · guardado · periodo · cantidad) |
+| `ranking_visto` | Se abre o se cambia el ranking | `canciones_por_partida`, `periodo`, `desde` (seccion · inicio · final · guardado · periodo) |
 | `partida_guardada` | La partida entra al ranking | `canciones_por_partida`, `puntos`, `puesto` |
 | `partida_descartada` | La base no la acepta | `canciones_por_partida`, `por` (propias · base) |
 | `invitacion_cuenta` | Al final, sin cuenta, se ofrece entrar | `desde`, `canciones_por_partida` |
-| `cuenta` | Entrar, volver de Google, salir, renombrar | `accion` (entrar · entro · cancelo · salir · renombrar), `desde`, `detalle` |
+| `cuenta` | Entrar, volver de Google, salir, renombrar, borrar | `accion` (entrar · entro · cancelo · salir · renombrar · borrar), `desde`, `detalle` |
 | `login` | Entró con Google (evento recomendado de GA4) | `method` |
-| `error_cuenta` | Falló algo de la cuenta o el ranking | `donde` (google · nombre · guardar · ranking · mis_partidas) |
+| `error_cuenta` | Falló algo de la cuenta o el ranking | `donde` (google · nombre · guardar · ranking · mis_partidas · borrar) |
+| `partida_retomada` | Con amigos: se retoma una partida que se había cortado | `numero`, `canciones_por_partida`, `equipos` |
 | `mis_canciones` | Mis canciones | `accion` (abrir · cancion_agregada · cancion_quitada · link_pegado · link_borrado · audio_quitado), `desde`, `total` |
 | `audio_propio_cargado` | Se cargan audios de la compu | `cantidad`, `fallidos`, `total` |
 | `preferencia_cambiada` | Se cambia "Restar un punto" | `resta_puntos`, `desde` (setup · cuenta) |

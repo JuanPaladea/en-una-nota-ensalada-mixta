@@ -230,7 +230,7 @@
      repetir, récord y cafecito a la derecha. */
   .inicio{display:flex;flex-direction:column;gap:12px}
   .inicio-main,.inicio-side{display:contents}
-  .modes{order:1} #repetir{order:2} .pasos{order:2} #record-card{order:3} .accesos{order:4} .inicio-side .cafecito{order:5}
+  .modes{order:1} #retomar{order:2} #repetir{order:2} .pasos{order:2} #record-card{order:3} .accesos{order:4} .inicio-side .cafecito{order:5}
   .modes{margin-bottom:2px}
   .inicio-side > div:empty{display:none}
   /* Tarjetas: solo para lo que se toca (repetir la última, tu récord) */
@@ -776,6 +776,7 @@
   .list-det > summary::-webkit-details-marker{display:none}
   .list-det[open] .ch{transform:rotate(90deg)}
   .salir{background:none;border:0;color:var(--no);font:inherit;font-weight:800;font-size:14.5px;cursor:pointer;display:block;margin:20px auto 0;padding:8px}
+  .salir.borrar{margin-top:2px;color:var(--muted);font-size:13px;font-weight:700;text-decoration:underline}
   @media (min-width:960px){
     .cuenta-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:start}
     .cuenta-col:last-child > .lbl:first-child{margin-top:0}

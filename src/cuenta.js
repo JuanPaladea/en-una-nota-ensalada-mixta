@@ -2,9 +2,9 @@
 //
 // Entrar es opcional: sin cuenta se juega igual que siempre. Con cuenta, cada
 // partida de un jugador se guarda (el historial) y el mejor puntaje de cada uno
-// entra al ranking, que hay uno por cantidad de canciones — 40 puntos en 5
-// canciones no se comparan con 40 en 20 — y por período: la semana (desde el
-// viernes), el mes (desde el 1) o de siempre.
+// con 10 canciones entra al ranking — 40 puntos en 5 canciones no se comparan
+// con 40 en 20, así que hay una sola tabla —, que se mira por período: la
+// semana (desde el viernes), el mes (desde el 1) o de siempre.
 //
 // Todo pasa por /api (netlify/functions/api.mjs): verifica el token de Google,
 // lleva la sesión en una cookie y habla con la base (db/esquema.sql). Esta
@@ -14,7 +14,7 @@ import { soloTramo } from "./sharecard.js";
 import { track, propiedadesUsuario, usuarioAnalytics } from "./analytics.js";
 import { contarVideos, favoritosHtml, nombreGenero } from "./favoritos.js";
 import { pastilla, indicadorTabs } from "./motion.js";
-import { api } from "./api.js";
+import { api, apiInsistente } from "./api.js";
 import { GENRES } from "./data.js";
 import { estadisticasHtml } from "./logros.js";
 import { fechaCorta as fechaDeDia, diaProvisional, olvidarDesafio } from "./fijas.js";
@@ -29,7 +29,7 @@ const LS_SESION = "eun_sesion_v1";             // "1" si acá hubo una sesión a
 const LS_PENDIENTE = "eun_partida_pendiente_v1";
 const PENDIENTE_VENCE_MS = 60 * 60 * 1000;    // una partida sin guardar de hace más de una hora ya no va
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];  // las mismas que el select de Opciones; 0 = sin límite
-const RANKING_CANCIONES = 10;   // el ranking es solo el de partidas de 10 canciones
+export const RANKING_CANCIONES = 10;   // el ranking es solo el de partidas de 10 canciones
 const LIMITE_RANKING = 20;
 // Los de ranking_solo(): la semana arranca el viernes y el mes el 1, a las 0 h de Argentina.
 // "hoy" es otra tabla: la del desafío del día (ranking_desafio).
@@ -225,6 +225,26 @@ async function salir(){
   renderCuenta();
 }
 
+// Borra la cuenta con todas sus partidas (y la saca del ranking). No hay vuelta atrás.
+async function borrarCuenta(){
+  if(!usuario) return;
+  if(!confirm("¿Borrar tu cuenta? Se borran tu nombre y todas tus partidas guardadas, y salís del ranking. No se puede deshacer.")) return;
+  try{ await api("/yo/borrar", {}); }
+  catch(_){
+    track("error_cuenta", { donde: "borrar" });
+    alert("No pudimos borrar la cuenta. Probá de nuevo en un rato.");
+    return;
+  }
+  track("cuenta", { accion: "borrar" });
+  recordarSesion(false);
+  usuario = null;
+  partidaFinal = null;
+  ligaVista = "";
+  olvidarCache();
+  renderCuenta();
+  alert("Listo: borramos tu cuenta y tus partidas.");
+}
+
 // El nombre del ranking se cambia ahí mismo, en Mi cuenta (antes era una
 // ventanita del navegador)
 function editarNombre(abrir){
@@ -287,7 +307,10 @@ function renderCuenta(){
 }
 function renderSalir(){
   const el = document.getElementById("cuenta-salir");
-  if(el) el.innerHTML = usuario ? `<button type="button" class="salir" onclick="salirDeCuenta()">Cerrar sesión</button>` : "";
+  if(el) el.innerHTML = usuario
+    ? `<button type="button" class="salir" onclick="salirDeCuenta()">Cerrar sesión</button>
+       <button type="button" class="salir borrar" onclick="borrarCuenta()">Borrar mi cuenta</button>`
+    : "";
 }
 
 /* ============================================================
@@ -392,13 +415,15 @@ export async function renderMiCuenta(){
       <div id="cuenta-ligas"></div>
       ${estadisticasHtml(partidas)}`;
     renderLigas(turno);
-    // el puesto de cada récord, de a uno a medida que llegan
-    OPCIONES_CANCIONES.filter(n=> mejores[n] && n === RANKING_CANCIONES).forEach(async n=>{
-      const mio = await miPuesto(n);
+    // el puesto va solo en el récord de 10 canciones, que es el que tiene ranking
+    box.querySelectorAll(".rec .pos").forEach(c=>{ c.textContent = ""; });
+    if(mejores[RANKING_CANCIONES]){
+      const celda = box.querySelector(`[data-rec="${RANKING_CANCIONES}"] .pos`);
+      celda.textContent = "…";
+      const mio = await miPuesto(RANKING_CANCIONES);
       if(turno !== turnoCuenta) return;
-      const celda = box.querySelector(`[data-rec="${n}"] .pos`);
-      if(celda) celda.textContent = mio ? "#" + mio.puesto : "";
-    });
+      celda.textContent = mio ? "#" + mio.puesto : "";
+    }
   }catch(e){
     track("error_cuenta", { donde: "mis_partidas" });
     if(turno !== turnoCuenta) return;
@@ -471,17 +496,19 @@ function verRankingDeLiga(id){
    PARTIDAS
    La partida se va anotando en la base mientras se juega, con o sin cuenta:
    qué video sonó y cuándo, y con cuántos segundos salió (1 a 6, 0 si no
-   salió). La base comprueba que el video sea del catálogo, que el título sea
-   el suyo y que haya pasado el tiempo de esos fragmentos; si algo no cierra,
-   la descarta. Al terminar, con cuenta, la pasa al historial y al ranking.
+   salió). La base comprueba que el video sea del catálogo y que el título sea
+   el suyo; si algo no cierra, la descarta. Al terminar, con cuenta, la pasa al
+   historial y al ranking.
    ============================================================ */
 let enCurso = null;   // { canciones, id, valida, propias, cola }
 
-// Los pasos van en orden: cada uno sale recién cuando volvió el anterior.
+// Los pasos van en orden: cada uno sale recién cuando volvió el anterior. Un
+// corte de red no tira la partida: se insiste (la base toma el mismo paso
+// repetido como uno solo).
 function paso(p, nombre, args){
   p.cola = p.cola.then(async ()=>{
     if(!p.valida) return;
-    if(!await api("/solo/" + nombre, { partida: p.id, ...args })) p.valida = false;
+    if(!await apiInsistente("/solo/" + nombre, { partida: p.id, ...args })) p.valida = false;
   }).catch(()=>{ p.valida = false; });
 }
 
@@ -492,7 +519,7 @@ export function soloEmpezar(canciones, extra = {}){
   if(!cuentasActivas) return;
   const datos = { modo: extra.modo || "titulo", genero: extra.genero || null, dia: extra.dia || null, duelo: extra.duelo || null };
   const p = { canciones, id: null, valida: true, propias: false, ...datos };
-  p.cola = api("/solo/empezar", { canciones, ...datos })
+  p.cola = apiInsistente("/solo/empezar", { canciones, ...datos })
     .then(id=>{ p.id = id; if(!id) p.valida = false; })
     .catch(()=>{ p.valida = false; });
   enCurso = p;
@@ -634,13 +661,12 @@ export async function rankingFinal(resueltas){
     const { puntos, mio } = await guardarPartida(partidaFinal);
     const semana = await miPuesto(canciones, "semana");
     if(turno !== turnoFinal) return;          // ya arrancó otra partida
-    const de = canciones ? ` · ${canciones} canciones` : " · sin límite";
     const txt = !semana ? "Partida guardada."
       : semana.puntos === puntos ? `Quedaste <b style="color:var(--amber)">#${semana.puesto}</b> esta semana`
       : `Tu mejor de la semana (${semana.puntos} puntos) está <b style="color:var(--amber)">#${semana.puesto}</b>`;
     const historico = mio ? `<span class="tarjeta-d">Histórico: #${mio.puesto}${mio.puntos === puntos ? "" : ` con ${mio.puntos} puntos`}</span>` : "";
     el.innerHTML = `<button type="button" class="tarjeta" style="border:0;padding:0;background:none" onclick="verRanking(${canciones}, '', 'semana', 'final')">
-        <span class="grow"><span class="eyebrow">Ranking${de}</span><span class="tarjeta-t">${txt}</span>${historico}</span>
+        <span class="grow"><span class="eyebrow">Ranking · ${canciones} canciones</span><span class="tarjeta-t">${txt}</span>${historico}</span>
         <span class="pill amber">Ver ›</span></button>`;
   }catch(e){
     track("error_cuenta", { donde: "guardar" });
@@ -651,7 +677,7 @@ export async function rankingFinal(resueltas){
 
 /* ============================================================
    RANKING
-   Semana, mes o histórico, y una tabla por cantidad de canciones. Podio para
+   Semana, mes o histórico, siempre con partidas de 10 canciones. Podio para
    los tres primeros, lista corta debajo y tu fila aparte (fija abajo en el
    celular), aunque estés lejos del podio.
    ============================================================ */
@@ -796,6 +822,6 @@ function renderYo(data){
 
 // Los onclick del HTML llaman funciones globales (como en main.js)
 Object.assign(window, {
-  entrarConGoogle: entrar, salirDeCuenta: salir, editarNombre, guardarNombre, verRanking,
+  entrarConGoogle: entrar, salirDeCuenta: salir, borrarCuenta, editarNombre, guardarNombre, verRanking,
   filtrarRanking, ligaCrear, ligaUnirse, ligaSalir, ligaCompartir, verRankingDeLiga,
 });

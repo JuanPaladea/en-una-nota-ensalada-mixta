@@ -44,6 +44,11 @@ create table if not exists public.usuarios (
   nombre      text not null check (char_length(btrim(nombre)) between 1 and 30),
   creado      timestamptz not null default now()
 );
+-- oculto: la cuenta no figura en el ranking para los demás (ella se sigue
+-- viendo, para que no sepa que está oculta). Es la forma de sacar un nombre
+-- ofensivo o un puntaje hecho con trampa; se marca a mano:
+--   update public.usuarios set oculto = true where nombre = '…';
+alter table public.usuarios add column if not exists oculto boolean not null default false;
 
 -- ===================== PARTIDAS =====================
 -- Misma tabla que PUNTOS_SOLO en src/main.js: 1 s → 10, 2 s → 7 … 6 s → 1, 0 = no salió.
@@ -249,8 +254,14 @@ create index if not exists salas_creada on public.salas (creada);
 
 -- ===================== PASOS DE LA PARTIDA =====================
 -- La base comprueba que el video sea del catálogo, que el título sea el suyo y
--- que haya pasado el tiempo de los fragmentos que sonaron. Si algo no cierra,
--- la partida se descarta.
+-- que la partida no se haya resuelto más rápido de lo que juega una persona.
+-- Si algo no cierra, la partida se descarta. Repetir el último paso (un
+-- reintento porque se cortó la red y no llegó la respuesta) no cambia nada.
+--
+-- Hasta dónde llega: el navegador sabe qué video suena (lo tiene que
+-- reproducir) y el catálogo viaja con la página, así que un programa que se
+-- tome su tiempo puede armar una partida perfecta. Esto frena lo burdo; para lo
+-- demás están el límite de pedidos de la función y usuarios.oculto.
 
 -- Empieza una partida. De paso borra las abandonadas hace más de 6 horas.
 -- p_genero: la playlist, si se juega con una sola · p_modo: titulo | artista ·
@@ -301,6 +312,8 @@ begin
   select * into p from public.partidas_en_curso where id = p_partida for update;
   if not found or p.guardada then return false; end if;
   n := cardinality(p.videos);
+  -- el mismo video que ya está sonando: es un reintento
+  if n > cardinality(p.segundos) and p.videos[n] = p_video then return true; end if;
   if p_video = any(p.videos)
      or not exists (select 1 from public.catalogo_solo c
                     where c.video = p_video and (p.genero is null or c.genero = p.genero))
@@ -331,8 +344,14 @@ end $$;
 
 -- Se resolvió la canción que suena: con p_segundos (1 a 6) y lo que eligió (el
 -- título o, en el modo artista, el artista), o 0 si no salió. p_pistas: cuántos
--- de esos pasos fueron pistas y no audio (hasta 2). Con a pasos de audio
--- sonaron 1 + 2 + … + a segundos; se dan 2 de margen por la red.
+-- de esos pasos fueron pistas y no audio (hasta 2; al menos uno tiene que ser
+-- audio). Repetir el mismo resultado (un reintento) no cambia nada.
+--
+-- Antes se exigía además que hubieran pasado los 1 + 2 + … + a segundos de los
+-- fragmentos. Se sacó: un fragmento se puede cortar antes ("Cortar ya"), así
+-- que descartaba partidas bien jugadas, y no frenaba ninguna trampa — el que
+-- hace trampa dice que la sacó con 1 segundo, que no exigía nada. El control
+-- de tiempo está en solo_terminar, sobre la partida entera.
 drop function if exists public.solo_resolver(uuid, smallint, text);
 create or replace function public.solo_resolver(
   p_partida uuid, p_segundos smallint, p_titulo text, p_pistas smallint default 0)
@@ -347,6 +366,8 @@ begin
   select * into p from public.partidas_en_curso where id = p_partida for update;
   if not found or p.guardada then return false; end if;
   n := cardinality(p.videos);
+  -- la última ya está resuelta con esos mismos segundos: es un reintento
+  if n > 0 and n = cardinality(p.segundos) and p.segundos[n] = p_segundos then return true; end if;
   v_audio := coalesce(p_segundos, 0) - v_pistas;
   if n <> cardinality(p.segundos) + 1 or p_segundos is null or p_segundos not between 0 and 6
      or v_pistas not between 0 and 2
@@ -355,7 +376,6 @@ begin
        or not exists (select 1 from public.catalogo_solo c
                       where c.video = p.videos[n]
                         and (case when p.modo = 'artista' then c.artista else c.titulo end) = p_titulo)
-       or now() - p.sono_en < make_interval(secs => greatest(0, v_audio * (v_audio + 1) / 2.0 - 2))
      )) then
     delete from public.partidas_en_curso where id = p_partida;
     return false;
@@ -368,16 +388,27 @@ end $$;
 -- (terminó a mitad de canción) cuenta como que no salió. Devuelve los puntos,
 -- o null si no se guardó: no existe, ya estaba guardada o era el desafío de un
 -- día que esa cuenta ya había jugado (vale el primer intento).
+--
+-- Una persona tarda por lo menos unos segundos por canción que acierta
+-- (escucharla, escribir, elegir). Si la partida entera duró menos de 2
+-- segundos por acierto (con 4 de margen, por si el primer pedido tardó en
+-- llegar) no la jugó nadie: se descarta y devuelve null.
 create or replace function public.solo_terminar(p_partida uuid, p_usuario uuid) returns smallint
 language plpgsql set search_path = '' as $$
 declare
   p public.partidas_en_curso;
   v_segundos smallint[];
   v_puntos smallint;
+  v_aciertos int;
 begin
   if p_usuario is null then raise exception 'hace falta entrar con una cuenta'; end if;
   select * into p from public.partidas_en_curso where id = p_partida for update;
   if not found or p.guardada then return null; end if;
+  select count(*) into v_aciertos from unnest(p.segundos) as s where s > 0;
+  if now() - p.empezada < make_interval(secs => greatest(0, 2.0 * v_aciertos - 4)) then
+    delete from public.partidas_en_curso where id = p_partida;
+    return null;
+  end if;
   v_segundos := p.segundos || array_fill(0::smallint, array[cardinality(p.videos) - cardinality(p.segundos)]);
   if cardinality(v_segundos) = 0 then return null; end if;
   insert into public.partidas_solo (usuario, canciones, segundos, videos, genero, modo, dia, duelo)
@@ -461,6 +492,7 @@ end $$;
 -- primeros p_limite y, si p_usuario quedó más abajo, también su fila. A igual
 -- puntaje queda antes el que lo hizo primero. No cuentan el desafío del día
 -- (tiene su tabla), los duelos (las canciones ya se conocen) ni el modo artista.
+-- Las cuentas ocultas (usuarios.oculto) no figuran, salvo para ellas mismas.
 --
 -- p_periodo: 'semana' cuenta solo las partidas desde el viernes a las 0 h
 -- (hora de Argentina), 'mes' desde el día 1 a las 0 h y 'siempre' todas. Un
@@ -497,6 +529,7 @@ language sql stable set search_path = '' as $$
            f.nombre, m.puntos, m.resueltas, m.jugada,
            m.usuario is not distinct from p_usuario as es_mio
     from mejores m join public.usuarios f on f.id = m.usuario
+    where not f.oculto or m.usuario is not distinct from p_usuario
   )
   select * from ordenado
   where puesto <= least(greatest(p_limite, 1), 100) or es_mio
@@ -505,6 +538,7 @@ $$;
 
 -- El ranking del desafío de un día: una partida por cuenta. Misma forma que
 -- ranking_solo, más los segundos de cada canción (para los cuadritos).
+-- Las cuentas ocultas tampoco figuran acá.
 create or replace function public.ranking_desafio(
   p_dia date, p_limite int default 20, p_usuario uuid default null, p_liga uuid default null)
 returns table (puesto bigint, nombre text, puntos smallint, resueltas smallint, jugada timestamptz, es_mio boolean, segundos smallint[])
@@ -515,6 +549,7 @@ language sql stable set search_path = '' as $$
            p.usuario is not distinct from p_usuario as es_mio, p.segundos
     from public.partidas_solo p join public.usuarios f on f.id = p.usuario
     where p.dia = p_dia
+      and (not f.oculto or p.usuario is not distinct from p_usuario)
       and (p_liga is null or exists (
             select 1 from public.liga_miembros m where m.liga = p_liga and m.usuario = p.usuario))
   )

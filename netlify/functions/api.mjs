@@ -5,8 +5,8 @@
 // Hace de intermediario entre el navegador y la base (Postgres en Neon, ver
 // db/esquema.sql): verifica el token de Google, mantiene la sesión en una
 // cookie y llama a las funciones de la base pasándoles quién es. La lógica que
-// cuida el ranking (que el video sea del catálogo, los tiempos…) está en la
-// base; acá solo se validan los formatos y se pone la identidad.
+// cuida el ranking (que el video sea del catálogo, que el título sea el suyo…)
+// está en la base; acá solo se validan los formatos y se pone la identidad.
 //
 // Variables de entorno (Netlify → Site configuration → Environment variables):
 //   DATABASE_URL     la conexión de Neon
@@ -34,7 +34,14 @@ const MOTIVOS = ["no_suena", "otra_cancion", "version", "empieza_mal", "otro"]; 
 const TOPE_HORA = { reportes: 300, listas: 200, salas: 500 };
 const MAX_LISTA = 150;                     // canciones de una lista compartida
 
-export const config = { path: "/api/*" };
+// rateLimit: hasta 120 pedidos por minuto por IP; pasado eso Netlify responde
+// 429 sin llegar a ejecutar la función (ni a la base). Una partida de 10
+// canciones son unos 25 pedidos. Si la regla quedara mal escrita el deploy no
+// falla: se ve en el log del deploy.
+export const config = {
+  path: "/api/*",
+  rateLimit: { windowLimit: 120, windowSize: 60, aggregateBy: ["ip", "domain"] },
+};
 
 let _sql = null;
 const sql = ()=> _sql || (_sql = neon(process.env.DATABASE_URL));
@@ -214,6 +221,19 @@ const RUTAS = {
     return json({ nombre: filas.length ? filas[0].nombre : null });
   },
 
+  // Borrar la cuenta: se van con ella todas sus partidas y sus ligas (on
+  // delete cascade) y deja de figurar en el ranking. No se puede deshacer.
+  "POST /yo/borrar": async ({ req, url })=>{
+    const s = await leerSesion(req);
+    if(!s) return json({ error: "sin sesión" }, 401);
+    // Los resultados de duelos llevan el nombre escrito: se van también. Y las
+    // ligas que quedan sin nadie.
+    await sql()`delete from public.duelo_resultados where usuario = ${s.id}`;
+    await sql()`delete from public.usuarios where id = ${s.id}`;
+    await sql()`delete from public.ligas l where not exists (select 1 from public.liga_miembros m where m.liga = l.id)`;
+    return json({ ok: true }, 200, [borrarSesion(url)]);
+  },
+
   // El historial propio
   "GET /partidas": async ({ req })=>{
     const s = await leerSesion(req);
@@ -288,7 +308,8 @@ const RUTAS = {
   // los segundos fueron pistas y no audio
   "POST /solo/resolver": async ({ req })=>{
     const { partida, segundos, titulo, pistas = 0 } = await cuerpo(req);
-    if(!UUID.test(partida) || !Number.isInteger(segundos) || !Number.isInteger(pistas)
+    if(!UUID.test(partida) || !Number.isInteger(segundos) || segundos < 0 || segundos > 6
+       || !Number.isInteger(pistas) || pistas < 0 || pistas > 2
        || typeof titulo !== "string" && titulo !== null) return json(false);
     const f = await sql()`select public.solo_resolver(${partida}::uuid, ${segundos}::smallint, ${titulo === null ? null : titulo.slice(0, 200)}::text, ${pistas}::smallint) as r`;
     return json(f[0].r);
@@ -509,8 +530,10 @@ export default async (req)=>{
   // Lo que cambia algo solo se acepta desde el propio sitio (el POST de Google
   // llega desde su dominio y se defiende con el nonce de la cookie).
   if(req.method === "POST" && ruta !== "/auth/google-vuelta"){
-    const origen = req.headers.get("origin");
-    if(!origen || new URL(origen).host !== url.host) return json({ error: "origen" }, 403);
+    // Un Origin que no es una dirección ("null", de un iframe aislado) tampoco pasa
+    let host = null;
+    try{ host = new URL(req.headers.get("origin") || "").host; }catch(_){}
+    if(host !== url.host) return json({ error: "origen" }, 403);
   }
   try{
     return await manejador({ req, url });

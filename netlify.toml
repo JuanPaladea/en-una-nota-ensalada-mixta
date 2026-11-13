@@ -1,9 +1,35 @@
+# Las pruebas corren antes del build: si fallan (una canción mal cargada, el
+# catálogo desactualizado), el deploy no sale.
 [build]
-  command = "npm run build"
+  command = "npm test && npm run build"
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 [functions]
   node_bundler = "esbuild"
+
+# Los archivos de /assets llevan un hash en el nombre (los genera Vite): si
+# cambian, cambia el nombre, así que el navegador los puede guardar para siempre.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# El service worker se vuelve a pedir siempre, para que una versión nueva llegue enseguida.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# Cabeceras de seguridad básicas. El sitio no se muestra dentro de otro (evita
+# el clickjacking) y el navegador no adivina tipos de archivo. El Referrer va
+# solo con el dominio: el reproductor de YouTube lo necesita para andar.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

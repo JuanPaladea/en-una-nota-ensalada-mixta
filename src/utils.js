@@ -2,14 +2,18 @@
 
 // localStorage con manejo de errores
 export function load(k, def){ try{ return JSON.parse(localStorage.getItem(k)) ?? def; }catch(e){ return def; } }
-export function save(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+// Guardar nunca tira: con el almacenamiento lleno o bloqueado (modo privado,
+// cookies apagadas) el juego sigue, solo que no recuerda. Devuelve si pudo.
+export function save(k, v){
+  try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; }
+}
 
 // clave única de una canción dentro de un género
 export function songKey(gid, t){ return gid + "::" + t; }
 
 // escapar texto para insertar en HTML
 export function esc(s){
-  return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 }
 
 // extraer el ID de 11 caracteres de un link (o un ID pelado) de YouTube

@@ -11,7 +11,7 @@ import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verR
 import { armarCatalogo, armarArtistas, buscarTitulos, esLaCancion, esElArtista } from "./titulos.js";
 import "./extras.css";
 import { apiSuave } from "./api.js";
-import { estadisticasHtml, logrosNuevos, logroNuevoHtml } from "./logros.js";
+import { estadisticas, logrosNuevos, logroNuevoHtml } from "./logros.js";
 import { armarFija, traerDesafio, desafioEnMemoria, diaProvisional, desafioLocal, guardarDesafioLocal, rachaDesafio, tarjetaDesafioHtml, fechaCorta,
   traerDuelo, crearDuelo, anotarDuelo, dueloLocal, nombreParaDuelo, rivalDe, tablaDueloHtml, veredicto, LINK_DUELO } from "./fijas.js";
 import { codigoDelLink } from "./ligas.js";
@@ -424,19 +424,23 @@ function renderCuentaLocal(){
   else {
     // solo los récords adivinando el título (los del artista van con la clave "a10", "a5"…)
     const mejor = Math.max(0, ...Object.entries(record).filter(([k])=> /^\d+$/.test(k)).map(([, v])=> Number(v)).filter(Number.isFinite));
-    box.innerHTML = `<div class="lbl">En este navegador</div>
+    const est = estadisticas(partidasLocales);
+    // Las mismas zonas que arma cuenta.js con sesión (.cz, en styles.css)
+    box.innerHTML = `<div class="cz cz-a"><div class="lbl">En este navegador</div>
       <div class="tiles">
         <div class="tile"><b>${jugado.partidas}</b><span>partidas</span></div>
         <div class="tile"><b>${jugado.canciones}</b><span>canciones</span></div>
         <div class="tile"><b>${mejor || "—"}</b><span>mejor récord</span></div>
       </div>
-      ${favoritosHtml(porGenero, "este navegador")}
-      <div class="lbl">Tus récords de Un jugador</div>
+      ${favoritosHtml(porGenero, "este navegador")}</div>
+      <div class="cz cz-b"><div class="lbl">Tus récords de Un jugador</div>
       <div class="rec">${OPCIONES_CANCIONES.map(n=>{
         const pts = record[String(n)] || 0;
         return `<div class="${pts ? "" : "none"}">${n ? n + " canciones" : "Sin límite"}<b>${pts || "—"}</b></div>`;
       }).join("")}</div>
-      ${estadisticasHtml(partidasLocales)}`;
+      ${est.racha}${est.porGenero}</div>
+      <div class="cz cz-c">${est.pendientes}</div>
+      <div class="cz cz-d">${est.logros}</div>`;
   }
   const propios = customSongs.length;
   document.getElementById("cuenta-canciones").innerHTML = `

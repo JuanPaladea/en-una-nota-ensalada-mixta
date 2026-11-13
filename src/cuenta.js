@@ -16,7 +16,7 @@ import { contarVideos, favoritosHtml, nombreGenero } from "./favoritos.js";
 import { pastilla, indicadorTabs } from "./motion.js";
 import { api, apiInsistente } from "./api.js";
 import { GENRES } from "./data.js";
-import { estadisticasHtml } from "./logros.js";
+import { estadisticas } from "./logros.js";
 import { fechaCorta as fechaDeDia, diaProvisional, olvidarDesafio } from "./fijas.js";
 import { misLigas, ligasEnMemoria, olvidarLigas, crearLiga, unirseALiga, salirDeLiga, ligaPendiente, sumarPendiente, ligasHtml, LINK_LIGA } from "./ligas.js";
 
@@ -378,18 +378,22 @@ export async function renderMiCuenta(){
         <small>Así te ven en el ranking · entraste con Google</small>
       </div>
     </div>
-    <div id="cuenta-datos"><p class="cargando">Cargando tus partidas…</p></div>`;
+    <div id="cuenta-datos"><div class="cz cz-a"><p class="cargando">Cargando tus partidas…</p></div></div>`;
   try{
     const partidas = await cargarMisPartidas();
     if(turno !== turnoCuenta) return;
     const box = document.getElementById("cuenta-datos");
+    // Las zonas (.cz, en styles.css): en el celular van una debajo de la otra,
+    // en este orden; en la compu, a y c a la izquierda, b a la derecha y d a
+    // todo el ancho.
     if(!partidas.length){
-      box.innerHTML = `<div class="tarjeta"><span class="grow"><span class="tarjeta-t">Todavía no jugaste con tu cuenta</span>
-        <span class="tarjeta-d">Las partidas de Un jugador se guardan solas y entran al ranking.</span></span></div>
-        <div id="cuenta-ligas"></div>`;
+      box.innerHTML = `<div class="cz cz-a"><div class="tarjeta"><span class="grow"><span class="tarjeta-t">Todavía no jugaste con tu cuenta</span>
+        <span class="tarjeta-d">Las partidas de Un jugador se guardan solas y entran al ranking.</span></span></div></div>
+        <div class="cz cz-b"><div id="cuenta-ligas"></div></div>`;
       renderLigas(turno);
       return;
     }
+    const est = estadisticas(partidas);
     const canciones = partidas.reduce((n, p)=> n + p.segundos.length, 0);
     const salieron = partidas.flatMap(p=> p.segundos).filter(s=> s > 0);
     const promedio = salieron.length ? (salieron.reduce((a, b)=> a + b, 0) / salieron.length) : 0;
@@ -397,7 +401,7 @@ export async function renderMiCuenta(){
     // Los récords son de las partidas comunes: ni el desafío, ni los duelos, ni el modo artista
     partidas.filter(p=> !p.dia && !p.duelo && (p.modo || "titulo") === "titulo")
       .forEach(p=>{ mejores[p.canciones] = Math.max(mejores[p.canciones] || 0, p.puntos); });
-    box.innerHTML = `
+    box.innerHTML = `<div class="cz cz-a">
       <div class="tiles">
         <div class="tile"><b>${partidas.length}</b><span>partidas</span></div>
         <div class="tile"><b>${canciones}</b><span>canciones</span></div>
@@ -412,8 +416,10 @@ export async function renderMiCuenta(){
           ${cuadritos(p.segundos, true)}<b>${p.puntos}</b>
           <small>${fechaCorta(p.jugada)} · ${p.dia ? "desafío del día" : p.duelo ? "duelo"
             : (p.canciones ? p.canciones + " canciones" : "sin límite") + (p.modo === "artista" ? " · artista" : "")}</small></div>`).join("")}</div>
-      <div id="cuenta-ligas"></div>
-      ${estadisticasHtml(partidas)}`;
+      </div>
+      <div class="cz cz-b"><div id="cuenta-ligas"></div>${est.racha}${est.porGenero}</div>
+      <div class="cz cz-c">${est.pendientes}</div>
+      <div class="cz cz-d">${est.logros}</div>`;
     renderLigas(turno);
     // el puesto va solo en el récord de 10 canciones, que es el que tiene ranking
     box.querySelectorAll(".rec .pos").forEach(c=>{ c.textContent = ""; });
@@ -427,7 +433,7 @@ export async function renderMiCuenta(){
   }catch(e){
     track("error_cuenta", { donde: "mis_partidas" });
     if(turno !== turnoCuenta) return;
-    document.getElementById("cuenta-datos").innerHTML = `<p class="cargando">No pudimos cargar tus partidas.</p>`;
+    document.getElementById("cuenta-datos").innerHTML = `<div class="cz cz-a"><p class="cargando">No pudimos cargar tus partidas.</p></div>`;
   }
 }
 

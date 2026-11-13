@@ -130,9 +130,11 @@ export function logrosNuevos(partidas){
 const MIN_POR_GENERO = 3;    // con menos canciones el porcentaje no dice nada
 const PENDIENTES = 5;
 
-// Las filas entran escalonadas (extras.css): --i es el orden de cada una
-export function estadisticasHtml(partidas){
-  if(!partidas || !partidas.length) return "";
+// Las filas entran escalonadas (extras.css): --i es el orden de cada una.
+// Va cada bloque por separado ("" si no hay nada que mostrar): Mi cuenta los
+// reparte en zonas, que en la compu son columnas (ver .cz en styles.css).
+export function estadisticas(partidas){
+  if(!partidas || !partidas.length) return { racha: "", porGenero: "", pendientes: "", logros: "" };
   const r = resumen(partidas);
   const filas = Object.entries(r.generos).filter(([, g])=> g.sonaron >= MIN_POR_GENERO)
     .map(([gid, g])=> ({ gid, pct: Math.round(g.salieron * 100 / g.sonaron), seg: g.salieron ? g.seg / g.salieron : 0, n: g.sonaron }))
@@ -168,7 +170,7 @@ export function estadisticasHtml(partidas){
         ${l.hecho ? `<span class="ok" aria-label="Conseguido">✓</span>` : `<span class="va">${l.lleva}/${l.meta}</span>`}
       </div>`).join("")}</div>`;
 
-  return racha + porGenero + pendientes + medallas;
+  return { racha, porGenero, pendientes, logros: medallas };
 }
 
 // El cartel de la pantalla final cuando la partida destrabó algún logro

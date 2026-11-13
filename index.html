@@ -317,12 +317,16 @@
 
     <!-- ===================== MI CUENTA ===================== -->
     <section id="s-cuenta" class="screen">
+      <!-- En la compu es una grilla: lo que arman cuenta.js y main.js viene en
+           zonas (.cz) que se reparten en dos columnas, y abajo va el pie, en tres
+           (ver MI CUENTA en styles.css). En el celular va todo en una columna,
+           en este orden. -->
       <div class="cuenta-grid">
-        <div class="cuenta-col">
-          <!-- Perfil, estadísticas, récords y últimas partidas (src/cuenta.js) -->
-          <div id="cuenta-perfil"></div>
-          <!-- Lo de este navegador, cuando no hay sesión (src/main.js) -->
-          <div id="cuenta-local"></div>
+        <!-- Perfil, estadísticas, récords y últimas partidas (src/cuenta.js) -->
+        <div id="cuenta-perfil"></div>
+        <!-- Lo de este navegador, cuando no hay sesión (src/main.js) -->
+        <div id="cuenta-local"></div>
+        <div class="cuenta-pie">
           <section class="cafecito" aria-labelledby="cafe-cuenta">
             <div class="cafe-top">
               <span class="cafe-ic" aria-hidden="true">☕</span>
@@ -340,61 +344,63 @@
                data-cafecito="cuenta">☕ Invitame un cafecito</a>
             <p class="cafe-after">¿No podés colaborar? <button type="button" class="linkish" onclick="shareGame('cuenta_cafecito')">Compartilo</button> con tus amigos, también suma 🙌</p>
           </section>
-        </div>
-        <div class="cuenta-col">
-          <div class="lbl">Mis canciones</div>
-          <div class="list" id="cuenta-canciones"></div>
+          <div class="cuenta-col">
+            <div class="lbl">Mis canciones</div>
+            <div class="list" id="cuenta-canciones"></div>
 
-          <div class="lbl">Preferencias</div>
-          <div class="list">
-            <label class="list-row" for="pref-penalty">
-              <span>Restar un punto si erra<small>Con amigos · nunca baja de cero</small></span>
-              <input type="checkbox" class="switch" id="pref-penalty" onchange="setPenalty(this.checked)">
-            </label>
-            <div class="list-row">
-              <span>Canciones ya escuchadas<small id="pref-hist"></small></span>
-              <button type="button" class="act" onclick="resetHistory()">Reiniciar</button>
+            <div class="lbl">Preferencias</div>
+            <div class="list">
+              <label class="list-row" for="pref-penalty">
+                <span>Restar un punto si erra<small>Con amigos · nunca baja de cero</small></span>
+                <input type="checkbox" class="switch" id="pref-penalty" onchange="setPenalty(this.checked)">
+              </label>
+              <div class="list-row">
+                <span>Canciones ya escuchadas<small id="pref-hist"></small></span>
+                <button type="button" class="act" onclick="resetHistory()">Reiniciar</button>
+              </div>
             </div>
           </div>
 
-          <div class="lbl">Ayuda</div>
-          <div class="list">
-            <a class="list-row" href="como-se-juega/"><span>Cómo se juega<small>Reglas y preguntas frecuentes</small></span><span class="ch" aria-hidden="true">›</span></a>
-            <!-- ===================== COMENTARIOS =====================
-                 Netlify Forms: el markup viaja en el HTML del deploy y Netlify se
-                 encarga de recibirlo. Se manda por fetch para no salir de la página.
-                 Es el único canal de contacto: la privacidad (borrar la cuenta)
-                 enlaza acá con ../#comentarios. -->
-            <details class="list-det" id="comentarios">
-              <summary class="list-row"><span>Dejame un comentario<small>¿Falta una canción? ¿Se rompió algo? Lo leo yo.</small></span><span class="ch" aria-hidden="true">›</span></summary>
-              <div class="feedback">
-                <form name="comentarios" method="POST" data-netlify="true" netlify-honeypot="bot-field"
-                      onsubmit="sendFeedback(event)">
-                  <input type="hidden" name="form-name" value="comentarios" />
-                  <p class="hp"><label>No completar: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
-                  <textarea name="mensaje" id="fb-msg" rows="4" maxlength="2000" required
-                            placeholder="Tu comentario, idea o la canción que falta…"></textarea>
-                  <div class="feedback-row">
-                    <input type="text" name="nombre" id="fb-nombre" maxlength="60" placeholder="Tu nombre (opcional)" />
-                    <input type="email" name="email" id="fb-email" maxlength="120" placeholder="Tu mail (si querés respuesta)" />
-                  </div>
-                  <button class="btn cyan" type="submit" id="fb-send">📩 Enviar comentario</button>
-                </form>
-                <p class="feedback-state" id="fb-state" role="status"></p>
-              </div>
-            </details>
-            <a class="list-row" href="privacidad/"><span>Privacidad<small>Qué se guarda y dónde</small></span><span class="ch" aria-hidden="true">›</span></a>
-          </div>
+          <div class="cuenta-col">
+            <div class="lbl">Ayuda</div>
+            <div class="list">
+              <a class="list-row" href="como-se-juega/"><span>Cómo se juega<small>Reglas y preguntas frecuentes</small></span><span class="ch" aria-hidden="true">›</span></a>
+              <!-- ===================== COMENTARIOS =====================
+                   Netlify Forms: el markup viaja en el HTML del deploy y Netlify se
+                   encarga de recibirlo. Se manda por fetch para no salir de la página.
+                   Es el único canal de contacto: la privacidad (borrar la cuenta)
+                   enlaza acá con ../#comentarios. -->
+              <details class="list-det" id="comentarios">
+                <summary class="list-row"><span>Dejame un comentario<small>¿Falta una canción? ¿Se rompió algo? Lo leo yo.</small></span><span class="ch" aria-hidden="true">›</span></summary>
+                <div class="feedback">
+                  <form name="comentarios" method="POST" data-netlify="true" netlify-honeypot="bot-field"
+                        onsubmit="sendFeedback(event)">
+                    <input type="hidden" name="form-name" value="comentarios" />
+                    <p class="hp"><label>No completar: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
+                    <textarea name="mensaje" id="fb-msg" rows="4" maxlength="2000" required
+                              placeholder="Tu comentario, idea o la canción que falta…"></textarea>
+                    <div class="feedback-row">
+                      <input type="text" name="nombre" id="fb-nombre" maxlength="60" placeholder="Tu nombre (opcional)" />
+                      <input type="email" name="email" id="fb-email" maxlength="120" placeholder="Tu mail (si querés respuesta)" />
+                    </div>
+                    <button class="btn cyan" type="submit" id="fb-send">📩 Enviar comentario</button>
+                  </form>
+                  <p class="feedback-state" id="fb-state" role="status"></p>
+                </div>
+              </details>
+              <a class="list-row" href="privacidad/"><span>Privacidad<small>Qué se guarda y dónde</small></span><span class="ch" aria-hidden="true">›</span></a>
+            </div>
 
-          <div id="cuenta-salir"></div>
-
-          <div class="footer-note">
-            Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
-            Tus links y canciones quedan guardados solo en este navegador.<br>
-            Si entrás con Google, guardamos solo un nombre corto (que podés cambiar) y tus partidas de un jugador, para el ranking: ni tu mail ni tu foto se muestran. <a href="privacidad/" style="color:inherit">Privacidad</a><br>
-            Para saber cuánta gente juega usamos Google Analytics, que mide el uso de forma anónima: no guardamos datos personales ni los vendemos.
+            <div id="cuenta-salir"></div>
           </div>
         </div>
+      </div>
+
+      <div class="footer-note">
+        Hecho para jugar en casa · La app no aloja música: usa los videos de YouTube (o tus propios archivos de audio).<br>
+        Tus links y canciones quedan guardados solo en este navegador.<br>
+        Si entrás con Google, guardamos solo un nombre corto (que podés cambiar) y tus partidas de un jugador, para el ranking: ni tu mail ni tu foto se muestran. <a href="privacidad/" style="color:inherit">Privacidad</a><br>
+        Para saber cuánta gente juega usamos Google Analytics, que mide el uso de forma anónima: no guardamos datos personales ni los vendemos.
       </div>
     </section>
 

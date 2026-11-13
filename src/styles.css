@@ -271,7 +271,6 @@
   .cafe-after .linkish{display:inline;vertical-align:baseline;margin:0;color:var(--cyan);padding:0;font-size:13px;font-weight:800}
   /* el mismo aire que hay entre secciones (22px), contando el gap de cada columna */
   .inicio-side .cafecito{margin-top:10px}
-  .cuenta-col .cafecito{margin-top:26px}
   .res-acc .cafecito{margin-top:12px}
   /* Pantalla final. El QR va solo en la compu (la misma consulta que CON_QR en
      main.js): fondo blanco y módulos oscuros, que es como lo leen las cámaras. */
@@ -777,11 +776,50 @@
   .list-det[open] .ch{transform:rotate(90deg)}
   .salir{background:none;border:0;color:var(--no);font:inherit;font-weight:800;font-size:14.5px;cursor:pointer;display:block;margin:20px auto 0;padding:8px}
   .salir.borrar{margin-top:2px;color:var(--muted);font-size:13px;font-weight:700;text-decoration:underline}
+  /* En la compu, dos columnas parejas en vez de una sola larguísima. Lo que
+     arman cuenta.js y main.js viene en zonas (.cz), en el orden del celular:
+       a  el resumen: números, géneros favoritos, récords, últimas partidas
+       b  ligas, racha y cómo te va por género (sin sesión, también los récords)
+       c  las canciones que todavía no salieron
+       d  los logros
+     Los contenedores no hacen caja (display:contents) y cada zona va a su
+     lugar: a y c a la izquierda debajo del perfil, b a la derecha desde
+     arriba, y los logros y el pie a todo el ancho. La fila de c es la que se
+     estira cuando la columna derecha queda más larga. */
   @media (min-width:960px){
-    .cuenta-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:start}
-    .cuenta-col:last-child > .lbl:first-child{margin-top:0}
+    .cuenta-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:36px;align-items:start;
+      grid-template-rows:auto auto 1fr auto auto;
+      grid-template-areas:"cab b" "a b" "c b" "d d" "pie pie"}
+    #cuenta-perfil,#cuenta-datos,#cuenta-local{display:contents}
+    .prof,.login-card{grid-area:cab}
+    .login-card{margin-bottom:4px}
+    .cz-a{grid-area:a}
+    .cz-b{grid-area:b}
+    .cz-c{grid-area:c}
+    .cz-d{grid-area:d}
+    /* lo primero de la columna derecha arranca a la altura del perfil */
+    .cz-b > .lbl:first-child,.cz-b > #cuenta-ligas:first-child > .lbl:first-child{margin-top:0}
+    .cz-d > .lbl:first-child{margin-top:30px}
+    .cz-d .logros{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+    /* El pie: el cafecito a la izquierda y, a su lado, lo de este navegador y
+       la ayuda (una debajo de la otra; con más ancho, cada una en su columna) */
+    .cuenta-pie{grid-area:pie;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr;
+      column-gap:36px;align-items:start;margin-top:34px;padding-top:30px;border-top:1px solid var(--line)}
+    .cuenta-pie .cafecito{margin-top:0;grid-row:1 / 3}
+    .cuenta-pie .cuenta-col{grid-column:2}
+    .cuenta-pie .cafecito + .cuenta-col > .lbl:first-child{margin-top:0}
+    #s-cuenta .footer-note{max-width:86ch;margin-inline:auto}
   }
-  @media (max-width:959px){ .cuenta-col + .cuenta-col{margin-top:4px} }
+  @media (min-width:1100px){
+    .cuenta-pie{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto}
+    .cuenta-pie .cafecito{grid-row:auto}
+    .cuenta-pie .cuenta-col{grid-column:auto}
+    .cuenta-pie .cuenta-col > .lbl:first-child{margin-top:0}
+  }
+  @media (max-width:959px){
+    .cuenta-pie .cafecito{margin-top:26px}
+    .cuenta-pie .cafecito + .cuenta-col{margin-top:4px}
+  }
 
   /* ---------- MIS CANCIONES ---------- */
   .songlist{display:flex;flex-direction:column;gap:10px;max-height:64vh;overflow:auto;padding-right:4px}

@@ -117,6 +117,11 @@ Después se **revela** la canción y el grupo decide si la pegó.
   veces que se muestra el pedido final (`cafecito_visto`, con `momento` y si llevaba `qr`)
   y los clics (`cafecito`, con `desde`: `final`, `inicio` o `cuenta`). Lo que se escanea
   con el QR va directo a Cafecito y no se puede medir desde acá.
+- **Si el audio no arranca, se avisa** (`src/espera.js`): después de apretar "Reproducir", si YouTube tarda la
+  tapa dice que está cargando y, si a los 8 segundos no sonó, en lugar de "Cortar ya" aparecen **Probar de
+  nuevo** y **Probar con otra canción** (esta última solo si la canción nunca llegó a sonar: si ya se
+  escuchó, cambiarla sería esquivar la que no se sabe). Antes la pantalla decía "Sonando…" en silencio.
+  En la primera canción de la primera partida, además, se recuerda subir el volumen.
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.
 - Página aparte **Cómo se juega** (`/como-se-juega/`, con un botón desde el inicio y desde Mi cuenta),
@@ -180,6 +185,7 @@ ranking descartaría.
 │   ├── logros.js        # estadísticas y logros, calculados de las partidas
 │   ├── ligas.js         # ligas privadas (un ranking entre amigos)
 │   ├── sala.js          # pulsadores: la sala y el botón ¡YO! de cada celular
+│   ├── espera.js        # el vigía del audio: avisa si se apretó reproducir y no suena
 │   ├── extras.css       # estilos y animaciones de todo lo anterior
 │   ├── share.js         # compartir el link del juego (lo usan las dos páginas)
 │   ├── como-se-juega.js # arranque de la página de Cómo se juega
@@ -274,12 +280,13 @@ La medición está en `src/analytics.js` (ID de la propiedad al principio; vací
 | `armar_partida` | Se abre Armar partida | `modo_juego`, `desde` (inicio · ranking) |
 | `modo_elegido` | Se cambia entre Con amigos y Un jugador | `modo_juego` |
 | `repetir_ultima` | Se toca Repetir la última | `modo_juego`, `canciones_por_partida` |
-| `partida_iniciada` | Arranca una partida | `modo_juego`, `generos`, `cantidad_generos`, `equipos`, `canciones_por_partida`, `resta_puntos`, `canciones_disponibles` |
+| `partida_iniciada` | Arranca una partida | `modo_juego`, `origen` (nueva · repetir), `generos`, `cantidad_generos`, `equipos`, `canciones_por_partida`, `resta_puntos`, `canciones_disponibles` |
 | `cancion_sonada` | Suena por primera vez una canción | `modo` (corte · continuo), `modo_juego`, `numero`, `tipo` (youtube · propia) |
 | `ronda_grupo` | Con amigos: se anota una canción | `resultado` (acierto · robo · erro · todos · algunos · ninguno · salteada), `segundos`, `sin_cortar`, `numero`, `equipos` |
 | `solo_respuesta` | Un jugador: se resuelve una canción | `respuesta` (acierto · error · no_se), `segundos`, `errados`, `puntos`, `numero` |
-| `partida_terminada` | Termina una partida | `modo_juego`, `motivo` (limit · agotada · manual), `canciones`, `equipos`, `puntos_ganador`, `duracion_seg` |
-| `partida_abandonada` | Se cierra la pestaña en plena partida | `modo_juego`, `numero`, `canciones_por_partida`, `duracion_seg` |
+| `partida_terminada` | Termina una partida | `modo_juego`, `motivo` (limit · agotada · manual), `origen`, `canciones`, `equipos`, `puntos_ganador`, `duracion_seg` |
+| `partida_abandonada` | Se cierra la pestaña en plena partida | `modo_juego`, `numero`, `momento` (ready · listening · continuous · decide · answering), `sono` (si · no: si esa canción llegó a sonar), `sin_audio` (si · no: si tenía el aviso a la vista), `origen`, `canciones_por_partida`, `duracion_seg` |
+| `sin_audio` | Se apretó reproducir y el audio no llegó | `accion` (aviso · reintentar · otra · sono · sin_reproductor), `momento`, `numero`, `modo_juego`, `tipo` (youtube · propia), `sono`, `reproductor` (estado del reproductor de YouTube: -1 sin empezar, 3 cargando) |
 | `record_nuevo` | Un jugador: récord del navegador | `puntos`, `anterior`, `canciones_por_partida` |
 | `revancha` | Revancha / Jugar otra vez | `canciones`, `modo_juego` |
 | `error_youtube` | Un video no se pudo reproducir | `momento`, `codigo`, `video`, `cancion` |
@@ -312,6 +319,12 @@ La medición está en `src/analytics.js` (ID de la propiedad al principio; vací
 acciones `lista_compartida` y `lista_importada`; `compartir`, `que: duelo`; y `preferencia_cambiada`,
 `adivina` y `tiempo_cantar`.
 
+`origen` dice de dónde salió la partida: nueva (Armar partida) · repetir · revancha · retomada · desafio ·
+duelo. La revancha no manda `partida_iniciada` (tiene su propio evento): para contar partidas hay que
+sumar las dos. En `sin_audio`, `aviso` es que se mostró la ayuda (a los 8 segundos sin audio), `sono`
+que el audio llegó solo con la ayuda a la vista y `sin_reproductor` que el reproductor de YouTube no
+había cargado al apretar reproducir.
+
 Propiedad de usuario: `con_cuenta` (si · no). Con sesión abierta va además el `user_id` (el ID interno
 de la cuenta, nunca el nombre ni el mail), que junta en una persona lo que hace en
 distintos dispositivos. Para verlo en los informes, en Administrar → Recopilación de datos →
@@ -319,7 +332,8 @@ Identidad para los informes usar "Combinada" u "Observada".
 
 **Para que los parámetros aparezcan en los informes** hay que darlos de alta una vez en
 Administrar → Definiciones personalizadas: como **dimensión de evento** `modo_juego`, `desde`,
-`resultado`, `respuesta`, `accion`, `motivo`, `periodo`, `donde`, `tipo`, `que`, `seccion`
+`resultado`, `respuesta`, `accion`, `motivo`, `periodo`, `donde`, `tipo`, `que`, `seccion`, `origen`, `sono`,
+`sin_audio`, `reproductor`
 (y los que se quieran mirar); como **métrica** `segundos`, `puntos`, `duracion_seg`, `numero` y
 `canciones`; y `con_cuenta` como **dimensión de usuario**. Los eventos se cuentan solos sin esto.
 

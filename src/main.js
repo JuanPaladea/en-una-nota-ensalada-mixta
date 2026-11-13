@@ -16,6 +16,7 @@ import { armarFija, traerDesafio, desafioEnMemoria, diaProvisional, desafioLocal
   traerDuelo, crearDuelo, anotarDuelo, dueloLocal, nombreParaDuelo, rivalDe, tablaDueloHtml, veredicto, LINK_DUELO } from "./fijas.js";
 import { codigoDelLink } from "./ligas.js";
 import { abrirSala, cerrarSala, salaActual, abrirPulsadores, cerrarPulsadores, invitacionHtml, pitido, salaDelLink, entrarASala } from "./sala.js";
+import { vigia } from "./espera.js";
 import { animar, entrar, golpe, flotar, volar, cancelarVuelos, contar, fijar, temblar, papelitos, pastilla, indicadorTabs } from "./motion.js";
 
 /* ============================================================
@@ -331,6 +332,7 @@ function retomarPartida(){
   played = p.sonadas.filter(k=> typeof k === "string");
   brokenIds = new Set(); songNo = p.numero;
   inicioPartida = Number(p.inicio) || Date.now();
+  origenPartida = "retomada";
   track("partida_retomada", { numero: songNo, canciones_por_partida: opts.maxSongs, equipos: teams.length });
   show("s-game");
   newSong();
@@ -370,7 +372,7 @@ function repetirUltima(){
   setModo(ultima.modo==="solo" ? "solo" : "grupo");
   if(OPCIONES_CANCIONES.includes(ultima.canciones)) opts.maxSongs = ultima.canciones;
   track("repetir_ultima", { modo_juego: modo, canciones_por_partida: opts.maxSongs });
-  startGame();
+  startGame("repetir");
 }
 // Tu récord con la cantidad de canciones que venís jugando y, con cuenta, tu
 // puesto en esa tabla. Tocándola se abre el ranking.
@@ -925,6 +927,103 @@ let snippetMs=SNIPPET_MS;     // lo que dura el fragmento actual (en el modo sol
 let inicioClip=null;          // modo solo: segundo de la canción donde arrancó el primer fragmento
 let mediaStarted=false;       // la canción actual ya arrancó (para reanudar vs cargar)
 let continuousMode=false;     // true = suena sin cortar hasta apretar detener
+
+/* ---- ¿Suena de verdad? ----
+   Apretar "Reproducir" no garantiza audio: con poca señal, un bloqueador o un
+   video trabado, YouTube no da error, simplemente no arranca. Antes la pantalla
+   decía "Sonando…" en silencio y no había nada que hacer. Ahora un vigía
+   (espera.js) cuenta desde que se pide el audio: si tarda, la tapa dice que
+   está cargando, y si no llega se ofrece probar de nuevo o cambiar de canción. */
+let sonoEsta=false;           // la canción actual llegó a sonar de verdad (no alcanza con apretar play)
+let sinAudio=false;           // se pidió el audio y no llegó: la ayuda está a la vista
+let demorado=false;           // la tapa dice "Cargando…": al sonar vuelve a decir "Sonando…"
+let avisoSinApi=false;        // ya se midió, en esta canción, que el reproductor de YouTube no cargó
+const enEscucha = ()=> pantalla==="s-game" && (phase==='listening' || phase==='continuous');
+const textoSonando = ()=> continuousMode ? "🎵 Sonando… ¡hasta que corten!" : "🎵 Sonando…";
+// Lo que acompaña a cada evento sin_audio. reproductor: el estado del
+// reproductor de YouTube (-1 sin empezar, 3 cargando, 5 en cola…): separa el
+// video que nunca arrancó de la conexión lenta.
+function datosSinAudio(accion){
+  let reproductor = "";
+  try{ if(mediaKind==='yt' && yt && yt.getPlayerState) reproductor = yt.getPlayerState(); }catch(_){}
+  return {
+    accion, momento: phase, numero: songNo, modo_juego: modo,
+    tipo: currentSong && currentSong.local ? "propia" : "youtube",
+    sono: sonoEsta ? "si" : "no", reproductor,
+  };
+}
+const espera = vigia({
+  alDemorar(){
+    if(!enEscucha()) return;
+    demorado = true;
+    setCover("⏳ Cargando la canción…", true);
+  },
+  alFallar(){
+    if(!enEscucha()) return;
+    sinAudio = true; demorado = false;
+    track("sin_audio", datosSinAudio("aviso"));
+    setCover("🔇 No arranca", true);
+    renderPhase();
+  },
+});
+// El audio arrancó de verdad (lo avisan YouTube o el <audio>)
+function audioSono(){
+  espera.sono();
+  sonoEsta = true;
+  if(!enEscucha()){ sinAudio = false; demorado = false; return; }
+  // Llegó solo mientras la ayuda estaba a la vista: era la conexión
+  if(sinAudio) track("sin_audio", datosSinAudio("sono"));
+  const repintar = sinAudio;
+  if(sinAudio || demorado) setCover(textoSonando());
+  sinAudio = false; demorado = false;
+  if(repintar) renderPhase();
+}
+function soltarEspera(){ espera.parar(); sinAudio = false; demorado = false; }
+// "Probar de nuevo": se vuelve a pedir el audio. Si la canción todavía no
+// sonó nunca, se carga el video otra vez desde cero (lo que estaba a medio
+// cargar pudo quedar trabado); si ya había sonado, se retoma donde iba.
+function reintentarAudio(){
+  const s = currentSong;
+  if(!sinAudio || !s || !enEscucha()) return;
+  track("sin_audio", datosSinAudio("reintentar"));
+  sinAudio = false; demorado = false;
+  setCover(textoSonando());
+  renderPhase();
+  if(sonoEsta){
+    if(modo==='solo' && !continuousMode && inicioClip!==null) mediaSeek(inicioClip);
+    mediaResume();
+  } else if(s.local){
+    playLocal(s);
+  } else {
+    preparedFor = null; prebuffering = false;
+    try{
+      yt.unMute(); yt.setVolume(100);
+      yt.loadVideoById({ videoId:s.id, startSeconds: inicioFijo(s) ? s.inicio : (startAt || randomStart()) });
+    }catch(_){}
+  }
+  espera.esperar();
+}
+// "Probar con otra": solo si esta nunca llegó a sonar. Si ya se escuchó, no se
+// cambia: en Un jugador sería una forma de esquivar la que no se sabe.
+function otraCancion(){
+  if(!sinAudio || sonoEsta || !currentSong || !enEscucha()) return;
+  track("sin_audio", datosSinAudio("otra"));
+  sinAudio = false; demorado = false;
+  brokenIds.add(currentSong.id);
+  saltarCancion("😕 No pudimos hacer sonar ninguna canción. Revisá la conexión y probá de nuevo.",
+    "😕 No quedan canciones para probar en estas playlists.");
+  renderPhase();
+}
+// La canción actual no se puede reproducir: se sigue con otra sin frenar el
+// juego. sinSalida: el cartel si ya se probaron demasiadas · sinCanciones: si
+// no queda ninguna.
+function saltarCancion(sinSalida, sinCanciones){
+  if(skipTries++ > 12){ soltarEspera(); setCover(sinSalida, true); return; }
+  const alt = pickSong(true);
+  if(!alt){ soltarEspera(); setCover(sinCanciones, true); return; }
+  currentSong = alt; seekedThisRound=false; mediaStarted=false; sonoEsta=false; segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null;
+  if(continuousMode) playContinuous(); else playSnippet();
+}
 function clearSnippetTimer(){
   if(snippetTimer){ clearTimeout(snippetTimer); snippetTimer=null; }
   barraFragmento(0);
@@ -984,6 +1083,7 @@ function onPlayerState(e){
       return;
     }
     try{ yt.unMute(); yt.setVolume(100); }catch(_){}
+    audioSono();
     eqPlaying();
     armSnippet();   // si es fragmento de 1s, programa el corte
   } else if(e.data===YT.PlayerState.PAUSED || e.data===YT.PlayerState.ENDED){
@@ -1018,11 +1118,8 @@ function onPlayerError(e){
     return;
   }
   if(phase!=='listening' && phase!=='continuous') return;
-  if(skipTries++ > 12){ setCover("😕 YouTube bloquea estos videos al abrir el archivo directo. Usá la playlist 🎵 “Mis canciones” (suena sin internet).", true); return; }
-  const alt = pickSong(true);
-  if(!alt){ setCover("😕 No hay canciones reproducibles en estas playlists.", true); return; }
-  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null;
-  if(continuousMode) playContinuous(); else playSnippet();
+  saltarCancion("😕 YouTube bloquea estos videos al abrir el archivo directo. Usá la playlist 🎵 “Mis canciones” (suena sin internet).",
+    "😕 No hay canciones reproducibles en estas playlists.");
 }
 
 /* ---- Capa de medios: unifica audio local (<audio>) y YouTube ---- */
@@ -1039,7 +1136,7 @@ function wireAudio(){
     seekedThisRound=true;
     try{ a.currentTime=fitStart(randomStart(), a.duration||0); }catch(_){}
   });
-  a.addEventListener("playing", ()=>{ eqPlaying(); armSnippet(); });
+  a.addEventListener("playing", ()=>{ audioSono(); eqPlaying(); armSnippet(); });
   a.addEventListener("pause", eqPaused);
   a.addEventListener("error", onLocalError);
 }
@@ -1052,11 +1149,7 @@ async function playLocal(s){
 }
 function onLocalError(){
   if(mediaKind!=='local' || (phase!=='listening' && phase!=='continuous')) return;
-  if(skipTries++ > 12){ setCover("😕 No se pudo reproducir ese archivo. Revisá tus canciones cargadas.", true); return; }
-  const alt = pickSong(true);
-  if(!alt){ setCover("😕 No hay canciones reproducibles.", true); return; }
-  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null;
-  if(continuousMode) playContinuous(); else playSnippet();
+  saltarCancion("😕 No se pudo reproducir ese archivo. Revisá tus canciones cargadas.", "😕 No hay canciones reproducibles.");
 }
 /* ---- Precarga silenciosa ----
    Se llama al sortear la canción, no al apretar play. El video se carga muteado
@@ -1117,7 +1210,7 @@ function mediaStart(){
 // La canción trae decidido desde qué segundo suena (desafío del día, duelos)
 function inicioFijo(s){ return Boolean(s) && Number.isFinite(s.inicio); }
 function mediaPause(){
-  clearSnippetTimer();
+  clearSnippetTimer(); soltarEspera();
   if(mediaKind==='local'){ try{ localAudioEl().pause(); }catch(_){} }
   else if(yt && yt.pauseVideo){ yt.pauseVideo(); }
   eqPaused();
@@ -1137,7 +1230,7 @@ function mediaResume(){
   else if(yt && yt.playVideo){ yt.playVideo(); }
 }
 function mediaStop(){
-  clearSnippetTimer(); pauseAfterSnippet=false; continuousMode=false;
+  clearSnippetTimer(); soltarEspera(); pauseAfterSnippet=false; continuousMode=false;
   preparedFor=null; prebuffering=false;
   if(mediaKind==='local'){ const a=localAudioEl(); try{ a.pause(); a.currentTime=0; }catch(_){} }
   else if(yt && yt.stopVideo){ yt.stopVideo(); }
@@ -1155,6 +1248,10 @@ let songNo=1;
 let lastGameSongs=0;    // canciones de la última partida (para la tarjeta que se comparte)
 let sinCortar=false;    // con amigos: la canción actual se escuchó sin cortar
 let inicioPartida=0;    // cuándo arrancó la partida (ms), para medir cuánto dura
+// De dónde salió la partida: nueva (Armar partida) · repetir · revancha ·
+// retomada · desafio · duelo. Una revancha que se deja sin tocar nada no es lo
+// mismo que alguien que arma su primera partida y se va.
+let origenPartida="nueva";
 
 // Lo que se le avisa a la base al empezar una partida de Un jugador: la
 // playlist, si se juega con una sola (para el ranking por género), y qué se
@@ -1170,7 +1267,7 @@ function modoAdivina(){ return fija ? (fija.modo === "artista" ? "artista" : "ti
 // Cuántas canciones dura la partida (0 = sin límite)
 function limite(){ return fija ? fija.total : opts.maxSongs; }
 
-function startGame(){
+function startGame(origen){
   if(selectedGenres.size===0){ alert("Elegí al menos un género."); return; }
   buildPool();
   if(pool.length===0){ alert("No hay canciones para jugar. Entrá a 📂 Mis canciones y cargá tus audios o pegá links de YouTube."); return; }
@@ -1193,9 +1290,11 @@ function startGame(){
   document.getElementById("s-game").classList.toggle("grupo", modo==='grupo');
   played=[]; brokenIds=new Set(); songNo=1;
   inicioPartida = Date.now();
+  origenPartida = origen === "repetir" ? "repetir" : "nueva";
   if(modo==='solo') soloEmpezar(opts.maxSongs, datosPartida());
   track("partida_iniciada", {
     modo_juego: modo,
+    origen: origenPartida,
     generos: [...selectedGenres].join(","),
     cantidad_generos: selectedGenres.size,
     equipos: modo==='solo' ? 1 : teams.length,
@@ -1225,6 +1324,7 @@ function empezarFija(f){
   document.getElementById("s-game").classList.remove("grupo");
   played=[]; brokenIds=new Set(); songNo=1;
   inicioPartida = Date.now();
+  origenPartida = f.tipo;
   soloEmpezar(f.tipo==="desafio" ? 10 : f.opcion, datosPartida());
   track("partida_iniciada", {
     modo_juego: "solo", tipo: f.tipo, canciones_por_partida: f.total, equipos: 1,
@@ -1401,6 +1501,7 @@ function newSong(){
   seekedThisRound=false; revealed=false; answeringTeam=-1; skipping=false; skipTries=0;
   segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null; soloRes=null; sugerencias=[]; sinCortar=false;
   mediaStarted=false; continuousMode=false; pauseAfterSnippet=false; clearSnippetTimer();
+  soltarEspera(); sonoEsta=false; avisoSinApi=false;
   phase='ready';
   prepareMedia(s);   // se carga mientras leen la pantalla, no cuando aprietan play
   const tot = totalSongs();
@@ -1444,12 +1545,20 @@ function playSnippet(){
       if(modo==='solo') soloSono(currentSong.id, currentSong.local || currentSong.id!==currentSong.yt);
       escucharPulsadores();
     }
-    else { pauseAfterSnippet=false; phase='ready'; renderPhase(); }
+    else { pauseAfterSnippet=false; phase='ready'; renderPhase(); sinReproductor(); }
   } else {
     if(modo==='solo' && inicioClip!==null) mediaSeek(inicioClip);
     mediaResume(); segundos++; oidos++;
     escucharPulsadores();
   }
+  if(phase==='listening') espera.esperar();
+}
+// El reproductor de YouTube todavía no cargó (o no va a cargar: un bloqueador,
+// una red que lo filtra). Se mide una vez por canción, no con cada toque.
+function sinReproductor(){
+  if(avisoSinApi) return;
+  avisoSinApi = true;
+  track("sin_audio", datosSinAudio("sin_reproductor"));
 }
 // Reproduce sin cortar hasta que aprieten detener.
 function playContinuous(){
@@ -1462,8 +1571,9 @@ function playContinuous(){
   renderPhase();
   if(!mediaStarted){
     if(mediaStart()){ mediaStarted=true; trackCancion("continuo"); escucharPulsadores(); }
-    else { continuousMode=false; phase='decide'; renderPhase(); }
+    else { continuousMode=false; phase='decide'; renderPhase(); sinReproductor(); }
   } else { mediaResume(); escucharPulsadores(); }
+  if(phase==='continuous') espera.esperar();
 }
 // Corta: fin automático del fragmento, o botón "detener".
 function snippetPause(){
@@ -1879,11 +1989,14 @@ function resolverSolo(ok){
   });
   renderPhase(); renderBoard();
 }
+// La primera canción de la primera partida en este navegador: lo único que
+// hay que saber antes de apretar reproducir es que dura un segundo.
+const primeraVez = ()=> songNo===1 && jugado.partidas===0;
 function renderSolo(c, t, sub){
   const pts = (n)=> n + " punto" + (n!==1 ? "s" : "");
   if(phase==='ready'){
     t.textContent="🎧 Escuchá";
-    sub.textContent="Si la sacás con 1 segundo, " + pts(PUNTOS_SOLO[0]);
+    sub.textContent = primeraVez() ? "🔊 Subí el volumen: suena solo 1 segundo" : "Si la sacás con 1 segundo, " + pts(PUNTOS_SOLO[0]);
     c.innerHTML=`<button class="btn cyan big" onclick="playSnippet()">▶ Reproducir 1 segundo</button>`;
   } else if(phase==='listening'){
     t.textContent="🎵 Sonando…";
@@ -1958,17 +2071,31 @@ function renderPhase(){
   const sub=document.getElementById("phase-sub");
   const tituloAntes = t.textContent;
   renderLadder();
-  if(modo==='solo') renderSolo(c, t, sub); else renderGrupo(c, t, sub);
-  const fase = [songNo, phase, revealed, answeringTeam, skipping].join("|");
+  if(sinAudio && enEscucha()) renderSinAudio(c, t, sub);
+  else if(modo==='solo') renderSolo(c, t, sub); else renderGrupo(c, t, sub);
+  const fase = [songNo, phase, revealed, answeringTeam, skipping, sinAudio].join("|");
   // los botones, sin desplazarse: están al fondo de la partida y moverlos
   // hacia abajo hacía aparecer la barra de scroll por un instante
   if(fase !== faseVista){ faseVista = fase; entrar(c, 0); }
   if(t.textContent !== tituloAntes) entrar(t.parentElement, 6, 200);
 }
+// El audio no llegó: qué puede ser y cómo seguir. Va en lugar de "Cortar ya",
+// que con la canción en silencio no servía de nada.
+function renderSinAudio(c, t, sub){
+  const propia = currentSong && currentSong.local;
+  t.textContent = "🔇 No arranca el audio";
+  sub.textContent = propia ? "Puede que ese archivo no se pueda leer"
+    : sonoEsta ? "Se cortó la conexión con YouTube"
+    : "Puede ser la conexión o este video";
+  c.innerHTML = `<button class="btn cyan big" onclick="reintentarAudio()">🔁 Probar de nuevo</button>
+    ${sonoEsta
+      ? `<button class="btn ghost" onclick="stopPlayback()">✋ Cortar</button>`
+      : `<button class="btn amber" onclick="otraCancion()">⏭ Probar con otra canción</button>`}`;
+}
 function renderGrupo(c, t, sub){
   if(phase==='ready'){
     t.textContent="🎧 Escuchen todos";
-    sub.textContent="Suena 1 segundo y se corta. Después, ¿quién arriesga?";
+    sub.textContent = primeraVez() ? "🔊 Suban el volumen: suena 1 segundo y se corta" : "Suena 1 segundo y se corta. Después, ¿quién arriesga?";
     c.innerHTML=`<button class="btn cyan big" onclick="playSnippet()">▶ Reproducir 1 segundo</button>`;
   } else if(phase==='listening'){
     t.textContent="🎵 Sonando…";
@@ -2153,6 +2280,7 @@ function endGame(reason){
   track("partida_terminada", {
     modo_juego: modo,
     motivo: reason || "manual",       // limit = llegó al tope, agotada = se acabó la playlist
+    origen: origenPartida,
     canciones: lastGameSongs,
     equipos: modo==='solo' ? 1 : teams.length,
     puntos_ganador: modo==='solo' ? soloPuntos : Math.max(...teams.map(p=>p.score), 0),
@@ -2454,6 +2582,7 @@ function rematch(){
   limpiarMarcador();
   played=[]; brokenIds=new Set(); songNo=1;
   inicioPartida = Date.now();
+  origenPartida = "revancha";
   if(modo==='solo') soloEmpezar(opts.maxSongs, datosPartida());
   show("s-game"); newSong();
 }
@@ -2576,7 +2705,7 @@ Object.assign(window, {
   show, irA, volver, elegirModo, repetirUltima, retomarPartida, toggleTodos, setMaxSongs, setPenalty,
   toggleGenre, setModo, addTeam, removeTeam, setTeamName, setLink,
   addCustomSong, removeCustom, onAudioFiles, removeLocal,
-  startGame, playSnippet, playContinuous, stopPlayback,
+  startGame, playSnippet, playContinuous, stopPlayback, reintentarAudio, otraCancion,
   pickTeam, pickAll, backToDecide, skipSong, revealAnswer,
   scoreTeam, toggleHit, scoreHits, scoreAllHit, scoreNone, finishRound, endGame, rematch, goHome,
   onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult, sendFeedback,
@@ -2608,6 +2737,10 @@ addEventListener("pagehide", ()=>{
   trackAlSalir("partida_abandonada", {
     modo_juego: modo,
     numero: songNo,                          // en qué canción la dejaron
+    momento: phase,                          // en qué estaba: sin apretar reproducir (ready), sonando, decidiendo…
+    sono: sonoEsta ? "si" : "no",            // si esa canción llegó a sonar de verdad
+    sin_audio: sinAudio ? "si" : "no",       // si tenía a la vista el aviso de que no arrancaba
+    origen: origenPartida,
     canciones_por_partida: opts.maxSongs,
     duracion_seg: duracionPartida(),
   });

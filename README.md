@@ -17,6 +17,11 @@ Después se **revela** la canción y el grupo decide si la pegó.
 - **Inicio**: se elige con amigos o un jugador, **repetir la última** arma la partida anterior en un toque
   (mismos géneros, modo y cantidad) y se ve tu récord con tu puesto en el ranking.
 - Letras **Baloo 2** (títulos) y **Nunito** (texto), servidas desde el sitio con `@fontsource-variable`.
+- **Movimiento** (`src/motion.js` y las curvas `--ease-*` de `styles.css`, sin librerías): la revelación
+  entra en etapas (se levanta el telón, título, artista, imagen), una barra al pie de la tapa marca lo
+  que dura el fragmento, el marcador salta al anotar (en Un jugador los puntos vuelan hasta él), hay
+  papelitos cuando gana un equipo o sale un récord, el podio del ranking crece desde abajo y los
+  selectores deslizan su pastilla. Con "reducir movimiento" activado en el sistema, todo eso solo aparece.
 
 - **16 playlists** con +1000 canciones precargadas (Rock Nacional, Cumbia y Cuarteto,
   Pop/Reggaetón, Internacional, Clásicos, Disney, Fiesta, Rock en Español, Trap/Urbano,
@@ -48,6 +53,39 @@ Después se **revela** la canción y el grupo decide si la pegó.
   porcentaje (`src/favoritos.js`). Con cuenta se cuentan los videos de tus partidas de Un jugador;
   sin cuenta, las canciones que sonaron en este navegador en los dos modos. Sin configurar,
   el juego queda igual que antes.
+- **Desafío del día**: las mismas 10 canciones para todos, una sola chance por día y un ranking propio
+  ("Hoy" en el ranking). Las sortea la base a las 0 h de Argentina con una sal que no está en el repo
+  (`public.desafio_del_dia()`), con 3 suplentes por si YouTube no pasa alguna, y a todos les suena cada
+  una desde el mismo segundo. Sin cuenta se juega igual y el resultado queda en el navegador; con
+  cuenta, además, se ve el puesto y la racha de días.
+- **Duelos por link**: al terminar una partida de Un jugador se puede retar a alguien. Le llega un link
+  (`?duelo=…`) y juega exactamente las mismas canciones desde el mismo segundo; al final se ve quién
+  ganó y la tabla de todos los que lo jugaron. No hace falta cuenta (se escribe un nombre). Los duelos
+  no cuentan para el ranking: las canciones ya se conocen.
+- **Estadísticas y logros** en Mi cuenta (`src/logros.js`): racha de días, porcentaje de acierto por
+  género, las canciones que todavía no sacaste y 11 logros. Salen de las partidas (con cuenta, las de la
+  base; sin cuenta, las últimas 150 de ese navegador). Un logro nuevo se festeja en la pantalla final.
+- **Ranking por género y ligas privadas**: el ranking se puede filtrar por género (cuentan las partidas
+  de 10 canciones jugadas solo con ese género) y por **liga**, un ranking entre amigos que se arma en
+  Mi cuenta y se comparte con un link (`?liga=…`); cada uno se suma con su cuenta (`src/ligas.js`).
+- **Adivinar el artista**: en Un jugador se elige si se escribe el título o quién la canta (vale
+  cualquiera de los artistas cuando son varios). Lleva su propio récord y no entra al ranking.
+- **Pistas**: hasta dos por canción (género y artista; en el modo artista, género e inicial). Cada una
+  baja un escalón, igual que escuchar un segundo más, sin alargar el audio.
+- **Décadas**: un filtro encima de los géneros (60s a 2020s). El año de cada canción es el cuarto
+  elemento de su fila en `src/data.js`; las que no lo tienen no entran cuando hay una década elegida.
+- **Tiempo para cantar** (con amigos): 5, 10 o 15 segundos después de elegir quién canta, con cuenta
+  regresiva en la tapa y un pitido al final. No anota nada solo: avisa y el grupo decide.
+- **Pulsadores** (con amigos, `src/sala.js`): se abre una sala con un código de 4 letras, cada equipo
+  entra desde su celular (`?sala=…`) y toca **¡YO!**; gana el primero que llega a la base y queda
+  elegido en la pantalla del que maneja. No hay conexión en tiempo real: los celulares solo avisan
+  cuando tocan y el que maneja pregunta a la base mientras hay una canción en juego.
+- **Reportar una canción**: con la canción revelada, un botón en la esquina de la tapa para avisar que
+  es otra versión, que arranca en silencio, etc. Se miran con `npm run reportes`. Además,
+  `npm run revisar` le pregunta a YouTube qué videos de `data.js` ya no existen o no se pueden insertar.
+- **Listas compartidas**: las canciones propias de YouTube se pueden pasar por link (`?lista=…`) y el
+  que lo abre las suma a las suyas. Las propias (audios y YouTube) ahora se juegan eligiendo la ficha
+  **"Mis canciones"**: antes las de YouTube se mezclaban siempre y no se podía jugar solo con ellas.
 - **Cantidad de canciones por partida** configurable; al agotarse la playlist, termina.
 - **No se repiten entre partidas**: las canciones que ya sonaron se guardan localmente y se
   evitan en partidas siguientes hasta agotar la playlist elegida (se puede reiniciar el
@@ -60,9 +98,17 @@ Después se **revela** la canción y el grupo decide si la pegó.
   no comparte archivos, se descarga y se copia el link.
 - **Compartir** con la Web Share API (y copia del link como respaldo).
 - **Cafecito**: el pedido aparece en la pantalla final desde la primera partida
-  terminada en ese navegador, contando cuántas partidas y canciones llevan (se guarda en
-  localStorage). Además hay una tarjeta en el inicio y en Mi cuenta que explica para qué es (playlists nuevas, dominio y hosting, cero anuncios). Se miden las veces que se
-  muestra el pedido final (`cafecito_visto`) y los clics (`cafecito`, con `desde`: `final`, `inicio` o `cuenta`).
+  terminada en ese navegador (lo jugado se guarda en localStorage). La tarjeta entera sale
+  solo en los **momentos altos**, con un texto para cada uno: la primera partida, los hitos
+  (3, 5, 10 y cada 10 partidas), pasar un récord que ya se tenía en Un jugador y que gane
+  un equipo con amigos. Entre dos tarjetas por récord o por ganador pasan al menos 3
+  partidas; en las demás queda solo el botón, en contorno. En la compu la tarjeta lleva
+  además un **QR** al mismo link (`public/qr-cafecito.svg`), para que cualquiera de la
+  juntada lo escanee con su celular. Además hay una tarjeta en el inicio y en Mi cuenta que
+  explica para qué es (playlists nuevas, dominio y hosting, cero anuncios). Se miden las
+  veces que se muestra el pedido final (`cafecito_visto`, con `momento` y si llevaba `qr`)
+  y los clics (`cafecito`, con `desde`: `final`, `inicio` o `cuenta`). Lo que se escanea
+  con el QR va directo a Cafecito y no se puede medir desde acá.
 - La canción se **precarga apenas se sortea** (muteada y tapada), así "Reproducir 1 segundo"
   suena al instante en vez de esperar a que bufferee.
 - Página aparte **Cómo se juega** (`/como-se-juega/`, con un botón desde el inicio y desde Mi cuenta),
@@ -112,6 +158,13 @@ npm run preview # sirve el build de dist/ para probarlo
 │   ├── data.js          # las playlists (título, artista, id de YouTube)
 │   ├── sharecard.js     # dibuja y comparte la imagen del resultado
 │   ├── cuenta.js        # cuentas con Google, partidas guardadas y ranking (habla con /api)
+│   ├── motion.js        # animaciones que no salen solo con CSS (marcador, papelitos, indicadores)
+│   ├── api.js           # la llamada a /api que usan todos los que guardan algo fuera del navegador
+│   ├── fijas.js         # desafío del día y duelos: partidas con las canciones fijas
+│   ├── logros.js        # estadísticas y logros, calculados de las partidas
+│   ├── ligas.js         # ligas privadas (un ranking entre amigos)
+│   ├── sala.js          # pulsadores: la sala y el botón ¡YO! de cada celular
+│   ├── extras.css       # estilos y animaciones de todo lo anterior
 │   ├── share.js         # compartir el link del juego (lo usan las dos páginas)
 │   ├── como-se-juega.js # arranque de la página de Cómo se juega
 │   ├── utils.js         # helpers puros (localStorage, escape, parseo de links)
@@ -124,7 +177,9 @@ npm run preview # sirve el build de dist/ para probarlo
 │   └── catalogo_solo.sql # catálogo contra el que la base verifica las partidas (generado)
 ├── scripts/
 │   ├── catalogo-solo.mjs # genera db/catalogo_solo.sql desde src/data.js (npm run catalogo)
-│   └── db.mjs           # ejecuta un .sql contra la base (npm run db -- <archivo>)
+│   ├── db.mjs           # ejecuta un .sql contra la base (npm run db -- <archivo>)
+│   ├── revisar-videos.mjs # lista los videos de data.js que ya no andan (npm run revisar)
+│   └── reportes.mjs     # lista las canciones reportadas desde la partida (npm run reportes)
 ├── vite.config.js
 └── netlify.toml         # build de Netlify (npm run build → dist/)
 ```
@@ -161,6 +216,19 @@ ranking.
 
 Para probarlo en local hace falta correr la función: `npx netlify dev` (con `npm run dev` solo,
 las cuentas y el ranking no responden; el juego anda igual).
+
+**Al actualizar el sitio con cambios en `db/esquema.sql`**: primero la base y después el deploy. El
+esquema se puede volver a ejecutar sin romper nada y las funciones nuevas siguen aceptando las llamadas
+de la versión anterior, así que el sitio viejo sigue andando mientras tanto:
+
+```bash
+npm run db -- db/esquema.sql
+npm run catalogo:subir
+```
+
+En la misma base viven, además de las cuentas y las partidas, el desafío de cada día (`desafios`), los
+duelos, las ligas, los reportes, las listas compartidas y las salas de pulsadores. Lo que se puede
+escribir sin cuenta (reportes, listas, salas) tiene un tope por hora en `netlify/functions/api.mjs`.
 
 **Al agregar o cambiar canciones en `src/data.js`**: correr `npm run catalogo` y después
 `npm run catalogo:subir`. Si no, las partidas en las que suene una canción nueva se descartan del
@@ -199,8 +267,21 @@ La medición está en `src/analytics.js` (ID de la propiedad al principio; vací
 | `preferencia_cambiada` | Se cambia "Restar un punto" | `resta_puntos`, `desde` (setup · cuenta) |
 | `historial_reiniciado` | Se reinicia el historial de sonadas | `canciones` |
 | `compartir` | Link del juego o imagen del resultado | `que` (link · resultado), `desde`, `resultado`, `canciones`, `modo_juego` |
-| `cafecito_visto` / `cafecito` | Pedido al final / clic en un botón | `partidas`, `canciones` / `desde`, `pantalla`, `partidas` |
+| `cafecito_visto` / `cafecito` | Pedido al final / clic en un botón | `partidas`, `canciones`, `momento` (primera · hito · record · gano · chico), `qr` (si · no) / `desde`, `pantalla`, `partidas`, `momento` (solo desde `final`) |
 | `comentario` | Se manda el formulario | `estado` (enviado · error) |
+| `desafio` | Desafío del día | `accion` (empezar · terminar), `puntos`, `canciones` |
+| `duelo` | Duelos por link | `accion` (ver · empezar · terminar · crear), `jugado`, `jugaron`, `gano`, `puntos`, `canciones` |
+| `logro` | La partida destrabó logros | `logros` (los ids, separados por coma) |
+| `liga` | Ligas privadas | `accion` (crear · unirse · salir · invitar) |
+| `pista` | Un jugador: se pide una pista | `pista` (genero · artista · inicial), `numero`, `segundos` |
+| `decadas` | Se cambia el filtro de décadas | `decadas` |
+| `sala` | Pulsadores | `accion` (abrir · compartir · entrar · pulsar · pulso), `estado`, `equipos`, `numero` |
+| `cancion_reportada` | Se reporta una canción | `motivo`, `video`, `cancion` |
+
+`partida_iniciada` suma `tipo` (desafio · duelo), `decadas`, `adivina`, `tiempo_cantar` y `pulsadores`;
+`solo_respuesta`, `pistas` y `adivina`; `ranking_visto`, `genero` y `liga`; `mis_canciones`, las
+acciones `lista_compartida` y `lista_importada`; `compartir`, `que: duelo`; y `preferencia_cambiada`,
+`adivina` y `tiempo_cantar`.
 
 Propiedad de usuario: `con_cuenta` (si · no). Con sesión abierta va además el `user_id` (el ID interno
 de la cuenta, nunca el nombre ni el mail), que junta en una persona lo que hace en

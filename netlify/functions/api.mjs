@@ -1,4 +1,6 @@
-// La API de las cuentas y el ranking del modo un jugador (/api/*).
+// La API del juego (/api/*): cuentas, partidas de un jugador y ranking, y
+// además el desafío del día, los duelos por link, las ligas privadas, los
+// reportes de canciones, las listas compartidas y las salas de pulsadores.
 //
 // Hace de intermediario entre el navegador y la base (Postgres en Neon, ver
 // db/esquema.sql): verifica el token de Google, mantiene la sesión en una
@@ -24,7 +26,13 @@ const COOKIE_NONCE = "eun_n";
 const SESION_SEG = 60 * 60 * 24 * 30;      // la sesión dura 30 días…
 const RENOVAR_SEG = 60 * 60 * 24 * 7;      // …y se renueva si pasaron más de 7 desde que se firmó
 const CANCIONES = [0, 5, 10, 15, 20, 30];  // las mismas que el select de Opciones; 0 = sin límite
-const PERIODOS = ["semana", "mes", "siempre"];
+const PERIODOS = ["hoy", "semana", "mes", "siempre"];   // hoy = el desafío del día
+const MODOS = ["titulo", "artista"];
+const MOTIVOS = ["no_suena", "otra_cancion", "version", "empieza_mal", "otro"];   // los de public.reportes
+// Lo que se puede escribir sin cuenta (reportes, listas, salas) tiene un tope
+// por hora entre todos: frena a un script, no a la gente.
+const TOPE_HORA = { reportes: 300, listas: 200, salas: 500 };
+const MAX_LISTA = 150;                     // canciones de una lista compartida
 
 export const config = { path: "/api/*" };
 
@@ -80,6 +88,25 @@ async function leerSesion(req){
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VIDEO = /^[A-Za-z0-9_-]{11}$/;
+const GENERO = /^[a-z0-9]{2,20}$/;         // el id de una playlist de src/data.js
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const CODIGO8 = /^[a-z0-9]{8}$/;           // duelos y listas
+const CODIGO_LIGA = /^[A-Za-z0-9]{6}$/;
+const CODIGO_SALA = /^[A-Z]{4}$/;
+
+// Un texto corto escrito por alguien: sin espacios de más y con tope.
+const texto = (v, max)=> typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "";
+// Los nombres de los equipos de una sala: de 1 a 12, de hasta 20 letras.
+function equiposValidos(v){
+  if(!Array.isArray(v) || v.length < 1 || v.length > 12) return null;
+  return v.map((n, i)=> texto(n, 20) || "Equipo " + (i + 1));
+}
+// Enteros para un smallint[] de la base ("{1,2,3}"), o null si alguno no lo es.
+function enteros(v, min, max, tope){
+  if(!Array.isArray(v) || v.length > tope) return null;
+  if(!v.every(n=> Number.isInteger(n) && n >= min && n <= max)) return null;
+  return "{" + v.join(",") + "}";
+}
 // Una ruta de este mismo sitio: nada de "//otro.com" ni "https://…"
 const rutaLocal = (v)=> typeof v === "string" && /^\/(?!\/)[^\s\\]*$/.test(v) ? v : "/";
 
@@ -192,27 +219,63 @@ const RUTAS = {
     const s = await leerSesion(req);
     if(!s) return json({ error: "sin sesión" }, 401);
     const filas = await sql()`
-      select canciones, segundos, puntos, jugada, videos from public.partidas_solo
+      select canciones, segundos, puntos, jugada, videos, genero, modo, dia::text as dia, duelo
+      from public.partidas_solo
       where usuario = ${s.id} order by jugada desc limit 500`;
     return json(filas);
   },
 
+  // periodo: hoy (el desafío del día) | semana | mes | siempre · genero: solo
+  // las partidas de esa playlist · liga: solo las cuentas de esa liga (hay que
+  // ser parte). Con periodo=hoy no se miran ni canciones ni genero.
   "GET /ranking": async ({ req, url })=>{
     const canciones = Number(url.searchParams.get("canciones"));
     const limite = Math.min(Math.max(Math.trunc(Number(url.searchParams.get("limite"))) || 20, 1), 100);
     const periodo = url.searchParams.get("periodo") || "siempre";
-    if(!CANCIONES.includes(canciones) || !PERIODOS.includes(periodo)) return json({ error: "parámetros" }, 400);
+    const genero = url.searchParams.get("genero") || null;
+    const liga = url.searchParams.get("liga") || null;
+    if(!CANCIONES.includes(canciones) || !PERIODOS.includes(periodo)
+       || (genero && !GENERO.test(genero)) || (liga && !UUID.test(liga))) return json({ error: "parámetros" }, 400);
     const s = await leerSesion(req);
-    const filas = await sql()`
-      select * from public.ranking_solo(${canciones}::smallint, ${limite}::int, ${periodo}::text, ${s ? s.id : null}::uuid)`;
+    if(liga){
+      if(!s) return json({ error: "sin sesión" }, 401);
+      const soy = await sql()`select 1 from public.liga_miembros where liga = ${liga}::uuid and usuario = ${s.id}::uuid`;
+      if(!soy.length) return json({ error: "liga" }, 403);
+    }
+    const yo = s ? s.id : null;
+    const filas = periodo === "hoy"
+      ? await sql()`select * from public.ranking_desafio(public.hoy_ar(), ${limite}::int, ${yo}::uuid, ${liga}::uuid)`
+      : await sql()`select * from public.ranking_solo(${canciones}::smallint, ${limite}::int, ${periodo}::text, ${yo}::uuid, ${genero}::text, ${liga}::uuid)`;
     return json(filas.map(f=> ({ ...f, puesto: Number(f.puesto) })));
   },
 
+  /* ============================================================
+     DESAFÍO DEL DÍA
+     ============================================================ */
+  // Las canciones de hoy (10 más 3 suplentes) y desde dónde suena cada una,
+  // cuántas cuentas ya lo jugaron y, con sesión, cómo te fue.
+  "GET /desafio": async ({ req })=>{
+    const d = (await sql()`select dia::text as dia, videos, inicios from public.desafio_del_dia()`)[0];
+    if(!d || !d.dia) return json({ dia: null });
+    const s = await leerSesion(req);
+    const cuantos = await sql()`select count(*)::int as n from public.partidas_solo where dia = ${d.dia}::date`;
+    let mio = null;
+    if(s){
+      const f = (await sql()`select * from public.ranking_desafio(${d.dia}::date, 1, ${s.id}::uuid)`).find(x=> x.es_mio);
+      if(f) mio = { puesto: Number(f.puesto), puntos: f.puntos, segundos: f.segundos };
+    }
+    return json({ ...d, jugaron: cuantos[0].n, mio });
+  },
+
   /* La partida, paso a paso. Cada uno devuelve lo que la función de la base. */
+  // genero: la playlist, si se juega con una sola · modo: titulo | artista ·
+  // dia: el desafío de esa fecha · duelo: el que se va a responder
   "POST /solo/empezar": async ({ req })=>{
-    const { canciones } = await cuerpo(req);
+    const { canciones, genero = null, modo = "titulo", dia = null, duelo = null } = await cuerpo(req);
     if(!CANCIONES.includes(canciones)) return json({ error: "canciones" }, 400);
-    const f = await sql()`select public.solo_empezar(${canciones}::smallint) as r`;
+    if((genero !== null && !GENERO.test(genero)) || !MODOS.includes(modo)
+       || (dia !== null && !FECHA.test(dia)) || (duelo !== null && !CODIGO8.test(duelo))) return json(null);
+    const f = await sql()`select public.solo_empezar(${canciones}::smallint, ${genero}::text, ${modo}::text, ${dia}::date, ${duelo}::text) as r`;
     return json(f[0].r);
   },
   "POST /solo/sonar": async ({ req })=>{
@@ -221,10 +284,13 @@ const RUTAS = {
     const f = await sql()`select public.solo_sonar(${partida}::uuid, ${video}::text) as r`;
     return json(f[0].r);
   },
+  // titulo: lo que eligió (en el modo artista, el artista) · pistas: cuántos de
+  // los segundos fueron pistas y no audio
   "POST /solo/resolver": async ({ req })=>{
-    const { partida, segundos, titulo } = await cuerpo(req);
-    if(!UUID.test(partida) || !Number.isInteger(segundos) || typeof titulo !== "string" && titulo !== null) return json(false);
-    const f = await sql()`select public.solo_resolver(${partida}::uuid, ${segundos}::smallint, ${titulo === null ? null : titulo.slice(0, 200)}::text) as r`;
+    const { partida, segundos, titulo, pistas = 0 } = await cuerpo(req);
+    if(!UUID.test(partida) || !Number.isInteger(segundos) || !Number.isInteger(pistas)
+       || typeof titulo !== "string" && titulo !== null) return json(false);
+    const f = await sql()`select public.solo_resolver(${partida}::uuid, ${segundos}::smallint, ${titulo === null ? null : titulo.slice(0, 200)}::text, ${pistas}::smallint) as r`;
     return json(f[0].r);
   },
   "POST /solo/terminar": async ({ req })=>{
@@ -235,7 +301,202 @@ const RUTAS = {
     const f = await sql()`select public.solo_terminar(${partida}::uuid, ${s.id}::uuid) as r`;
     return json(f[0].r);
   },
+
+  /* ============================================================
+     DUELOS POR LINK
+     Las canciones de una partida, para que otro juegue lo mismo. Se puede
+     sin cuenta: ahí el nombre es el que escriba cada uno.
+     ============================================================ */
+  // Arma el duelo con la partida recién jugada. inicios: desde qué segundo
+  // sonó cada canción. Devuelve { id } (null si no se pudo).
+  "POST /duelo/crear": async ({ req })=>{
+    const { partida, inicios, nombre } = await cuerpo(req);
+    const lista = enteros(inicios, 0, 36000, 600);
+    if(!UUID.test(partida) || lista === null) return json({ id: null });
+    const quien = await quienJuega(req, nombre);
+    if(!quien.nombre) return json({ id: null });
+    const f = await sql()`select public.duelo_crear(${partida}::uuid, ${lista}::smallint[], ${quien.nombre}::text, ${quien.id}::uuid) as r`;
+    return json({ id: f[0].r });
+  },
+  // Anota el resultado de la partida en el duelo que respondía y devuelve la tabla.
+  "POST /duelo/anotar": async ({ req })=>{
+    const { partida, nombre } = await cuerpo(req);
+    if(!UUID.test(partida)) return json(null);
+    const quien = await quienJuega(req, nombre);
+    if(!quien.nombre) return json(null);
+    const f = await sql()`select public.duelo_anotar(${partida}::uuid, ${quien.nombre}::text, ${quien.id}::uuid) as r`;
+    return json(f[0].r ? await verDuelo(f[0].r, quien.id, partida) : null);
+  },
+  // El duelo de un link: qué suena y cómo le fue a cada uno. partida (opcional)
+  // marca cuál fila es la de este navegador cuando se jugó sin cuenta.
+  "GET /duelo": async ({ req, url })=>{
+    const id = url.searchParams.get("id") || "";
+    const partida = url.searchParams.get("partida");
+    if(!CODIGO8.test(id) || (partida && !UUID.test(partida))) return json(null);
+    const s = await leerSesion(req);
+    return json(await verDuelo(id, s ? s.id : null, partida || null));
+  },
+
+  /* ============================================================
+     LIGAS PRIVADAS
+     ============================================================ */
+  "GET /ligas": async ({ req })=>{
+    const s = await leerSesion(req);
+    if(!s) return json({ error: "sin sesión" }, 401);
+    const filas = await sql()`
+      select l.id, l.codigo, l.nombre, l.creador is not distinct from ${s.id}::uuid as es_creador,
+             (select count(*)::int from public.liga_miembros x where x.liga = l.id) as miembros
+      from public.ligas l join public.liga_miembros m on m.liga = l.id
+      where m.usuario = ${s.id}::uuid order by m.desde`;
+    return json(filas);
+  },
+  "POST /ligas/crear": async ({ req })=>{
+    const s = await leerSesion(req);
+    if(!s) return json({ error: "sin sesión" }, 401);
+    const nombre = texto((await cuerpo(req)).nombre, 40);
+    if(!nombre) return json({ error: "nombre" }, 400);
+    const f = await sql()`select public.liga_crear(${s.id}::uuid, ${nombre}::text) as r`;
+    return json({ codigo: f[0].r });
+  },
+  // Devuelve { liga, nombre }; liga null si el código no existe o no hay lugar.
+  "POST /ligas/unirse": async ({ req })=>{
+    const s = await leerSesion(req);
+    if(!s) return json({ error: "sin sesión" }, 401);
+    const codigo = texto((await cuerpo(req)).codigo, 6);
+    if(!CODIGO_LIGA.test(codigo)) return json({ liga: null });
+    const f = await sql()`select public.liga_unirse(${s.id}::uuid, ${codigo}::text) as r`;
+    if(!f[0].r) return json({ liga: null });
+    const l = await sql()`select nombre from public.ligas where id = ${f[0].r}::uuid`;
+    return json({ liga: f[0].r, nombre: l.length ? l[0].nombre : "" });
+  },
+  "POST /ligas/salir": async ({ req })=>{
+    const s = await leerSesion(req);
+    if(!s) return json({ error: "sin sesión" }, 401);
+    const { liga } = await cuerpo(req);
+    if(!UUID.test(liga)) return json(false);
+    const f = await sql()`select public.liga_salir(${s.id}::uuid, ${liga}::uuid) as r`;
+    return json(f[0].r);
+  },
+
+  /* ============================================================
+     REPORTES · LISTAS COMPARTIDAS
+     ============================================================ */
+  // "Esta canción anda mal". Solo de videos del catálogo.
+  "POST /reporte": async ({ req })=>{
+    const { video, motivo } = await cuerpo(req);
+    if(!VIDEO.test(video) || !MOTIVOS.includes(motivo)) return json(false);
+    const s = await leerSesion(req);
+    const f = await sql()`
+      insert into public.reportes (video, motivo, usuario)
+      select ${video}::text, ${motivo}::text, ${s ? s.id : null}::uuid
+      where exists (select 1 from public.catalogo_solo c where c.video = ${video}::text)
+        and (select count(*) from public.reportes r where r.creado > now() - interval '1 hour') < ${TOPE_HORA.reportes}
+      returning id`;
+    return json(f.length > 0);
+  },
+  // Guarda las canciones propias de YouTube de alguien y devuelve el código del link.
+  "POST /lista": async ({ req })=>{
+    const { nombre, canciones } = await cuerpo(req);
+    const titulo = texto(nombre, 40) || "Mis canciones";
+    if(!Array.isArray(canciones) || !canciones.length || canciones.length > MAX_LISTA) return json({ codigo: null });
+    const limpias = [];
+    for(const c of canciones){
+      if(!Array.isArray(c) || !VIDEO.test(c[2])) return json({ codigo: null });
+      const t = texto(c[0], 80);
+      if(!t) return json({ codigo: null });
+      limpias.push([t, texto(c[1], 80), c[2]]);
+    }
+    const s = await leerSesion(req);
+    const f = await sql()`
+      insert into public.listas (codigo, nombre, canciones, usuario)
+      select substr(replace(gen_random_uuid()::text, '-', ''), 1, 8), ${titulo}::text, ${JSON.stringify(limpias)}::jsonb, ${s ? s.id : null}::uuid
+      where (select count(*) from public.listas l where l.creada > now() - interval '1 hour') < ${TOPE_HORA.listas}
+      returning codigo`;
+    return json({ codigo: f.length ? f[0].codigo : null });
+  },
+  "GET /lista": async ({ url })=>{
+    const codigo = url.searchParams.get("codigo") || "";
+    if(!CODIGO8.test(codigo)) return json(null);
+    const f = await sql()`select nombre, canciones from public.listas where codigo = ${codigo}`;
+    return json(f.length ? f[0] : null);
+  },
+
+  /* ============================================================
+     SALAS (PULSADORES)
+     Con amigos: el que maneja la partida abre una sala, los demás entran con
+     el código y tocan "¡YO!" en su celular. La base dice quién llegó primero.
+     ============================================================ */
+  // Devuelve { codigo, clave }: la clave queda en el navegador que maneja la partida.
+  "POST /sala/crear": async ({ req })=>{
+    const equipos = equiposValidos((await cuerpo(req)).equipos);
+    if(!equipos) return json(null);
+    const hay = await sql()`select count(*)::int as n from public.salas where creada > now() - interval '1 hour'`;
+    if(hay[0].n >= TOPE_HORA.salas) return json(null);
+    const f = await sql()`select public.sala_crear(array(select jsonb_array_elements_text(${JSON.stringify(equipos)}::jsonb))) as r`;
+    return json(f[0].r);
+  },
+  // Abre o cierra los pulsadores. excluidos: equipos que ya erraron esta
+  // canción · equipos (opcional): los nombres, si cambiaron · limpiar: al
+  // cerrar, olvidar también quién había pulsado (la canción ya terminó).
+  "POST /sala/ronda": async ({ req })=>{
+    const { codigo, clave, abierta, excluidos = [], equipos, limpiar } = await cuerpo(req);
+    const fuera = enteros(excluidos, 0, 11, 12);
+    const nombres = equipos === undefined ? null : equiposValidos(equipos);
+    if(!CODIGO_SALA.test(codigo) || !UUID.test(clave) || fuera === null || (equipos !== undefined && !nombres)) return json(false);
+    const f = nombres
+      ? await sql()`select public.sala_ronda(${codigo}::text, ${clave}::uuid, ${abierta === true}::boolean, ${fuera}::smallint[],
+          array(select jsonb_array_elements_text(${JSON.stringify(nombres)}::jsonb)), ${limpiar === true}::boolean) as r`
+      : await sql()`select public.sala_ronda(${codigo}::text, ${clave}::uuid, ${abierta === true}::boolean, ${fuera}::smallint[],
+          null::text[], ${limpiar === true}::boolean) as r`;
+    return json(f[0].r);
+  },
+  // Lo que mira el que maneja la partida mientras suena: si ya pulsó alguien.
+  // Va por POST para que la clave no viaje en la dirección.
+  "POST /sala/estado": async ({ req })=>{
+    const { codigo, clave } = await cuerpo(req);
+    if(!CODIGO_SALA.test(codigo) || !UUID.test(clave)) return json(null);
+    const f = await sql()`select abierta, primero from public.salas where codigo = ${codigo} and clave = ${clave}::uuid`;
+    return json(f.length ? f[0] : null);
+  },
+  // Para el celular que se suma: los equipos de la sala (null si no existe).
+  "GET /sala": async ({ url })=>{
+    const codigo = (url.searchParams.get("codigo") || "").toUpperCase();
+    if(!CODIGO_SALA.test(codigo)) return json(null);
+    const f = await sql()`select codigo, equipos from public.salas where codigo = ${codigo}`;
+    return json(f.length ? f[0] : null);
+  },
+  // Un equipo tocó "¡YO!". Devuelve { estado, primero, equipos }.
+  "POST /sala/yo": async ({ req })=>{
+    const { codigo, equipo } = await cuerpo(req);
+    if(!CODIGO_SALA.test(codigo) || !Number.isInteger(equipo) || equipo < 0 || equipo > 11) return json({ estado: "no" });
+    const f = await sql()`select public.sala_pulsar(${codigo}::text, ${equipo}::smallint) as r`;
+    return json(f[0].r);
+  },
 };
+
+// Con sesión, la cuenta y su nombre; sin sesión, el nombre que escribió.
+async function quienJuega(req, nombre){
+  const s = await leerSesion(req);
+  if(s){
+    const f = await sql()`select nombre from public.usuarios where id = ${s.id}::uuid`;
+    if(f.length) return { id: s.id, nombre: f[0].nombre };
+  }
+  return { id: null, nombre: texto(nombre, 30) };
+}
+
+// El duelo con su tabla (mejor puntaje arriba; a igual puntaje, el que jugó
+// antes), o null si no existe. es_mio: la fila de esa cuenta o de esa partida.
+async function verDuelo(id, usuario, partida){
+  const d = await sql()`select id, canciones, modo, videos, inicios from public.duelos where id = ${id}`;
+  if(!d.length) return null;
+  const resultados = await sql()`
+    select nombre, puntos, segundos,
+           (usuario is not null and usuario is not distinct from ${usuario}::uuid)
+             or partida is not distinct from ${partida}::uuid as es_mio
+    from public.duelo_resultados where duelo = ${id}
+    order by puntos desc, jugada asc limit 50`;
+  return { ...d[0], resultados };
+}
 
 const borrarSesion = (url)=> cookie(COOKIE_SESION, "", { seg: 0, https: esHttps(url) });
 const cuerpo = (req)=> req.json().then(d=> d && typeof d === "object" ? d : {}).catch(()=> ({}));

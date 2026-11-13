@@ -17,6 +17,11 @@
     --f-display:"Baloo 2 Variable","Trebuchet MS",system-ui,sans-serif;
     --f-body:"Nunito Variable","Trebuchet MS","Segoe UI",system-ui,sans-serif;
     --tabs-h:0px;          /* alto de la barra de abajo del celular (0 en la compu) */
+    /* Curvas del movimiento (las mismas que usa src/motion.js): lo que entra o
+       responde, lo que se mueve por la pantalla y lo que festeja con rebote */
+    --ease-out:cubic-bezier(0.23,1,0.32,1);
+    --ease-in-out:cubic-bezier(0.77,0,0.175,1);
+    --ease-back:cubic-bezier(0.34,1.56,0.64,1);
     color-scheme:dark;
     font-synthesis:none;
   }
@@ -38,10 +43,15 @@
   .wrap.app{max-width:1160px;padding-top:20px;
     padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right));
     padding-bottom:calc(48px + var(--tabs-h) + env(safe-area-inset-bottom))}
-  .screen{display:none;animation:pop .25s ease}
+  .screen{display:none;animation:pop .25s var(--ease-out)}
   .screen.on{display:block}
   @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  @media (prefers-reduced-motion:reduce){ .screen{animation:none} }
+  /* Entradas que se reusan. Sin "to": terminan en el estilo propio del
+     elemento, y van con fill backwards (no forwards) para no pisar después
+     el transform de :active de los botones. */
+  @keyframes sube{from{opacity:0;transform:translateY(10px)}}
+  @keyframes salta{from{opacity:0;transform:scale(.88)}}
+  @keyframes aparece{from{opacity:0}}
   :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .grow{flex:1;min-width:0}
 
@@ -92,7 +102,9 @@
   .tab{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--muted);font:inherit;
     font-weight:800;font-size:15px;padding:10px 14px;border-radius:12px;cursor:pointer;transition:color .12s,background .12s}
   a.tab{text-decoration:none}
-  .tab svg{width:20px;height:20px;flex:none}
+  .tab svg{width:20px;height:20px;flex:none;transition:transform .2s var(--ease-back)}
+  .tab:active svg{transform:scale(.86);transition-duration:.1s}
+  .tabs-ind{display:none}
   .tab:hover{color:var(--paper);background:rgba(255,255,255,.05)}
   .tab[aria-current="page"]{color:var(--paper);background:rgba(255,255,255,.08)}
   .tab[data-tab="jugar"][aria-current="page"] svg{color:var(--magenta)}
@@ -137,6 +149,16 @@
     .tab:hover,.tab[aria-current="page"]{background:none}
     .tab::after{content:"";width:18px;height:3px;border-radius:2px;margin-top:2px;background:transparent}
     .tab[aria-current="page"]::after{background:currentColor}
+    /* En el juego la rayita es una sola y se desliza de una sección a la otra
+       (indicadorTabs en motion.js); las páginas de texto usan la de arriba.
+       Ocupa una columna de la barra, con la raya centrada: moverla es un
+       translateX de su propio ancho. */
+    .tabs.con-ind .tab[aria-current="page"]::after{background:transparent}
+    .tabs-ind{display:block;position:absolute;pointer-events:none;
+      left:max(6px, env(safe-area-inset-left));bottom:calc(8px + env(safe-area-inset-bottom));
+      width:calc((100% - max(6px, env(safe-area-inset-left)) - max(6px, env(safe-area-inset-right))) / var(--n,3));
+      transition:transform .3s var(--ease-out)}
+    .tabs-ind::after{content:"";display:block;width:18px;height:3px;border-radius:2px;background:var(--paper);margin:0 auto}
     /* Armar partida, el resultado y la partida van sin la barra de abajo */
     body.sin-tabs{--tabs-h:0px}
     body.sin-tabs .tabs{display:none}
@@ -146,7 +168,8 @@
 
   /* Buttons */
   .btn{border:none;border-radius:16px;padding:14px 20px;font-weight:800;font-size:16px;cursor:pointer;
-    font-family:inherit;transition:transform .05s, filter .15s;box-shadow:var(--sh);color:var(--ink);line-height:1.2}
+    font-family:inherit;transition:transform .1s var(--ease-out), box-shadow .1s var(--ease-out), filter .15s;
+    box-shadow:var(--sh);color:var(--ink);line-height:1.2}
   .btn:active{transform:translateY(4px);box-shadow:0 4px 0 rgba(0,0,0,.35)}
   .btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
   .btn.big{padding:18px 26px;font-size:19px;width:100%}
@@ -191,7 +214,8 @@
   .hola small{display:block;font-family:var(--f-body);font-weight:700;font-size:14.5px;color:var(--muted);margin-bottom:4px;letter-spacing:0}
   .modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .mode{border:0;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:5px;text-align:left;cursor:pointer;
-    font:inherit;box-shadow:var(--sh);min-height:178px;color:var(--ink);transition:transform .08s,filter .15s}
+    font:inherit;box-shadow:var(--sh);min-height:178px;color:var(--ink);
+    transition:transform .1s var(--ease-out), box-shadow .1s var(--ease-out), filter .15s}
   .mode:hover{filter:brightness(1.05)}
   .mode:active{transform:translateY(4px);box-shadow:0 6px 0 rgba(0,0,0,.35)}
   .mode-grupo{background:var(--magenta);color:#fff}
@@ -249,9 +273,35 @@
   .inicio-side .cafecito{margin-top:10px}
   .cuenta-col .cafecito{margin-top:26px}
   .res-acc .cafecito{margin-top:12px}
+  /* Pantalla final. El QR va solo en la compu (la misma consulta que CON_QR en
+     main.js): fondo blanco y módulos oscuros, que es como lo leen las cámaras. */
+  .cafe-qr{display:none}
+  .cafe-qr img{width:104px;height:104px;border-radius:10px;flex:none;display:block}
+  .cafe-qr p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.45}
+  .cafe-qr b{display:block;color:var(--paper);font-size:14.5px}
+  @media (min-width:960px) and (hover:hover) and (pointer:fine){
+    .cafecito:not(.chico) .cafe-qr{display:flex;gap:14px;align-items:center;border:1px solid rgba(255,203,46,.35);
+      border-radius:14px;padding:10px;background:rgba(255,203,46,.05)}
+  }
+  /* Las partidas que no son un momento alto: queda solo el botón, en contorno,
+     para que la tarjeta entera vuelva a llamar la atención cuando aparece */
+  .cafecito.chico{border:0;background:none;box-shadow:none;padding:0;gap:0}
+  .cafecito.chico .cafe-top,.cafecito.chico .cafe-txt{display:none}
+  .cafecito.chico .btn{background:transparent;color:var(--amber);border:2px solid rgba(255,203,46,.45);box-shadow:none;
+    padding:12px 16px;font-size:16px;margin-top:0}
+  .cafecito.chico .btn:hover{border-color:var(--amber);background:rgba(255,203,46,.06)}
   .pasos{display:none;list-style:none;padding:0;margin:0;grid-template-columns:repeat(3,1fr);gap:12px}
   .pasos li{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:rgba(255,255,255,.02);color:var(--muted);font-size:14px;line-height:1.45}
   .pasos b{display:block;font-family:var(--f-display);font-size:20px;color:var(--paper);margin-bottom:2px}
+  /* La primera vez que se ve el inicio, entra escalonado: el título, los dos
+     modos y después el resto. Al volver de otra pantalla ya no (main.js saca
+     la clase "estreno"). */
+  .estreno #s-inicio :where(.hola,.mode,.pasos,.accesos,#repetir,#record-card,.cafecito){animation:sube .5s var(--ease-out) backwards}
+  .estreno #s-inicio .mode-grupo{animation-delay:.06s}
+  .estreno #s-inicio .mode-solo{animation-delay:.12s}
+  .estreno #s-inicio :is(.pasos,#repetir,#record-card){animation-delay:.2s}
+  .estreno #s-inicio .accesos{animation-delay:.26s}
+  .estreno #s-inicio .cafecito{animation-delay:.32s}
   @media (min-width:960px){
     /* el título va de lado a lado y las dos columnas arrancan a la misma altura */
     .inicio{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:32px;align-items:start}
@@ -272,24 +322,36 @@
   /* misma altura aunque el nombre ocupe una o dos líneas */
   .genre{position:relative;display:flex;gap:10px;align-items:center;min-height:58px;border:1.5px solid var(--line);border-radius:14px;
     padding:10px 11px;cursor:pointer;background:rgba(255,255,255,.03);text-align:left;color:var(--paper);
-    font:inherit;transition:border-color .12s,background .12s;min-width:0}
+    font:inherit;transition:border-color .12s,background .12s,transform .12s var(--ease-out);min-width:0}
   .genre:hover{border-color:#6a49a3}
+  .genre:active{transform:scale(.97)}
   .genre .em{font-size:22px;flex:none;line-height:1}
   .genre .gn{font-weight:800;font-size:14px;line-height:1.15;min-width:0}
   .genre .gc{display:block;color:var(--muted);font-size:12px;font-weight:700;margin-top:1px}
   .genre.sel{border-color:var(--magenta);background:rgba(255,46,136,.14)}
   /* el tilde va de insignia en la esquina: así no le reserva lugar al nombre y la ficha queda pareja */
   .genre .tick{position:absolute;right:-7px;top:-7px;width:22px;height:22px;border-radius:50%;
-    background:var(--magenta);color:#fff;font-size:11px;display:none;place-items:center;font-weight:900;box-shadow:0 0 0 3px var(--bg)}
-  .genre.sel .tick{display:grid}
+    background:var(--magenta);color:#fff;font-size:11px;display:grid;place-items:center;font-weight:900;box-shadow:0 0 0 3px var(--bg);
+    opacity:0;transform:scale(.5);transition:opacity .12s ease,transform .12s var(--ease-out)}
+  /* entra con rebote y se va más rápido, sin él */
+  .genre.sel .tick{opacity:1;transform:scale(1);transition:opacity .15s ease,transform .3s var(--ease-back)}
   .genre.local{border-color:rgba(166,255,61,.55)}
   .genre.local.sel{border-color:var(--lime);background:rgba(166,255,61,.12)}
   .genre.local .tick{background:var(--lime);color:var(--ink)}
-  .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ink);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
-  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-weight:900;font-size:14.5px;padding:9px 4px;border-radius:10px;cursor:pointer;white-space:nowrap}
+  .seg{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ink);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+  .seg button{position:relative;z-index:1;background:none;border:0;color:var(--muted);font:inherit;font-weight:900;font-size:14.5px;padding:9px 4px;border-radius:10px;cursor:pointer;white-space:nowrap;
+    transition:color .15s ease}
   .seg button:hover{color:var(--paper)}
   .seg button[aria-pressed="true"]{background:var(--amber);color:var(--ink)}
-  .seg-modo button[aria-pressed="true"]{background:var(--cyan)}
+  .seg-modo button[aria-pressed="true"],.seg-per button[aria-pressed="true"]{background:var(--cyan)}
+  /* La pastilla de color va detrás de los botones y se desliza hasta el
+     apretado (pastilla() en motion.js le pone el ancho y la posición). Sin
+     JS queda el fondo del botón, como antes. */
+  .seg-pill{position:absolute;top:4px;bottom:4px;left:4px;border-radius:10px;background:var(--amber);
+    transition:transform .25s var(--ease-out)}
+  .seg-modo .seg-pill,.seg-per .seg-pill{background:var(--cyan)}
+  .seg.con-pill button[aria-pressed="true"]{background:none}
+  .seg-per{margin-bottom:14px}
   .teams{display:flex;flex-direction:column;gap:7px;margin-bottom:10px}
   .prow{display:flex;gap:8px;align-items:center}
   .prow .dot{width:14px;height:14px;border-radius:50%;flex:none}
@@ -303,9 +365,10 @@
   /* Interruptor: es un checkbox de verdad, con pinta de llave */
   input.switch{appearance:none;-webkit-appearance:none;width:46px;height:27px;border-radius:999px;background:var(--line);position:relative;
     flex:none;cursor:pointer;transition:background .15s;margin:0}
-  input.switch::after{content:"";position:absolute;width:21px;height:21px;border-radius:50%;background:var(--paper);top:3px;left:3px;transition:left .15s}
+  input.switch::after{content:"";position:absolute;width:21px;height:21px;border-radius:50%;background:var(--paper);top:3px;left:3px;
+    transition:transform .18s var(--ease-out),background .15s}
   input.switch:checked{background:var(--lime)}
-  input.switch:checked::after{left:22px;background:var(--ink)}
+  input.switch:checked::after{transform:translateX(19px);background:var(--ink)}
   input.switch:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .aviso{border:1.5px solid var(--no);border-radius:16px;padding:12px 14px;margin-top:18px;font-size:14px;line-height:1.45;background:rgba(255,77,94,.08)}
   .dock{margin-top:22px;display:grid;gap:7px}
@@ -338,12 +401,17 @@
   .ladder .used b{text-decoration:line-through}
   .ladder .now{border-color:var(--amber);background:rgba(255,203,46,.16)}
   .ladder .now b{color:var(--amber)}
+  .ladder .now.paso{animation:escalon .35s var(--ease-back)}
+  @keyframes escalon{from{transform:scale(.86)}}
 
   /* Cuadritos de Un jugador: 🟩 1 s, 🟨 2–3 s, 🟧 4–6 s, ⬛ no salió */
   .sqs{display:flex;gap:3px;flex-wrap:wrap}
   .sq{width:14px;height:14px;border-radius:3px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08)}
   .sq.g{background:var(--sq-g)} .sq.y{background:var(--sq-y)} .sq.o{background:var(--sq-o)} .sq.k{background:var(--sq-k)}
   .sq.cur{background:transparent;border:1.5px dashed var(--paper)}
+  /* el de la canción recién resuelta se llena con un salto */
+  .sq.nuevo{animation:cuadrito .45s var(--ease-back)}
+  @keyframes cuadrito{from{opacity:.2;transform:scale(.4)}}
   .sqs.s{gap:2px}
   .sqs.s .sq{width:10px;height:10px;border-radius:2px}
 
@@ -383,8 +451,14 @@
   .turn-sub{color:var(--muted);font-size:14px;font-weight:700;margin-top:3px}
 
   .stage{position:relative;border-radius:22px;overflow:hidden;border:2px solid var(--line);
-    aspect-ratio:16/7;background:#000;margin-bottom:16px}
+    aspect-ratio:16/7;background:#000;margin-bottom:16px;transition:border-color .25s ease}
+  /* mientras hay audio de verdad, la tapa se enciende */
+  .stage.sonando{border-color:var(--cyan)}
   .stage iframe,.stage #ytplayer{position:absolute;inset:0;width:100%;height:100%;border:0}
+  /* Al pie de la tapa: se llena en lo que dura el fragmento */
+  .snip{position:absolute;left:0;right:0;bottom:0;height:6px;z-index:4;background:rgba(255,255,255,.1)}
+  .snip span{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--magenta));
+    transform-origin:0 50%;transform:scaleX(0)}
   .cover{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;
     background:radial-gradient(circle at 50% 40%, #3a1c66, #170b2c);z-index:3}
   .cover .st{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;font-weight:800}
@@ -397,23 +471,39 @@
      espacio en vez de desbordar la tapa */
   .cover .rev-img{height:clamp(52px,38%,150px);flex:0 1 auto;min-height:0;width:auto;max-width:min(80%,270px);
     aspect-ratio:16/9;object-fit:cover;border-radius:12px;border:2px solid rgba(255,255,255,.35);
-    box-shadow:0 8px 24px rgba(0,0,0,.5);margin-top:6px;animation:artin .35s ease}
-  @keyframes artin{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+    box-shadow:0 8px 24px rgba(0,0,0,.5);margin-top:6px;animation:artin .45s var(--ease-out) .42s backwards}
+  @keyframes artin{from{opacity:0;transform:translateY(10px) scale(.94)}}
   /* Fondo difuminado con la misma imagen, para que el reveal se sienta “de la canción” */
   .cover .rev-bg{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;
-    filter:blur(26px) saturate(1.3);opacity:.4;transform:scale(1.15)}
+    filter:blur(26px) saturate(1.3);opacity:.4;transform:scale(1.15);animation:aparece .8s ease .1s backwards}
   .cover .rev-bg::after{content:"";position:absolute;inset:0;background:rgba(12,6,24,.45)}
-  /* equalizer */
+  /* La revelación, en etapas: el telón (la tapa que había) se levanta, y
+     mientras sube entran "Era…", el título con rebote, el artista y la
+     imagen. Es el momento del juego: una vez por canción, por eso se toma
+     casi un segundo. */
+  .cover .rev-telon{position:absolute;inset:0;z-index:4;background:radial-gradient(circle at 50% 40%, #3a1c66, #170b2c);
+    animation:telon .5s var(--ease-in-out) both}
+  @keyframes telon{to{transform:translateY(-101%)}}
+  .cover .rev .st{animation:sube .3s var(--ease-out) .12s backwards}
+  .cover .rev-t{animation:salta .5s var(--ease-back) .2s backwards}
+  .cover .rev-a{animation:sube .35s var(--ease-out) .32s backwards}
+  /* Ecualizador. Cada barra es una ventana con una pieza adentro que sube y
+     baja: se mueve con transform (no cambia el alto, que obligaba a recalcular
+     la tapa en cada cuadro) y las puntas quedan redondas a cualquier altura.
+     Cada una con su ritmo, para que no parezca una ola. */
   .eq{display:flex;gap:6px;align-items:flex-end;justify-content:center;height:64px;margin-bottom:10px}
-  .eq span{width:9px;background:linear-gradient(var(--cyan),var(--magenta));border-radius:6px;animation:bar 1s ease-in-out infinite}
-  .eq span:nth-child(2){animation-delay:.15s}
-  .eq span:nth-child(3){animation-delay:.3s}
-  .eq span:nth-child(4){animation-delay:.45s}
-  .eq span:nth-child(5){animation-delay:.6s}
-  .eq span:nth-child(6){animation-delay:.75s}
-  .eq span:nth-child(7){animation-delay:.9s}
-  @keyframes bar{0%,100%{height:22%}50%{height:94%}}
-  .eq.paused span{animation-play-state:paused;height:22%;opacity:.5}
+  .eq span{position:relative;width:9px;height:100%;border-radius:6px;overflow:hidden;transition:opacity .3s ease}
+  .eq span::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(var(--cyan),var(--magenta));
+    transform:translateY(78%);animation:bar 1s ease-in-out infinite;transition:transform .3s var(--ease-out)}
+  .eq span:nth-child(2)::after{animation-duration:.82s;animation-delay:-.3s}
+  .eq span:nth-child(3)::after{animation-duration:1.14s;animation-delay:-.65s}
+  .eq span:nth-child(4)::after{animation-duration:.9s;animation-delay:-.1s}
+  .eq span:nth-child(5)::after{animation-duration:1.06s;animation-delay:-.5s}
+  .eq span:nth-child(6)::after{animation-duration:.78s;animation-delay:-.2s}
+  .eq span:nth-child(7)::after{animation-duration:1.2s;animation-delay:-.8s}
+  @keyframes bar{0%,100%{transform:translateY(78%)}50%{transform:translateY(6%)}}
+  .eq.paused span{opacity:.5}
+  .eq.paused span::after{animation:none}
   /* Con mucho alto (celulares largos, compu) la tapa no queda vacía: crece lo de adentro */
   #s-game .stage{container-type:size}
   @container (min-height:300px){
@@ -422,6 +512,12 @@
     .cover .st{font-size:18px}
     .cover .rev-t{font-size:clamp(30px,6vw,52px)}
     .cover .rev-a{font-size:19px}
+  }
+  /* la tapa de un celular parado: ocupa media pantalla */
+  @container (min-height:440px){
+    .cover .eq{height:170px;gap:11px;margin-bottom:22px}
+    .cover .eq span{width:17px;border-radius:9px}
+    .cover .st{font-size:19px}
   }
 
   /* minmax(0,…): un título largo en las sugerencias no ensancha la partida */
@@ -464,7 +560,8 @@
     padding-top:max(12px, env(safe-area-inset-top));
     padding-bottom:max(12px, env(safe-area-inset-bottom))}
   /* Si con muchos equipos no entra ni con la tapa al mínimo, scrollea solo la partida */
-  #s-game.on{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  /* overflow-x: la sacudida de la tapa al errar se sale unos píxeles de costado y no tiene que aparecer un scroll */
+  #s-game.on{display:flex;flex-direction:column;flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
   #s-game > *{flex:none}
   #s-game .stage{flex:1 1 0;aspect-ratio:auto;min-height:130px;margin-bottom:12px}
   #s-game .ladder{margin-bottom:10px}
@@ -544,19 +641,22 @@
   .ranking-final{border:1px solid var(--line);border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,var(--card),var(--card2))}
   .ranking-final .btn.google{width:100%;padding:13px 16px}
   .ranking-final .hint{margin:0}
+  /* El resultado entra con presencia: la tarjeta cae a su lugar con rebote y
+     las acciones aparecen después, de a una */
+  #s-results.on .result-img{animation:tarjeta .6s var(--ease-back) .1s backwards}
+  @keyframes tarjeta{from{opacity:0;transform:translateY(26px) scale(.92) rotate(-3deg)}}
+  #s-results.on #res-record{animation:salta .45s var(--ease-back) .55s backwards}
+  #s-results.on .res-acc > *{animation:sube .4s var(--ease-out) .3s backwards}
+  #s-results.on .res-acc > :nth-child(2){animation-delay:.36s}
+  #s-results.on .res-acc > :nth-child(3){animation-delay:.42s}
+  #s-results.on .res-acc > :nth-child(4){animation-delay:.48s}
+  #s-results.on .res-acc > :nth-child(n+5){animation-delay:.54s}
   @media (min-width:900px){
     .res-grid{grid-template-columns:minmax(0,460px) minmax(0,1fr);gap:36px;align-items:start}
     .result-img{max-width:none}
   }
 
   /* ---------- RANKING ---------- */
-  .chips{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px}
-  .chips button{border:1.5px solid var(--line);background:none;color:var(--muted);border-radius:12px;padding:9px 0;
-    font:inherit;font-weight:900;font-size:15px;cursor:pointer}
-  .chips button:hover{color:var(--paper)}
-  .chips button[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:var(--ink)}
-  .chips.periodos{grid-template-columns:repeat(3,1fr);margin-bottom:14px}
-  .chips.periodos button[aria-pressed="true"]{background:var(--cyan);border-color:var(--cyan)}
   .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin:10px 0 14px}
   .podium:empty{display:none}
   .pod{display:grid;justify-items:center;gap:4px;text-align:center;min-width:0}
@@ -571,6 +671,17 @@
   .pod.p2 .av{background:#7b68a6}
   .pod.p3 .av{background:#a0613a}
   .pod.mio .n{color:var(--lime)}
+  /* El podio crece desde abajo (tercero, segundo, primero) y cuando llega
+     arriba aparece quién es. Con clip-path y no con el alto: el número de
+     adentro no se deforma y no se mueve nada alrededor. */
+  .pod .blk{animation:crece .55s var(--ease-out) backwards}
+  @keyframes crece{from{clip-path:inset(100% 0 0 0 round 14px 14px 4px 4px)}to{clip-path:inset(0 0 0 0 round 14px 14px 4px 4px)}}
+  .pod :is(.av,.n,.p){animation:sube .35s var(--ease-out) .35s backwards}
+  .pod.p2 .blk{animation-delay:.12s}
+  .pod.p2 :is(.av,.n,.p){animation-delay:.47s}
+  .pod.p1 .blk{animation-delay:.24s}
+  .pod.p1 :is(.av,.n,.p){animation-delay:.59s}
+  .rk-row{animation:sube .3s var(--ease-out) backwards}
   .rk{display:grid;gap:4px}
   .rk-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 13px;
     border-radius:12px;background:rgba(255,255,255,.035);font-weight:800;font-size:14.5px}
@@ -648,7 +759,9 @@
   .fav-row .gn{font-weight:800;font-size:14.5px;min-width:0}
   .fav-row b{font-family:var(--f-display);font-size:18px;color:var(--amber);line-height:1}
   .fav-bar{grid-column:2 / 4;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
-  .fav-bar span{display:block;height:100%;border-radius:3px;background:var(--amber)}
+  .fav-bar span{display:block;height:100%;border-radius:3px;background:var(--amber);
+    transform-origin:0 50%;animation:barra .7s var(--ease-out) .15s backwards}
+  @keyframes barra{from{transform:scaleX(0)}}
   .fav-hint{margin:8px 0 0}
   /* Listas planas, separadas por líneas */
   .list{display:grid;border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--card)}
@@ -755,9 +868,36 @@
     .cta-fila .btn{max-width:420px;margin:0 auto}
   }
   a{color:var(--cyan)}
-  .flash{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0}
-  .flash.go{animation:fl .6s ease}
-  @keyframes fl{0%{opacity:.85}100%{opacity:0}}
+  /* Resplandor de color desde los bordes al anotar (antes era la pantalla
+     entera de un color: encandilaba y tapaba lo que se estaba mirando) */
+  .flash{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0;
+    background:radial-gradient(ellipse at 50% 50%, transparent 42%, var(--c, transparent) 125%)}
+  .flash.go{animation:fl .7s var(--ease-out)}
+  @keyframes fl{0%{opacity:1}100%{opacity:0}}
+  /* Lo que motion.js pone encima de todo por un momento: el "+1" que sube del
+     marcador, los puntos que vuelan hasta él y los papelitos del final */
+  .flota,.vuela{position:fixed;z-index:98;pointer-events:none;font-family:var(--f-display);font-weight:800;line-height:1;white-space:nowrap}
+  .flota{font-size:26px;text-shadow:0 2px 0 rgba(0,0,0,.45)}
+  .vuela{font-size:28px;color:var(--ink);background:var(--amber);border-radius:999px;padding:7px 15px 5px;box-shadow:var(--sh-sm)}
+  .papelitos{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:98}
+
+  /* ---------- Reducir movimiento ----------
+     Con esa preferencia del sistema no se saca todo: lo que entraba
+     moviéndose solo aparece, y lo que se deslizaba cambia de lugar al toque.
+     motion.js hace lo mismo con lo suyo (sin papelitos, vuelos ni sacudidas). */
+  @media (prefers-reduced-motion:reduce){
+    .screen,.estreno #s-inicio *,#s-results.on .res-acc > *,.pod :is(.av,.n,.p),.rk-row,.sq.nuevo,.ladder .now.paso,.fav-bar span{animation:none!important}
+    .cover .rev .st,.cover .rev-t,.cover .rev-a,.cover .rev-img,#s-results.on .result-img,#s-results.on #res-record,.pod .blk{animation-name:aparece!important}
+    .cover .rev-telon{animation-name:seva!important}
+    .seg-pill,.tabs-ind,input.switch::after,.tab svg{transition:none}
+    .genre .tick,.genre.sel .tick{transform:none;transition:opacity .15s ease}
+    .genre:active,.tab:active svg{transform:none}
+    /* el ecualizador no sube y baja: late */
+    .eq span::after{transform:translateY(35%);animation-name:late;animation-duration:1.6s}
+    .eq.paused span::after{transform:translateY(78%)}
+  }
+  @keyframes seva{to{opacity:0}}
+  @keyframes late{0%,100%{opacity:.45}50%{opacity:1}}
 
   /* ---------- Responsive / celular ---------- */
   /* clip y no hidden: hidden convierte al body en el que scrollea, y entonces

@@ -238,8 +238,9 @@ function drawCuadritos(ctx, resultados, y){
 }
 
 // puntos: total; posibles: el máximo que se podía hacer;
-// resultados: [{ok, seg, pts}] por canción; record: true si es récord nuevo
-export function drawSoloCard(puntos, posibles, resultados, record){
+// resultados: [{ok, seg, pts}] por canción; record: true si es récord nuevo;
+// pie: el texto chico de abajo, si no es una partida común ("Desafío del día · 13 nov")
+export function drawSoloCard(puntos, posibles, resultados, record, pie){
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d");
@@ -274,7 +275,7 @@ export function drawSoloCard(puntos, posibles, resultados, record){
   }
   if(vis) drawCuadritos(ctx, resultados, y + altoPuntos + 44);
 
-  drawPie(ctx, n ? `${n} ${n===1 ? "canción" : "canciones"} · un jugador` : "");
+  drawPie(ctx, pie || (n ? `${n} ${n===1 ? "canción" : "canciones"} · un jugador` : ""));
   return cv;
 }
 

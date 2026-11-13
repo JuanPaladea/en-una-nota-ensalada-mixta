@@ -7,7 +7,15 @@ import { shareCard, drawCard, drawSoloCard, soloTramo } from "./sharecard.js";
 import { track, trackAlSalir } from "./analytics.js";
 import { SHARE_URL, shareGame } from "./share.js";
 import { nombreGenero, favoritosHtml } from "./favoritos.js";
-import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verRanking, usuarioActual, miPuesto, renderMiCuenta, cuentasActivas } from "./cuenta.js";
+import { iniciarCuentas, rankingFinal, soloEmpezar, soloSono, soloResolvio, verRanking, usuarioActual, miPuesto, renderMiCuenta, cuentasActivas, partidaLista } from "./cuenta.js";
+import "./extras.css";
+import { apiSuave } from "./api.js";
+import { estadisticasHtml, logrosNuevos, logroNuevoHtml } from "./logros.js";
+import { armarFija, traerDesafio, desafioEnMemoria, diaProvisional, desafioLocal, guardarDesafioLocal, rachaDesafio, tarjetaDesafioHtml, fechaCorta,
+  traerDuelo, crearDuelo, anotarDuelo, dueloLocal, nombreParaDuelo, rivalDe, tablaDueloHtml, veredicto, LINK_DUELO } from "./fijas.js";
+import { codigoDelLink } from "./ligas.js";
+import { abrirSala, cerrarSala, salaActual, abrirPulsadores, cerrarPulsadores, invitacionHtml, pitido, salaDelLink, entrarASala } from "./sala.js";
+import { animar, entrar, golpe, flotar, volar, cancelarVuelos, contar, fijar, temblar, papelitos, pastilla, indicadorTabs } from "./motion.js";
 
 /* ============================================================
    ESTADO
@@ -23,7 +31,15 @@ const LS_RECORD = "eun_record_solo_v1";
 const LS_ULTIMA = "eun_ultima_v1";
 const LS_PENALTY = "eun_resta_v1";
 const LS_POR_GENERO = "eun_por_genero_v1";
+const LS_ADIVINA = "eun_adivina_v1";     // un jugador: qué se escribe, 'titulo' o 'artista'
+const LS_TIEMPO = "eun_tiempo_v1";       // con amigos: segundos para cantar (0 = sin límite)
+const LS_PARTIDAS = "eun_partidas_v1";   // las últimas partidas de Un jugador de este navegador (estadísticas y logros)
+const LS_PROPIAS = "eun_propias_v2";     // ya se avisó que las canciones propias van con "Mis canciones"
 const OPCIONES_CANCIONES = [5, 10, 15, 20, 30, 0];   // canciones por partida; 0 = sin límite
+const OPCIONES_TIEMPO = [0, 5, 10, 15];              // segundos para cantar; 0 = sin límite
+// Décadas para filtrar: la de 1960 junta todo lo anterior
+const DECADAS = [[1960, "60s"], [1970, "70s"], [1980, "80s"], [1990, "90s"], [2000, "2000s"], [2010, "2010s"], [2020, "2020s"]];
+const MAX_PARTIDAS_LOCALES = 150;
 let links = load(LS_LINKS, {});          // { songKey: videoId }
 let customSongs = load(LS_CUSTOM, []);    // [{t,a,gid}]
 let localTracks = load(LS_LOCAL, []);     // [{id,t,a}] audio guardado en IndexedDB
@@ -46,7 +62,17 @@ let opts = {
 };
 // 'grupo' = equipos, el grupo juzga · 'solo' = se escribe el título y el juego lo comprueba
 let modo = load(LS_MODO, "grupo") === "solo" ? "solo" : "grupo";
-let record = load(LS_RECORD, {});         // modo solo: { "10": mejor puntaje con 10 canciones, ... }
+let record = load(LS_RECORD, {});         // modo solo: { "10": mejor puntaje con 10 canciones, "a10": lo mismo adivinando el artista, ... }
+// Un jugador: se escribe el título o quién la canta. Se recuerda.
+let adivina = load(LS_ADIVINA, "titulo") === "artista" ? "artista" : "titulo";
+// Con amigos: cuánto tiene para cantar el que arriesga (0 = lo que quiera)
+let tiempoCantar = OPCIONES_TIEMPO.includes(load(LS_TIEMPO, 0)) ? load(LS_TIEMPO, 0) : 0;
+// Décadas elegidas en Armar partida (vacío = todas)
+let decadas = new Set(ultima && Array.isArray(ultima.decadas) ? ultima.decadas.filter(d=> DECADAS.some(x=> x[0]===d)) : []);
+// Partida con las canciones fijas (el desafío del día o un duelo): ver fijas.js
+let fija = null;          // { tipo, total, canciones, suplentes, dia | id, modo }
+let partidasLocales = load(LS_PARTIDAS, []);   // [{ canciones, segundos, puntos, jugada, videos, genero, modo, dia }], más nuevas primero
+if(!Array.isArray(partidasLocales)) partidasLocales = [];
 
 let pool = [];        // canciones jugables [{t,a,gid,id,key}]
 let played = [];      // keys ya jugadas
@@ -74,7 +100,7 @@ function localUrlFor(id){
 }
 function allSongs(){
   const base = [];
-  GENRES.forEach(g=> g.songs.forEach(([t,a,yt])=> base.push({t,a,gid:g.id,yt:yt||null})));
+  GENRES.forEach(g=> g.songs.forEach(([t,a,yt,y])=> base.push({t,a,gid:g.id,yt:yt||null,y:y||null})));
   customSongs.forEach(s=> base.push({t:s.t,a:s.a,gid:s.gid||"custom",yt:null}));
   localTracks.forEach(s=> base.push({t:s.t,a:s.a||"Archivo local",gid:"local",yt:null,local:true,id:s.id}));
   return base;
@@ -92,15 +118,21 @@ function countLinked(){ return customSongs.filter(customId).length; }
 // y el resultado van sin la barra de abajo: ahí manda el botón principal.
 const SECCION = {
   "s-inicio":"jugar", "s-setup":"jugar", "s-game":"jugar", "s-results":"jugar",
+  "s-duelo":"jugar", "s-pulsador":"jugar",
   "s-ranking":"ranking", "s-cuenta":"cuenta", "s-armar":"cuenta",
 };
-const SIN_TABS = ["s-setup", "s-game", "s-results"];
+const SIN_TABS = ["s-setup", "s-game", "s-results", "s-duelo", "s-pulsador"];
 let pantalla = "s-inicio", pantallaAnterior = "s-inicio";
 // "s-inicio" → "inicio", para los parámetros de Analytics
 const sinS = (id)=> id.replace(/^s-/, "");
 function show(id){
   const cambia = id !== pantalla;
-  if(cambia){ pantallaAnterior = pantalla; pantalla = id; }
+  if(cambia){
+    pantallaAnterior = pantalla; pantalla = id;
+    // La entrada escalonada del inicio es solo para la primera vez que se ve
+    document.body.classList.remove("estreno");
+    cancelarVuelos();
+  }
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   document.getElementById(id).classList.add("on");
   // El CSS usa estas clases: en la partida no se ve nada de arriba, y en
@@ -111,6 +143,7 @@ function show(id){
     if(t.dataset.tab === SECCION[id]) t.setAttribute("aria-current", "page");
     else t.removeAttribute("aria-current");
   });
+  indicadorTabs();
   scrollTop();
   if(id==="s-inicio") renderInicio();
   if(id==="s-setup") renderSetup();
@@ -123,6 +156,7 @@ function show(id){
 // Las secciones de arriba / de la barra de abajo
 function irA(seccion){
   track("seccion", { seccion });
+  soltarFija();
   if(seccion==="ranking"){ verRanking(opts.maxSongs, "", undefined, "seccion"); return; }
   show(seccion==="cuenta" ? "s-cuenta" : "s-inicio");
 }
@@ -145,9 +179,11 @@ function scrollTop(){
   arriba();
   requestAnimationFrame(arriba);
 }
+// Un resplandor del color desde los bordes (el centro queda libre: antes tapaba
+// toda la pantalla de un color)
 function flash(color){
   const f=document.getElementById("flash");
-  f.style.background=color; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+  f.style.setProperty("--c", color); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
 }
 
 const plural = (n, uno, varios)=> n + " " + (n===1 ? uno : varios);
@@ -162,16 +198,36 @@ function renderInicio(){
   document.getElementById("hola").textContent = u
     ? "Hola, " + u.nombre.split(" ")[0]
     : "El juego para cantar con amigos";
+  renderDesafioCard();
   renderRepetir();
   renderRecordCard();
 }
+// La tarjeta del desafío del día. Sale enseguida con lo que ya se sabe (la
+// fecha y, si se jugó en este navegador, cómo fue) y se completa cuando
+// responde la base: cuántos lo jugaron y tu puesto. Sin base, no hay tarjeta.
+let turnoDesafio = 0;
+async function renderDesafioCard(){
+  const el = document.getElementById("desafio-card");
+  if(!cuentasActivas){ el.innerHTML = ""; return; }
+  const turno = ++turnoDesafio;
+  const pintar = (d)=>{
+    const html = tarjetaDesafioHtml(d, d ? rachaDesafio(d.dia) : 0, Boolean(usuarioActual()));
+    if(el.dataset.html === html) return;
+    el.dataset.html = html; el.innerHTML = html;
+  };
+  pintar(desafioEnMemoria() || { dia: diaProvisional(), jugaron: 0, mio: null });
+  const d = await traerDesafio();
+  if(turno === turnoDesafio) pintar(d);
+}
 // Los géneros de la última partida que todavía existen (y "Mis canciones" solo
-// si quedan audios cargados).
+// si quedan audios o canciones propias).
 function generosDeUltima(){
   if(!ultima || !Array.isArray(ultima.generos)) return [];
   const validos = new Set(GENRES.map(g=> g.id));
-  return ultima.generos.filter(id=> validos.has(id) || (id==="local" && localTracks.length));
+  return ultima.generos.filter(id=> validos.has(id) || (id==="local" && hayPropias()));
 }
+// Hay algo en "Mis canciones": audios cargados o canciones de YouTube con link
+function hayPropias(){ return localTracks.length > 0 || countLinked() > 0; }
 function renderRepetir(){
   const el = document.getElementById("repetir");
   const gens = generosDeUltima();
@@ -192,7 +248,9 @@ function renderRepetir(){
 function repetirUltima(){
   const gens = generosDeUltima();
   if(!gens.length) return;
+  soltarFija();
   selectedGenres = new Set(gens);
+  decadas = new Set(Array.isArray(ultima.decadas) ? ultima.decadas : []);
   setModo(ultima.modo==="solo" ? "solo" : "grupo");
   if(OPCIONES_CANCIONES.includes(ultima.canciones)) opts.maxSongs = ultima.canciones;
   track("repetir_ultima", { modo_juego: modo, canciones_por_partida: opts.maxSongs });
@@ -246,7 +304,8 @@ function renderCuentaLocal(){
   const box = document.getElementById("cuenta-local");
   if(usuarioActual()){ box.innerHTML = ""; }
   else {
-    const mejor = Math.max(0, ...Object.values(record).map(Number).filter(Number.isFinite));
+    // solo los récords adivinando el título (los del artista van con la clave "a10", "a5"…)
+    const mejor = Math.max(0, ...Object.entries(record).filter(([k])=> /^\d+$/.test(k)).map(([, v])=> Number(v)).filter(Number.isFinite));
     box.innerHTML = `<div class="lbl">En este navegador</div>
       <div class="tiles">
         <div class="tile"><b>${jugado.partidas}</b><span>partidas</span></div>
@@ -258,7 +317,8 @@ function renderCuentaLocal(){
       <div class="rec">${OPCIONES_CANCIONES.map(n=>{
         const pts = record[String(n)] || 0;
         return `<div class="${pts ? "" : "none"}">${n ? n + " canciones" : "Sin límite"}<b>${pts || "—"}</b></div>`;
-      }).join("")}</div>`;
+      }).join("")}</div>
+      ${estadisticasHtml(partidasLocales)}`;
   }
   const propios = customSongs.length;
   document.getElementById("cuenta-canciones").innerHTML = `
@@ -281,6 +341,7 @@ function renderCuentaLocal(){
 // Desde las tarjetas del inicio o desde "Jugar un jugador" del ranking. Con
 // partida_iniciada da cuántos arman la partida y no la arrancan.
 function elegirModo(m){
+  soltarFija();
   setModo(m);
   track("armar_partida", { modo_juego: modo, desde: sinS(pantalla) });
   // Arranca con los géneros de la última partida, si había
@@ -288,13 +349,87 @@ function elegirModo(m){
   show("s-setup");
 }
 function renderSetup(){
-  renderGenres(); renderTeams(); renderMaxSongs(); syncPenalty(); updatePoolWarn();
+  renderGenres(); renderDecadas(); renderTeams(); renderMaxSongs(); renderAdivina(); renderTiempo();
+  renderPulsadores(); syncPenalty(); updatePoolWarn();
+}
+/* ---- Décadas ----
+   Un filtro encima de los géneros: sin ninguna elegida van todas. Las
+   canciones sin año cargado (data.js) no entran cuando hay alguna elegida;
+   las propias sí, porque las eligió quien juega. */
+const decadaDe = (anio)=> Math.max(DECADAS[0][0], Math.floor(anio / 10) * 10);
+function renderDecadas(){
+  const el = document.getElementById("decadas");
+  if(!el.querySelector("button")){
+    el.innerHTML = DECADAS.map(([d, nombre])=>
+      `<button type="button" data-d="${d}" onclick="toggleDecada(${d})">${nombre}</button>`).join("");
+  }
+  el.querySelectorAll("button").forEach(b=> b.setAttribute("aria-pressed", String(decadas.has(Number(b.dataset.d)))));
+  document.getElementById("dec-info").textContent = decadas.size ? "· " + plural(decadas.size, "elegida", "elegidas") : "· todas";
+  document.getElementById("dec-todas").hidden = !decadas.size;
+}
+function toggleDecada(d){
+  decadas.has(d) ? decadas.delete(d) : decadas.add(d);
+  track("decadas", { decadas: [...decadas].sort().join(",") || "todas" });
+  renderDecadas(); updatePoolWarn();
+}
+function todasLasDecadas(){ decadas = new Set(); renderDecadas(); updatePoolWarn(); }
+
+/* ---- Un jugador: qué se adivina ---- */
+function renderAdivina(){
+  const el = document.getElementById("opt-adivina");
+  el.querySelectorAll("button").forEach(b=> b.setAttribute("aria-pressed", String(b.dataset.a === adivina)));
+  pastilla(el);
+  document.getElementById("adivina-hint").textContent = adivina === "artista"
+    ? "Suena 1 segundo y escribís quién la canta. Adivinando el artista no hay ranking: es para practicar."
+    : "Suena 1 segundo y escribís el título. Si no sale, se repite desde el mismo punto un segundo más largo, hasta 6. Errar también suma un segundo.";
+}
+function setAdivina(a){
+  adivina = a === "artista" ? "artista" : "titulo";
+  try{ save(LS_ADIVINA, adivina); }catch(_){}
+  track("preferencia_cambiada", { adivina, desde: sinS(pantalla) });
+  renderAdivina();
+}
+
+/* ---- Con amigos: tiempo para cantar y pulsadores ---- */
+function renderTiempo(){
+  const el = document.getElementById("opt-tiempo");
+  if(!el.querySelector("button")){
+    el.innerHTML = OPCIONES_TIEMPO.map(n=>
+      `<button type="button" data-n="${n}" onclick="setTiempo(${n})"${n ? "" : ' aria-label="Sin límite de tiempo"'}>${n ? n + " s" : "∞"}</button>`).join("");
+  }
+  el.querySelectorAll("button").forEach(b=> b.setAttribute("aria-pressed", String(Number(b.dataset.n) === tiempoCantar)));
+  pastilla(el);
+}
+function setTiempo(n){
+  if(!OPCIONES_TIEMPO.includes(n)) return;
+  tiempoCantar = n;
+  try{ save(LS_TIEMPO, n); }catch(_){}
+  track("preferencia_cambiada", { tiempo_cantar: n, desde: sinS(pantalla) });
+  renderTiempo();
+}
+// La sala se abre al prender el interruptor, así ya pueden ir entrando
+// mientras se arma la partida. Sin base (o sin red) el interruptor vuelve atrás.
+function renderPulsadores(){
+  const s = salaActual();
+  document.getElementById("opt-pulsadores").checked = Boolean(s);
+  const box = document.getElementById("sala-inv");
+  const html = s ? invitacionHtml(s.codigo) : "";
+  if(box.dataset.cod !== (s ? s.codigo : "")){ box.dataset.cod = s ? s.codigo : ""; box.innerHTML = html; }
+}
+async function setPulsadores(si){
+  const chk = document.getElementById("opt-pulsadores");
+  if(!si){ cerrarSala(); renderPulsadores(); return; }
+  chk.disabled = true;
+  const codigo = await abrirSala(teams.map((t, i)=> t.name.trim() || "Equipo " + (i + 1)));
+  chk.disabled = false;
+  if(!codigo) alert("No pudimos abrir la sala de pulsadores. Revisá la conexión y probá de nuevo.");
+  renderPulsadores();
 }
 function renderGenres(){
   const el = document.getElementById("genres");
   const ficha = (id, em, nombre, detalle, extra)=>{
     const sel = selectedGenres.has(id);
-    return `<button type="button" class="genre ${extra||""} ${sel?"sel":""}" aria-pressed="${sel}" onclick="toggleGenre('${id}')">
+    return `<button type="button" class="genre ${extra||""} ${sel?"sel":""}" data-g="${id}" aria-pressed="${sel}" onclick="toggleGenre('${id}')">
       <span class="em" aria-hidden="true">${em}</span>
       <span class="gn">${esc(nombre)}${detalle ? `<span class="gc">${detalle}</span>` : ""}</span>
       <span class="tick" aria-hidden="true">✓</span>
@@ -304,25 +439,42 @@ function renderGenres(){
   // Sin la cantidad de canciones de cada género: solo el nombre
   el.innerHTML = GENRES.map(g=> ficha(g.id, g.em, nombreGenero(g.id), "")).join("") +
     ficha("local", "🎵", "Mis canciones", localTracks.length
-      ? `<b style="color:var(--lime)">suena seguro</b>` : "Cargá tus audios", "local");
+      ? `<b style="color:var(--lime)">suena seguro</b>`
+      : countLinked() ? plural(countLinked(), "canción tuya", "canciones tuyas") : "Cargá tus audios", "local");
+}
+// Al elegir no se vuelve a armar la lista: se cambia la clase de cada ficha,
+// así el tilde entra y sale con su transición.
+function marcarGeneros(){
+  document.querySelectorAll("#genres .genre").forEach(b=>{
+    const sel = selectedGenres.has(b.dataset.g);
+    b.classList.toggle("sel", sel);
+    b.setAttribute("aria-pressed", String(sel));
+  });
 }
 function toggleGenre(id){
   selectedGenres.has(id) ? selectedGenres.delete(id) : selectedGenres.add(id);
-  renderGenres(); updatePoolWarn();
+  marcarGeneros(); updatePoolWarn();
 }
-// "Elegir todos" suma Mis canciones solo si hay audios cargados
+// "Elegir todos" suma Mis canciones solo si hay audios o canciones propias
 function todosLosGeneros(){
-  return GENRES.map(g=> g.id).concat(localTracks.length ? ["local"] : []);
+  return GENRES.map(g=> g.id).concat(hayPropias() ? ["local"] : []);
 }
 function toggleTodos(){
   const todos = todosLosGeneros();
   const estanTodos = todos.every(id=> selectedGenres.has(id));
   selectedGenres = estanTodos ? new Set() : new Set(todos);
-  renderGenres(); updatePoolWarn();
+  marcarGeneros(); updatePoolWarn();
 }
+// Los botones se arman una sola vez; después solo cambia cuál está apretado y
+// la pastilla se desliza hasta él
 function renderMaxSongs(){
-  document.getElementById("opt-maxsongs").innerHTML = OPCIONES_CANCIONES.map(n=>
-    `<button type="button" aria-pressed="${n===opts.maxSongs}" onclick="setMaxSongs(${n})"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
+  const el = document.getElementById("opt-maxsongs");
+  if(!el.querySelector("button")){
+    el.innerHTML = OPCIONES_CANCIONES.map(n=>
+      `<button type="button" data-n="${n}" onclick="setMaxSongs(${n})"${n ? "" : ' aria-label="Sin límite"'}>${n || "∞"}</button>`).join("");
+  }
+  el.querySelectorAll("button").forEach(b=> b.setAttribute("aria-pressed", String(Number(b.dataset.n) === opts.maxSongs)));
+  pastilla(el);
 }
 function setMaxSongs(n){
   if(!OPCIONES_CANCIONES.includes(n)) return;
@@ -379,6 +531,7 @@ function setModo(m){
   const solo = modo === "solo";
   document.getElementById("modo-grupo").setAttribute("aria-pressed", String(!solo));
   document.getElementById("modo-solo").setAttribute("aria-pressed", String(solo));
+  pastilla(document.getElementById("modo-grupo").parentElement);
   document.getElementById("setup-titulo").textContent = solo ? "Un jugador" : "Con amigos";
   document.getElementById("teams-box").hidden = solo;
   document.getElementById("solo-box").hidden = !solo;
@@ -387,11 +540,16 @@ function setModo(m){
 function setTeamName(i, val){ if(teams[i]){ teams[i].name = val; saveTeams(); } }
 function removeTeam(i){ teams.splice(i,1); saveTeams(); renderTeams(); }
 
+// Las canciones propias de YouTube van con la ficha "Mis canciones", igual
+// que los audios (antes se mezclaban siempre, y no se podía jugar solo con
+// ellas ni sin ellas). Las décadas filtran solo las playlists precargadas.
 function buildPool(){
   pool = [];
   allSongs().forEach(s=>{
-    const inSel = selectedGenres.has(s.gid) || s.gid==="custom";
+    const propia = s.local || s.gid==="custom";
+    const inSel = selectedGenres.has(propia ? "local" : s.gid);
     if(!inSel) return;
+    if(decadas.size && !propia && !(s.y && decadas.has(decadaDe(s.y)))) return;
     const key = songKey(s.gid, s.t);
     if(s.local){ pool.push({...s, key}); return; }   // audio local: ya trae id
     const id = s.yt || links[key];                    // precargado, o el link de una propia
@@ -413,7 +571,10 @@ function updatePoolWarn(){
   if(pool.length===0){
     const onlyLocal = selectedGenres.has("local") && n===1;
     info.textContent = "";
-    el.innerHTML=`<div class="aviso">
+    el.innerHTML = decadas.size && !onlyLocal
+      ? `<div class="aviso"><b>⚠️ No hay canciones de esas décadas</b> en los géneros que elegiste.
+          Sumá otra década o <a href="#" onclick="todasLasDecadas();return false">elegí todas</a>.</div>`
+      : `<div class="aviso">
       <b>⚠️ No hay canciones para jugar</b> en lo que elegiste.
       Entrá a <a href="#" onclick="show('s-armar');return false">📂 Mis canciones</a> y ${onlyLocal?'cargá tus archivos de audio':'cargá tus audios o pegá links de YouTube'} para poder jugar.</div>`;
     return;
@@ -528,6 +689,66 @@ function removeCustom(idx){
   renderSongList();
 }
 
+/* ---- Compartir la lista ----
+   Las canciones propias de YouTube (las que tienen link) se pueden pasar por
+   un link (?lista=…): el que lo abre las suma a las suyas. Los audios de la
+   compu no viajan: quedan en el navegador de cada uno. */
+const LINK_LISTA = "https://enunanota.com.ar/?lista=";
+let listaCompartida = null;     // { codigo, firma }: para no guardar dos veces la misma lista
+async function compartirLista(btn){
+  const canciones = customSongs.filter(customId).map(s=> [s.t, s.a || "", customId(s)]);
+  if(!canciones.length){ alert("Primero agregá alguna canción y pegale su link de YouTube."); return; }
+  const firma = JSON.stringify(canciones);
+  // Igual que con los duelos: un toque la guarda y otro la manda
+  if(listaCompartida && listaCompartida.firma === firma){ mandarLista(listaCompartida.codigo, canciones.length, btn); return; }
+  const nombre = (prompt("¿Cómo se llama la lista? (por ejemplo: Cumple de Ana)", "Mis canciones") || "").trim();
+  if(!nombre) return;
+  const antes = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  const r = await apiSuave("/lista", { nombre, canciones });
+  btn.disabled = false;
+  if(!r || !r.codigo){ btn.textContent = antes; alert("No pudimos guardar la lista. Probá de nuevo en un rato."); return; }
+  listaCompartida = { codigo: r.codigo, firma };
+  track("mis_canciones", { accion: "lista_compartida", total: canciones.length });
+  btn.textContent = "📲 Mandar el link de la lista";
+  entrar(btn, 0, 200);
+}
+async function mandarLista(codigo, cuantas, btn){
+  const url = LINK_LISTA + codigo;
+  const text = `🎵 Te paso mi lista de ${plural(cuantas, "canción", "canciones")} para jugar a “En una nota”:`;
+  if(navigator.share){
+    try{ await navigator.share({ title: "Lista · En una nota", text, url }); return; }
+    catch(e){ if(e && e.name === "AbortError") return; }
+  }
+  try{
+    await navigator.clipboard.writeText(text + " " + url);
+    btn.textContent = "✔ Link copiado";
+    setTimeout(()=>{ btn.textContent = "📲 Mandar el link de la lista"; }, 2200);
+  }catch(_){ prompt("Copiá el link y mandalo:", url); }
+}
+// Se abrió un link de lista: se pregunta y se suman las que no estaban.
+async function importarLista(codigo){
+  const l = await apiSuave("/lista?codigo=" + encodeURIComponent(codigo));
+  if(!l || !Array.isArray(l.canciones)){ alert("No encontramos esa lista. Puede que el link esté incompleto."); return; }
+  const nuevas = l.canciones.filter(([t, , id])=>
+    !customSongs.some(s=> norm(s.t) === norm(t) && customId(s) === id));
+  show("s-armar");
+  if(!nuevas.length){ alert(`Ya tenías todas las canciones de “${l.nombre}”.`); return; }
+  if(!confirm(`¿Sumar ${plural(nuevas.length, "canción", "canciones")} de “${l.nombre}” a tus canciones?`)) return;
+  nuevas.forEach(([t, a, id])=>{
+    // Dos con el mismo título comparten la clave del link: la segunda se distingue
+    let titulo = String(t).slice(0, 80);
+    while(customSongs.some(s=> s.t === titulo)) titulo += " ·";
+    customSongs.push({ t: titulo, a: String(a || "").slice(0, 80), gid: "custom" });
+    links[songKey("custom", titulo)] = id;
+  });
+  save(LS_CUSTOM, customSongs); save(LS_LINKS, links);
+  selectedGenres.add("local");
+  track("mis_canciones", { accion: "lista_importada", total: nuevas.length });
+  renderSongList();
+  alert(`Listo: se sumaron ${plural(nuevas.length, "canción", "canciones")}. Para jugar con ellas elegí “Mis canciones” en Armar partida.`);
+}
+
 /* ============================================================
    REPRODUCTOR: YouTube + audio local
    ============================================================ */
@@ -577,13 +798,29 @@ let snippetMs=SNIPPET_MS;     // lo que dura el fragmento actual (en el modo sol
 let inicioClip=null;          // modo solo: segundo de la canción donde arrancó el primer fragmento
 let mediaStarted=false;       // la canción actual ya arrancó (para reanudar vs cargar)
 let continuousMode=false;     // true = suena sin cortar hasta apretar detener
-function clearSnippetTimer(){ if(snippetTimer){ clearTimeout(snippetTimer); snippetTimer=null; } }
+function clearSnippetTimer(){
+  if(snippetTimer){ clearTimeout(snippetTimer); snippetTimer=null; }
+  barraFragmento(0);
+}
 // Al empezar a sonar (evento del medio), si estamos en modo fragmento, programa el corte.
 function armSnippet(){
   if(!pauseAfterSnippet) return;
   if(inicioClip===null) inicioClip = mediaTime();   // de acá vuelve a arrancar cada intento
   clearSnippetTimer();
   snippetTimer = setTimeout(snippetPause, snippetMs);
+  barraFragmento(snippetMs);
+}
+// La barra al pie de la tapa: se llena en lo que dura el fragmento, así se ve
+// cuánto falta para el corte. Arranca con el audio (no al apretar el botón) y
+// con ms = 0 se esconde.
+let animBarra=null;
+function barraFragmento(ms){
+  const el = document.getElementById("snip");
+  if(animBarra){ animBarra.cancel(); animBarra=null; }
+  if(!el) return;
+  el.hidden = !ms;
+  if(ms) animBarra = animar(el.firstElementChild, [{transform:"scaleX(0)"},{transform:"scaleX(1)"}],
+    {duration:ms, easing:"linear", fill:"forwards"});
 }
 
 function onYouTubeIframeAPIReady(){
@@ -602,7 +839,6 @@ function onYouTubeIframeAPIReady(){
   });
 }
 function onPlayerState(e){
-  const eq=document.getElementById("eq");
   if(e.data===YT.PlayerState.PLAYING){
     // En 'ready' todavía nadie apretó play: lo que está sonando es la precarga
     // (o un rebote del seek). Se frena y se mantiene muteado — que se escuche
@@ -612,7 +848,8 @@ function onPlayerState(e){
       try{
         yt.pauseVideo();
         if(prebuffering){
-          startAt = fitStart(startAt, yt.getDuration());
+          // en el desafío y en los duelos el punto es el mismo para todos: no se corrige
+          if(!inicioFijo(currentSong)) startAt = fitStart(startAt, yt.getDuration());
           yt.seekTo(startAt, true);
         }
       }catch(_){}
@@ -620,10 +857,10 @@ function onPlayerState(e){
       return;
     }
     try{ yt.unMute(); yt.setVolume(100); }catch(_){}
-    if(eq) eq.classList.remove("paused");
+    eqPlaying();
     armSnippet();   // si es fragmento de 1s, programa el corte
-  } else if(e.data===YT.PlayerState.PAUSED){
-    if(eq) eq.classList.add("paused");
+  } else if(e.data===YT.PlayerState.PAUSED || e.data===YT.PlayerState.ENDED){
+    eqPaused();
   }
 }
 // Si un video de YouTube no se puede reproducir (embed deshabilitado 101/150, etc.)
@@ -657,13 +894,18 @@ function onPlayerError(e){
   if(skipTries++ > 12){ setCover("😕 YouTube bloquea estos videos al abrir el archivo directo. Usá la playlist 🎵 “Mis canciones” (suena sin internet).", true); return; }
   const alt = pickSong(true);
   if(!alt){ setCover("😕 No hay canciones reproducibles en estas playlists.", true); return; }
-  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; fallidos=[]; inicioClip=null;
+  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null;
   if(continuousMode) playContinuous(); else playSnippet();
 }
 
 /* ---- Capa de medios: unifica audio local (<audio>) y YouTube ---- */
-function eqPlaying(){ const eq=document.getElementById("eq"); if(eq) eq.classList.remove("paused"); }
-function eqPaused(){ const eq=document.getElementById("eq"); if(eq) eq.classList.add("paused"); }
+// El ecualizador se mueve y la tapa se enciende solo mientras hay audio de verdad
+function eqSuena(si){
+  const eq=document.getElementById("eq"); if(eq) eq.classList.toggle("paused", !si);
+  const st=document.querySelector("#s-game .stage"); if(st) st.classList.toggle("sonando", si);
+}
+function eqPlaying(){ eqSuena(true); }
+function eqPaused(){ eqSuena(false); }
 function wireAudio(){
   const a=localAudioEl(); if(!a) return;
   a.addEventListener("loadedmetadata", ()=>{
@@ -686,7 +928,7 @@ function onLocalError(){
   if(skipTries++ > 12){ setCover("😕 No se pudo reproducir ese archivo. Revisá tus canciones cargadas.", true); return; }
   const alt = pickSong(true);
   if(!alt){ setCover("😕 No hay canciones reproducibles.", true); return; }
-  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; fallidos=[]; inicioClip=null;
+  currentSong = alt; seekedThisRound=false; mediaStarted=false; segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null;
   if(continuousMode) playContinuous(); else playSnippet();
 }
 /* ---- Precarga silenciosa ----
@@ -705,7 +947,7 @@ function prepareMedia(s){
   }
   if(!ytReady || !yt) return;   // la API todavía no cargó: se carga al apretar play
   try{ localAudioEl().pause(); }catch(_){}
-  startAt = randomStart();
+  startAt = inicioFijo(s) ? s.inicio : randomStart();
   prebuffering=true;
   try{
     yt.mute(); yt.setVolume(0);        // silencio total antes de tocar el video
@@ -741,10 +983,12 @@ function mediaStart(){
     prebuffering=false;   // si todavía bufferea, que siga de largo y suene
     try{ yt.unMute(); yt.setVolume(100); yt.playVideo(); return true; }catch(e){}
   }
-  try{ yt.unMute(); yt.setVolume(100); yt.loadVideoById({videoId:s.id, startSeconds:randomStart()}); }
+  try{ yt.unMute(); yt.setVolume(100); yt.loadVideoById({videoId:s.id, startSeconds: inicioFijo(s) ? s.inicio : randomStart()}); }
   catch(e){ onPlayerError({data:5}); }
   return true;
 }
+// La canción trae decidido desde qué segundo suena (desafío del día, duelos)
+function inicioFijo(s){ return Boolean(s) && Number.isFinite(s.inicio); }
 function mediaPause(){
   clearSnippetTimer();
   if(mediaKind==='local'){ try{ localAudioEl().pause(); }catch(_){} }
@@ -785,10 +1029,25 @@ let lastGameSongs=0;    // canciones de la última partida (para la tarjeta que 
 let sinCortar=false;    // con amigos: la canción actual se escuchó sin cortar
 let inicioPartida=0;    // cuándo arrancó la partida (ms), para medir cuánto dura
 
+// Lo que se le avisa a la base al empezar una partida de Un jugador: la
+// playlist, si se juega con una sola (para el ranking por género), y qué se
+// adivina. En el desafío y los duelos, además, cuál es.
+function datosPartida(){
+  if(fija) return { modo: modoAdivina(), ...(fija.tipo==="desafio" ? { dia: fija.dia } : { duelo: fija.id }) };
+  const unico = selectedGenres.size===1 ? [...selectedGenres][0] : null;
+  return { modo: adivina, genero: unico && GENRES.some(g=> g.id===unico) ? unico : null };
+}
+// Qué se escribe en esta partida: en el desafío siempre el título, en un
+// duelo lo que jugó el que lo armó, y si no lo elegido en Armar partida.
+function modoAdivina(){ return fija ? (fija.modo === "artista" ? "artista" : "titulo") : adivina; }
+// Cuántas canciones dura la partida (0 = sin límite)
+function limite(){ return fija ? fija.total : opts.maxSongs; }
+
 function startGame(){
   if(selectedGenres.size===0){ alert("Elegí al menos un género."); return; }
   buildPool();
   if(pool.length===0){ alert("No hay canciones para jugar. Entrá a 🔗 Armar canciones y agregá algunos links."); return; }
+  fija = null; modoAntesDeFija = null;
   if(modo==='solo'){
     armarCatalogo();
     resetSolo();
@@ -798,13 +1057,14 @@ function startGame(){
     saveTeams();   // los nombres quedan guardados para la próxima partida
   }
   opts.noRepeat = true;   // siempre: no se repiten canciones en una partida
-  ultima = { modo, generos:[...selectedGenres], canciones:opts.maxSongs };
+  ultima = { modo, generos:[...selectedGenres], canciones:opts.maxSongs, decadas:[...decadas] };
   try{ save(LS_ULTIMA, ultima); }catch(_){}
+  limpiarMarcador();
   // con amigos, en la compu ancha el marcador va al costado (lo hace el CSS)
   document.getElementById("s-game").classList.toggle("grupo", modo==='grupo');
   played=[]; brokenIds=new Set(); songNo=1;
   inicioPartida = Date.now();
-  if(modo==='solo') soloEmpezar(opts.maxSongs);
+  if(modo==='solo') soloEmpezar(opts.maxSongs, datosPartida());
   track("partida_iniciada", {
     modo_juego: modo,
     generos: [...selectedGenres].join(","),
@@ -813,15 +1073,122 @@ function startGame(){
     canciones_por_partida: opts.maxSongs,
     resta_puntos: modo==='grupo' && opts.penalty,
     canciones_disponibles: pool.length,
+    decadas: [...decadas].sort().join(",") || "todas",
+    adivina: modo==='solo' ? adivina : "",
+    tiempo_cantar: modo==='grupo' ? tiempoCantar : 0,
+    pulsadores: modo==='grupo' && Boolean(salaActual()),
   });
   show("s-game");
   newSong();
 }
+
+/* ---- Partidas con las canciones fijas: desafío del día y duelos ----
+   Se juegan como Un jugador sin tocar lo elegido en Armar partida: el modo
+   guardado, los géneros y la cantidad quedan como estaban. */
+let modoAntesDeFija = null;
+function empezarFija(f){
+  if(!fija) modoAntesDeFija = modo;
+  fija = f;
+  modo = 'solo';
+  armarCatalogo();
+  resetSolo();
+  limpiarMarcador();
+  document.getElementById("s-game").classList.remove("grupo");
+  played=[]; brokenIds=new Set(); songNo=1;
+  inicioPartida = Date.now();
+  soloEmpezar(f.tipo==="desafio" ? 10 : f.opcion, datosPartida());
+  track("partida_iniciada", {
+    modo_juego: "solo", tipo: f.tipo, canciones_por_partida: f.total, equipos: 1,
+    adivina: modoAdivina(),
+  });
+  show("s-game");
+  newSong();
+}
+// Se vuelve a lo de siempre (al salir al inicio o al armar una partida común)
+function soltarFija(){
+  if(!fija) return;
+  fija = null;
+  if(modoAntesDeFija){ modo = modoAntesDeFija; modoAntesDeFija = null; }
+}
+// El desafío de hoy. Si ya se jugó (con la cuenta o en este navegador), al ranking.
+async function jugarDesafio(){
+  const d = await traerDesafio(true);
+  if(!d){ alert("No pudimos cargar el desafío de hoy. Revisá la conexión y probá de nuevo."); return; }
+  if(d.mio || desafioLocal(d.dia)){ verRanking(10, "", "hoy", "inicio"); return; }
+  const f = armarFija("desafio", d.videos, d.inicios, 10, { dia: d.dia });
+  // Pasa si la página quedó abierta desde antes de que se sumaran canciones
+  if(f.total < 10){ alert("Hay canciones nuevas: recargá la página para jugar el desafío de hoy."); return; }
+  track("desafio", { accion: "empezar" });
+  empezarFija(f);
+}
+
+/* ---- Duelos ----
+   Se llega por un link (?duelo=…): se ve quién retó y cómo le fue, y se
+   juegan las mismas canciones desde el mismo segundo. */
+let dueloVisto = null;      // el duelo que está en la pantalla s-duelo
+async function abrirDuelo(id){
+  show("s-duelo");
+  const box = document.getElementById("duelo-box");
+  document.getElementById("duelo-titulo").textContent = "Te retaron";
+  box.innerHTML = `<p class="cargando">Buscando el duelo…</p>`;
+  const d = await traerDuelo(id);
+  if(pantalla !== "s-duelo") return;
+  if(!d){
+    dueloVisto = null;
+    box.innerHTML = `<div class="tarjeta"><span class="grow"><span class="tarjeta-t">No encontramos ese duelo</span>
+      <span class="tarjeta-d">Puede que el link esté incompleto o que sea muy viejo.</span></span></div>
+      <button type="button" class="btn mag big" onclick="irA('jugar')">Ir al juego</button>`;
+    return;
+  }
+  dueloVisto = d;
+  const yaJugo = d.resultados.some(r=> r.es_mio) || Boolean(dueloLocal(d.id));
+  const rival = rivalDe(d);
+  const n = d.videos.length;
+  document.getElementById("duelo-titulo").textContent = yaJugo ? "Así va el duelo"
+    : rival ? rival.nombre + " te retó" : "Te retaron";
+  track("duelo", { accion: "ver", jugado: yaJugo ? "si" : "no", jugaron: d.resultados.length });
+  box.innerHTML = `
+    <p class="duelo-bajada">${yaJugo
+      ? "Ya lo jugaste: vale tu primer intento."
+      : `${rival ? `Hizo <b>${rival.puntos} ${rival.puntos===1 ? "punto" : "puntos"}</b> en` : "Son"} ${n} canciones${d.modo==="artista" ? ", adivinando el artista" : ""}.
+         Te tocan <b>las mismas</b>, desde el mismo segundo. ¿${rival ? "Lo superás" : "Te animás"}?`}</p>
+    ${tablaDueloHtml(d)}
+    ${yaJugo ? "" : `<button type="button" class="btn mag big" onclick="jugarDuelo()">▶ Jugar el duelo</button>`}
+    <button type="button" class="btn ${yaJugo ? "cyan" : "ghost"} big" onclick="compartirDuelo('${d.id}', this)">📲 Pasárselo a alguien más</button>
+    <button type="button" class="linkish" onclick="irA('jugar')">${yaJugo ? "Ir al juego" : "Ahora no"}</button>`;
+}
+function jugarDuelo(){
+  const d = dueloVisto;
+  if(!d) return;
+  // El nombre se pide antes de jugar: al final solo queda ver cómo salió
+  const u = usuarioActual();
+  const nombre = u ? u.nombre : nombreParaDuelo();
+  if(!nombre) return;
+  const f = armarFija("duelo", d.videos, d.inicios, d.videos.length, { id: d.id, modo: d.modo, opcion: d.canciones, nombre });
+  if(f.total < d.videos.length){ alert("Hay canciones nuevas: recargá la página para jugar este duelo."); return; }
+  track("duelo", { accion: "empezar", canciones: f.total });
+  empezarFija(f);
+}
+// Manda el link del duelo. texto: lo que acompaña al link.
+async function compartirDuelo(id, btn, texto){
+  const url = LINK_DUELO + id;
+  const text = texto || "🎧 Te reto en “En una nota”: las mismas canciones, desde el mismo segundo. ¿Me ganás?";
+  track("compartir", { que: "duelo", desde: sinS(pantalla) });
+  if(navigator.share){
+    try{ await navigator.share({ title: "Duelo · En una nota", text, url }); return; }
+    catch(e){ if(e && e.name === "AbortError") return; }
+  }
+  try{
+    await navigator.clipboard.writeText(text + " " + url);
+    if(btn){ const antes = btn.textContent; btn.textContent = "✔ Link copiado"; setTimeout(()=>{ btn.textContent = antes; }, 2200); }
+  }catch(_){ prompt("Copiá el link y mandáselo:", url); }
+}
+
 // total de canciones que durará la partida (para el contador "X / Y"). Es solo
 // el límite elegido: nunca el tamaño de la playlist, para no dar pistas de
 // cuántas canciones tiene. 0 = sin límite, el contador va sin total.
 function totalSongs(){
-  return opts.maxSongs;
+  return limite();
 }
 
 // Devuelve una canción nueva, o null si se agotaron (con "no repetir" activo).
@@ -829,6 +1196,14 @@ function totalSongs(){
 // Además de no repetir dentro de la partida, evita (mientras sea posible) canciones
 // que ya sonaron en partidas anteriores — ese historial se guarda en localStorage.
 function pickSong(force){
+  if(fija){
+    // En orden. Si YouTube no pasó alguna, se sigue con la que viene y al
+    // final entra un suplente (en los duelos no hay: se juega una menos).
+    const s = fija.canciones.concat(fija.suplentes).find(c=> !played.includes(c.key) && !brokenIds.has(c.id));
+    if(!s) return null;
+    played.push(s.key);
+    return s;
+  }
   let cands = pool.filter(s=> !brokenIds.has(s.id));
   if(!cands.length) return null;
   if(opts.noRepeat && !force){
@@ -886,13 +1261,14 @@ function setCover(txt, paused){
 }
 
 function newSong(){
-  if(opts.maxSongs && songNo > opts.maxSongs){ endGame('limit'); return; }
+  if(limite() && songNo > limite()){ endGame('limit'); return; }
   const s = pickSong();
   if(!s){ endGame('agotada'); return; }
   currentSong = s;
   preloadArt(s);
+  pararCuenta(); callarPulsadores(true);
   seekedThisRound=false; revealed=false; answeringTeam=-1; skipping=false; skipTries=0;
-  segundos=0; fallidos=[]; inicioClip=null; soloRes=null; sugerencias=[]; sinCortar=false;
+  segundos=0; oidos=0; pistas=[]; fallidos=[]; inicioClip=null; soloRes=null; sugerencias=[]; sinCortar=false;
   mediaStarted=false; continuousMode=false; pauseAfterSnippet=false; clearSnippetTimer();
   phase='ready';
   prepareMedia(s);   // se carga mientras leen la pantalla, no cuando aprietan play
@@ -921,7 +1297,9 @@ function trackCancion(modoCorte){
 function playSnippet(){
   if(modo==='solo' && segundos >= MAX_SEGUNDOS) return;
   clearSnippetTimer();
-  snippetMs = modo==='solo' ? (segundos+1)*SNIPPET_MS : SNIPPET_MS;
+  // El fragmento crece con lo que ya se escuchó, no con los pasos: una pista
+  // baja un escalón pero no alarga el audio
+  snippetMs = modo==='solo' ? (oidos+1)*SNIPPET_MS : SNIPPET_MS;
   continuousMode=false;
   pauseAfterSnippet=true;
   phase='listening';
@@ -929,15 +1307,17 @@ function playSnippet(){
   renderPhase();
   if(!mediaStarted){
     if(mediaStart()){
-      mediaStarted=true; segundos++; trackCancion("corte");
+      mediaStarted=true; segundos++; oidos++; trackCancion("corte");
       sumarGenero(currentSong.gid);
       // Para el ranking: los audios y links propios no están en el catálogo
       if(modo==='solo') soloSono(currentSong.id, currentSong.local || currentSong.id!==currentSong.yt);
+      escucharPulsadores();
     }
     else { pauseAfterSnippet=false; phase='ready'; renderPhase(); }
   } else {
     if(modo==='solo' && inicioClip!==null) mediaSeek(inicioClip);
-    mediaResume(); segundos++;
+    mediaResume(); segundos++; oidos++;
+    escucharPulsadores();
   }
 }
 // Reproduce sin cortar hasta que aprieten detener.
@@ -950,9 +1330,9 @@ function playContinuous(){
   setCover("🎵 Sonando… ¡hasta que corten!");
   renderPhase();
   if(!mediaStarted){
-    if(mediaStart()){ mediaStarted=true; trackCancion("continuo"); }
+    if(mediaStart()){ mediaStarted=true; trackCancion("continuo"); escucharPulsadores(); }
     else { continuousMode=false; phase='decide'; renderPhase(); }
-  } else mediaResume();
+  } else { mediaResume(); escucharPulsadores(); }
 }
 // Corta: fin automático del fragmento, o botón "detener".
 function snippetPause(){
@@ -971,20 +1351,90 @@ function stopPlayback(){
 
 function pickTeam(i){
   clearSnippetTimer(); continuousMode=false;
+  callarPulsadores();
   answeringTeam=i; skipping=false; phase='answering'; revealed=false;
   renderPhase(); renderBoard();
+  iniciarCuenta();
 }
 function pickAll(){
   clearSnippetTimer(); continuousMode=false;
+  callarPulsadores();
   answeringTeam='all'; skipping=false; phase='answering'; revealed=false;
   allHits=new Set();
   renderPhase(); renderBoard();
+  iniciarCuenta();
 }
 function backToDecide(){
   clearSnippetTimer(); continuousMode=false;
+  pararCuenta();
   phase='decide'; answeringTeam=-1;
   setCover("✋ ¿Quién arriesga?", true);
   renderPhase(); renderBoard();
+  escucharPulsadores();
+}
+
+/* ---- Tiempo para cantar ----
+   Con la opción activa, al elegir quién canta arranca una cuenta regresiva
+   en la tapa. No anota nada sola: avisa que se acabó y el grupo decide. */
+let cuentaTimer = null;
+function pararCuenta(){
+  if(cuentaTimer){ clearInterval(cuentaTimer); cuentaTimer = null; }
+}
+function iniciarCuenta(){
+  pararCuenta();
+  if(modo!=='grupo' || !tiempoCantar) return;
+  let quedan = tiempoCantar;
+  const cover = document.getElementById("cover");
+  cover.style.background = "";
+  cover.innerHTML = `<div class="cuenta">
+      <b id="cuenta-n" aria-live="off">${quedan}</b>
+      <div class="st">para cantar</div>
+      <span class="cuenta-barra" aria-hidden="true"><span></span></span>
+    </div>`;
+  // La barra se vacía pareja (es tiempo, no una entrada): lineal y solo con transform
+  animar(cover.querySelector(".cuenta-barra span"), [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
+    { duration: tiempoCantar * 1000, easing: "linear", fill: "forwards" });
+  cuentaTimer = setInterval(()=>{
+    quedan--;
+    const n = document.getElementById("cuenta-n");
+    if(!n || phase!=='answering' || revealed){ pararCuenta(); return; }
+    if(quedan > 0){
+      n.textContent = quedan;
+      if(quedan <= 3){ n.classList.add("apura"); golpe(n); }
+      return;
+    }
+    pararCuenta();
+    setCover("⏰ ¡Tiempo!", true);
+    pitido(440, 450);
+    flash("var(--amber)");
+    temblar(laTapa());
+  }, 1000);
+}
+
+/* ---- Pulsadores (sala.js) ----
+   Con la sala abierta, mientras suena o se espera que alguien arriesgue, los
+   celulares pueden tocar "¡YO!". El primero que llega corta el audio y queda
+   elegido, igual que si lo hubieran tocado en esta pantalla. */
+let escuchando = false;
+function escucharPulsadores(){
+  if(modo!=='grupo' || !salaActual() || escuchando) return;
+  escuchando = true;
+  abrirPulsadores(teams.map(t=> t.name), (i)=>{
+    escuchando = false;
+    if(pantalla!=="s-game" || !teams[i] || !['listening','continuous','decide'].includes(phase)) return;
+    pauseAfterSnippet = false;
+    mediaPause();
+    pitido();
+    flash("var(--lime)");
+    track("sala", { accion: "pulso", numero: songNo });
+    pickTeam(i);
+  });
+}
+// limpiar: la canción terminó, que la base olvide quién había pulsado
+function callarPulsadores(limpiar){
+  if(!escuchando && !salaActual()) return;
+  escuchando = false;
+  cerrarPulsadores(limpiar);
 }
 
 // Con amigos: cómo terminó cada canción, con cuántos fragmentos de 1 segundo y
@@ -1000,6 +1450,7 @@ function trackRonda(resultado){
 function skipSong(){
   trackRonda("salteada");
   clearSnippetTimer(); continuousMode=false;
+  callarPulsadores();
   skipping=true; answeringTeam=-1; phase='answering'; revealed=true;
   revealCover(); mediaResume();
   renderPhase(); renderBoard();
@@ -1022,17 +1473,60 @@ function revealCover(){
   const cover=document.getElementById("cover");
   const art = songArtUrl(currentSong);
   cover.style.background="radial-gradient(circle at 50% 40%, #4a2170, #180b30)";
+  // El telón (la tapa de antes) se levanta y lo de abajo entra escalonado:
+  // "Era…", el título, el artista y la imagen (los tiempos están en el CSS)
   cover.innerHTML=`
     ${art?`<div class="rev-bg" style="background-image:url('${art}')"></div>`:""}
+    <div class="rev-telon" aria-hidden="true"></div>
     <div class="rev">
       <div class="st">Era…</div>
       <div class="rev-t">${esc(currentSong.t)}</div>
       <div class="rev-a">${esc(currentSong.a)}</div>
       ${art?`<img class="rev-img" src="${art}" alt="Imagen de ${esc(currentSong.t)}, de ${esc(currentSong.a)}"
         onerror="this.remove();var b=document.querySelector('.rev-bg');if(b)b.remove()">`:""}
-    </div>`;
+    </div>
+    ${sePuedeReportar(currentSong) ? `<button type="button" class="reportar" id="reportar" onclick="abrirReporte()"
+      aria-haspopup="true" aria-expanded="false" aria-label="Avisar que esta canción anda mal" title="¿Sonó mal?">⚠️</button>` : ""}`;
+}
+
+/* ---- Reportar una canción ----
+   Con la canción ya revelada, un botón chico en la esquina de la tapa: se
+   elige qué pasó y queda anotado en la base (se miran con `npm run reportes`).
+   Solo para las canciones de las playlists: las propias las arregla cada uno. */
+const MOTIVOS_REPORTE = [
+  ["otra_cancion", "No es esa canción"],
+  ["version", "Es otra versión (en vivo, cover…)"],
+  ["empieza_mal", "Arranca hablada o en silencio"],
+  ["no_suena", "No suena o se corta"],
+];
+let reportados = new Set();    // videos ya avisados en esta visita
+function sePuedeReportar(s){
+  return cuentasActivas && s && !s.local && s.yt && s.id===s.yt && !reportados.has(s.id);
+}
+function abrirReporte(){
+  const btn = document.getElementById("reportar");
+  if(!btn) return;
+  const abierto = document.getElementById("reporte-menu");
+  if(abierto){ abierto.remove(); btn.setAttribute("aria-expanded", "false"); return; }
+  const menu = document.createElement("div");
+  menu.id = "reporte-menu"; menu.className = "reporte-menu"; menu.setAttribute("role", "menu");
+  menu.innerHTML = `<div class="eyebrow">¿Qué pasó con esta canción?</div>` + MOTIVOS_REPORTE.map(([id, txt])=>
+    `<button type="button" role="menuitem" onclick="reportar('${id}')">${txt}</button>`).join("");
+  btn.after(menu);
+  btn.setAttribute("aria-expanded", "true");
+}
+function reportar(motivo){
+  const s = currentSong, menu = document.getElementById("reporte-menu"), btn = document.getElementById("reportar");
+  if(!s || !menu) return;
+  reportados.add(s.id);
+  apiSuave("/reporte", { video: s.id, motivo });
+  track("cancion_reportada", { motivo, video: s.id, cancion: s.t });
+  menu.innerHTML = `<div class="reporte-ok">¡Gracias! Lo reviso 💛</div>`;
+  if(btn) btn.remove();
+  setTimeout(()=>{ if(menu.isConnected) menu.remove(); }, 1600);
 }
 function revealAnswer(){
+  pararCuenta();
   revealed=true; revealCover();
   mediaResume();   // reanuda para comprobar si la pegó
   renderPhase();
@@ -1040,7 +1534,8 @@ function revealAnswer(){
 
 // ¿Es la última de la partida? Mismo criterio que newSong usa para terminarla.
 function esUltima(){
-  if(opts.maxSongs && songNo >= opts.maxSongs) return true;
+  if(limite() && songNo >= limite()) return true;
+  if(fija) return false;
   return opts.noRepeat && !pool.some(s=> !brokenIds.has(s.id) && !played.includes(s.key));
 }
 function btnSiguiente(){
@@ -1051,6 +1546,7 @@ function btnSiguiente(){
 
 // fin de la canción actual → siguiente (o fin de partida)
 function finishRound(){
+  pararCuenta();
   mediaStop();
   songNo++;
   renderBoard();
@@ -1088,7 +1584,8 @@ function scoreAllHit(){
   allHits = new Set(teams.map((_,i)=>i));
   scoreHits();
 }
-function scoreNone(){ trackRonda("erro"); penalize(); flash("var(--no)"); finishRound(); }
+function scoreNone(){ trackRonda("erro"); penalize(); flash("var(--no)"); temblar(laTapa()); finishRound(); }
+const laTapa = ()=> document.querySelector("#s-game .stage");
 
 /* ============================================================
    MODO SOLO
@@ -1102,10 +1599,16 @@ const PUNTOS_SOLO = [10, 7, 5, 3, 2, 1];   // con 1 segundo, con 2, … con 6
 const MAX_SEGUNDOS = PUNTOS_SOLO.length;   // errar con el sexto pierde la canción
 let soloPuntos = 0;
 let soloResultados = [];   // [{ok, seg, pts}], una por canción resuelta
-let segundos = 0;          // fragmentos que sonaron de la canción actual
+let segundos = 0;          // escalones gastados en la canción actual: fragmentos que sonaron más pistas pedidas
+let oidos = 0;             // de esos, cuántos fueron audio (el próximo fragmento dura oidos + 1 segundos)
+let pistas = [];           // las pistas pedidas en la canción actual: 'genero' | 'artista' | 'inicial'
+let soloInicios = [];      // desde qué segundo sonó cada canción resuelta (para armar un duelo)
+let soloVideos = [];       // el video de cada canción resuelta (null si era propia), para las estadísticas
 let fallidos = [];         // títulos que probó y no eran
 let soloRes = null;        // resultado de la canción actual, una vez resuelta
 let nuevoRecord = false;
+let recordPrevio = 0;      // el récord que había antes de esta partida (0 si era la primera con esa cantidad)
+let puntosVolando = false; // hay un "+10" en camino al marcador: el número se actualiza cuando llega
 let catalogo = [];         // títulos para autocompletar [{t, a, nt, na}]
 let sugerencias = [], sugSel = 0;
 
@@ -1114,7 +1617,7 @@ const valeAhora = ()=> PUNTOS_SOLO[Math.max(0, segundos-1)];
 const valeConUnoMas = ()=> PUNTOS_SOLO[Math.min(segundos, MAX_SEGUNDOS-1)];
 const segSonando = ()=> Math.round(snippetMs/SNIPPET_MS);   // segundos del fragmento que está sonando
 
-function resetSolo(){ soloPuntos = 0; soloResultados = []; nuevoRecord = false; }
+function resetSolo(){ soloPuntos = 0; soloResultados = []; soloInicios = []; soloVideos = []; nuevoRecord = false; }
 
 // Se autocompleta con todo el catálogo, no solo con los géneros elegidos: si
 // no, jugando con una playlist chica la lista de opciones ya era media pista.
@@ -1136,6 +1639,23 @@ function armarCatalogo(){
     titulos.add(nt);
     catalogo.push({ t, a, nt, na:norm(a) });
   });
+  // Para el modo artista: cada artista una vez, con la misma forma que una
+  // canción (así sirve la misma búsqueda). También salen los del relleno.
+  const nombres = new Map();
+  catalogo.forEach(s=>{
+    if(s.na && s.na !== "archivo local" && !nombres.has(s.na)) nombres.set(s.na, { t:s.a, a:"", nt:s.na, na:s.na });
+  });
+  listaArtistas = [...nombres.values()];
+}
+let listaArtistas = [];    // artistas para autocompletar en el modo artista [{t, a:"", nt, na}]
+// "Shakira ft. Maluma", "Carlos Vives, Shakira", "Rosalía y J Balvin" → cada uno por separado
+const partesArtista = (a)=> String(a).split(/\s*(?:,|&|\bft\.?|\bfeat\.?|\by\b|\bx\b|\bcon\b)\s*/i).map(norm).filter(Boolean);
+// ¿Lo elegido es quien canta? Vale el nombre entero, o cualquiera de los que
+// la cantan cuando son varios ("Maluma" para una de Shakira ft. Maluma).
+function esElArtista(elegido, artista){
+  if(norm(elegido) === norm(artista)) return true;
+  const de = partesArtista(artista), el = partesArtista(elegido);
+  return el.length > 0 && (el.every(p=> de.includes(p)) || de.every(p=> el.includes(p)));
 }
 const MAX_SUGERENCIAS = 6;
 // Hash chico para mezclar el relleno siempre igual para lo mismo escrito.
@@ -1156,7 +1676,7 @@ function buscarTitulos(q){
   if(n.length < 2) return [];
   const palabras = n.split(" ");
   const hits = [], resto = [];
-  for(const s of catalogo){
+  for(const s of (modoAdivina()==="artista" ? listaArtistas : catalogo)){
     const rank = s.nt.startsWith(n) ? 0
       : (" "+s.nt).includes(" "+n) ? 1
       : s.nt.includes(n) ? 2
@@ -1182,7 +1702,7 @@ function renderSugerencias(q){
   if(!el) return;
   if(!sugerencias.length){
     el.innerHTML = norm(q).length >= 2
-      ? `<p class="hint sug-nada">No está en la lista: probá con otra palabra o con el artista</p>` : "";
+      ? `<p class="hint sug-nada">No está en la lista: probá con otra palabra${modoAdivina()==="artista" ? "" : " o con el artista"}</p>` : "";
     return;
   }
   // mousedown con preventDefault: en la compu el foco se queda en el campo
@@ -1213,20 +1733,72 @@ function onGuessKey(ev){
 function guessSong(i){
   const s = sugerencias[i];
   if(!s || modo!=='solo' || phase!=='decide') return;
-  if(s.nt === norm(currentSong.t)){ resolverSolo(true); return; }
+  const acerto = modoAdivina()==="artista" ? esElArtista(s.t, currentSong.a) : s.nt === norm(currentSong.t);
+  if(acerto){ resolverSolo(true); return; }
   fallidos.push(s.t);
+  temblar(laTapa());
   if(segundos >= MAX_SEGUNDOS){ resolverSolo(false); return; }
   flash("var(--no)");
   playSnippet();
 }
 function noSe(){ if(modo==='solo' && phase==='decide') resolverSolo(false); }
+
+/* ---- Pistas ----
+   Hasta dos por canción. Cada una baja un escalón, igual que escuchar un
+   segundo más o errar, pero sin audio: primero el género y después el artista
+   (adivinando el artista, con qué letra empieza). La base las cuenta aparte
+   para no pedirle el tiempo de un audio que no sonó. */
+const MAX_PISTAS = 2;
+const ORDEN_PISTAS = { titulo: ["genero", "artista"], artista: ["genero", "inicial"] };
+function hayPista(){
+  const s = currentSong;
+  return modo==='solo' && phase==='decide' && s && !s.local && s.gid!=="custom"
+    && pistas.length < MAX_PISTAS && segundos < MAX_SEGUNDOS;
+}
+function pedirPista(){
+  if(!hayPista()) return;
+  const cual = ORDEN_PISTAS[modoAdivina()][pistas.length];
+  pistas.push(cual);
+  segundos++;
+  track("pista", { pista: cual, numero: songNo, segundos });
+  renderPhase();
+  const nueva = document.querySelector("#controls .pistas span:last-child");
+  if(nueva) entrar(nueva, 6, 220);
+}
+function textoPista(cual){
+  const s = currentSong;
+  if(cual==="genero") return "🎼 " + nombreGenero(s.gid);
+  if(cual==="artista") return "🎤 " + s.a;
+  return "🔤 Empieza con " + (norm(s.a)[0] || "?").toUpperCase();
+}
+
 function resolverSolo(ok){
   clearSnippetTimer();
   const pts = ok ? valeAhora() : 0;
-  soloRes = { ok, seg: segundos, pts };
+  soloRes = { ok, seg: segundos, pts, pistas: pistas.length };
+  soloInicios.push(Math.max(0, Math.round(inicioClip !== null ? inicioClip : startAt || 0)));
+  soloVideos.push(!currentSong.local && currentSong.yt && currentSong.id===currentSong.yt ? currentSong.yt : null);
+  // Los puntos salen volando de lo que valía la canción (la escalera, o los
+  // botones si en ese celular la escalera está escondida) hasta el marcador,
+  // y recién ahí el número cuenta hasta el nuevo total.
+  const antes = soloPuntos;
   soloPuntos += pts;
+  if(pts){
+    const marcador = document.getElementById("solo-pts-n");
+    const ahora = document.querySelector("#ladder .now");
+    let desde = ahora ? ahora.getBoundingClientRect() : null;
+    if(!desde || !desde.width) desde = document.getElementById("controls").getBoundingClientRect();
+    puntosVolando = true;
+    volar(desde, marcador, "+" + pts, ()=>{
+      puntosVolando = false;
+      if(pantalla!=="s-game" || modo!=='solo') return;
+      contar(marcador, Math.min(antes, soloPuntos), soloPuntos);
+      golpe(marcador, "var(--lime)");
+    });
+  }
   soloResultados.push(soloRes);
-  soloResolvio(ok ? segundos : 0, ok ? norm(currentSong.t) : null);
+  // A la base va lo que tenía que escribir: el título o, en el modo artista, el artista
+  soloResolvio(ok ? segundos : 0, ok ? norm(modoAdivina()==="artista" ? currentSong.a : currentSong.t) : null, ok ? pistas.length : 0);
   phase='answering'; revealed=true;
   revealCover(); mediaResume();   // se escucha cómo seguía
   flash(ok ? "var(--ok)" : "var(--no)");
@@ -1235,7 +1807,7 @@ function resolverSolo(ok){
   track("solo_respuesta", {
     respuesta: ok ? "acierto" : (fallidos.length ? "error" : "no_se"),
     segundos, errados: fallidos.length, puntos: pts,
-    numero: songNo,
+    numero: songNo, pistas: pistas.length, adivina: modoAdivina(),
   });
   renderPhase(); renderBoard();
 }
@@ -1253,21 +1825,25 @@ function renderSolo(c, t, sub){
     sub.textContent = n > 1 ? "Desde el mismo punto, " + n + " segundos" : "Escuchá bien…";
     c.innerHTML=`<button class="btn amber big" onclick="stopPlayback()">✋ Cortar ya</button>`;
   } else if(phase==='decide'){
-    t.textContent="🤔 ¿Qué canción es?";
+    const artista = modoAdivina()==="artista";
+    t.textContent = artista ? "🤔 ¿Quién la canta?" : "🤔 ¿Qué canción es?";
     const ultimo = fallidos[fallidos.length-1];
     sub.textContent = (ultimo ? "No era “" + ultimo + "” · " : "") +
       "Ahora vale " + pts(valeAhora()) + " · intento " + segundos + " de " + MAX_SEGUNDOS;
     const hayMas = segundos < MAX_SEGUNDOS;
     // La lista va arriba del campo: en el celular, abajo la tapa el teclado.
+    // Las pistas pedidas quedan a la vista arriba de todo.
     c.innerHTML=`<div class="guess">
-        <div id="guess-list" class="sugs" role="listbox" aria-label="Canciones que coinciden"></div>
-        <input type="text" id="guess-in" placeholder="Escribí el título…" autocomplete="off"
-          autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="Título de la canción"
+        ${pistas.length ? `<div class="pistas" aria-label="Pistas">${pistas.map(p=> `<span>${esc(textoPista(p))}</span>`).join("")}</div>` : ""}
+        <div id="guess-list" class="sugs" role="listbox" aria-label="${artista ? "Artistas" : "Canciones"} que coinciden"></div>
+        <input type="text" id="guess-in" placeholder="${artista ? "Escribí el artista…" : "Escribí el título…"}" autocomplete="off"
+          autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="${artista ? "Quién la canta" : "Título de la canción"}"
           oninput="onGuessInput()" onkeydown="onGuessKey(event)">
       </div>
-      <div class="solo-acc">
-        <button class="btn amber" onclick="playSnippet()" ${hayMas?'':'disabled'}>${hayMas ? '▶ Escuchar '+(segundos+1)+' segundos · vale '+valeConUnoMas() : 'Ya no quedan intentos'}</button>
+      <div class="solo-acc${hayPista() ? " con-pista" : ""}">
+        <button class="btn amber" onclick="playSnippet()" ${hayMas?'':'disabled'}>${hayMas ? '▶ Escuchar '+(oidos+1)+' segundos · vale '+valeConUnoMas() : 'Ya no quedan intentos'}</button>
         <button class="btn ghost" onclick="noSe()">🏳️ No sé · ver cuál era</button>
+        ${hayPista() ? `<button class="btn ghost pista-btn" onclick="pedirPista()" aria-label="Pedir una pista: baja a ${valeConUnoMas()} puntos" title="Pista · baja a ${valeConUnoMas()}">💡</button>` : ""}
       </div>`;
     sugerencias = [];
     // En la compu se escribe directo. En el celular no: el teclado taparía
@@ -1276,7 +1852,9 @@ function renderSolo(c, t, sub){
   } else if(phase==='answering' && soloRes){
     if(soloRes.ok){
       t.textContent="✅ ¡La sacaste!";
-      sub.textContent="+" + pts(soloRes.pts) + " · con " + soloRes.seg + " segundo" + (soloRes.seg!==1?"s":"");
+      const oyo = soloRes.seg - (soloRes.pistas || 0);
+      sub.textContent="+" + pts(soloRes.pts) + " · con " + oyo + " segundo" + (oyo!==1?"s":"") +
+        (soloRes.pistas ? " y " + plural(soloRes.pistas, "pista", "pistas") : "");
     } else {
       t.textContent="❌ Era esta";
       sub.textContent="0 puntos · escuchá cómo seguía";
@@ -1292,17 +1870,34 @@ function renderLadder(){
   const ver = modo==='solo' && phase!=='answering';
   el.hidden = !ver;
   if(!ver) return;
-  const ahora = phase==='listening' ? segSonando()-1 : Math.max(0, segundos-1);
+  // mientras suena, el escalón es el del fragmento más las pistas ya pedidas
+  const ahora = phase==='listening' ? segSonando()-1+pistas.length : Math.max(0, segundos-1);
+  // el escalón que pasa a valer salta un poco, solo cuando cambia
+  const paso = ahora !== escalonVisto && ahora > 0 ? ' paso' : '';
+  escalonVisto = ahora;
   el.innerHTML = PUNTOS_SOLO.map((p,i)=>
-    `<div class="${i<ahora ? 'used' : i===ahora ? 'now' : ''}"><b>${p}</b><span>${i+1} s</span></div>`).join("");
+    `<div class="${i<ahora ? 'used' : i===ahora ? 'now'+paso : ''}"><b>${p}</b><span>${i+1} s</span></div>`).join("");
 }
+let escalonVisto = 0;
 
+// El título y los botones cambian con cada fase: entran con un fundido corto
+// en vez de aparecer. Solo cuando cambia la fase, no al marcar un equipo
+// (ahí se repinta lo mismo y parpadearía).
+let faseVista = "";
 function renderPhase(){
   const c=document.getElementById("controls");
   const t=document.getElementById("phase-title");
   const sub=document.getElementById("phase-sub");
+  const tituloAntes = t.textContent;
   renderLadder();
-  if(modo==='solo'){ renderSolo(c, t, sub); return; }
+  if(modo==='solo') renderSolo(c, t, sub); else renderGrupo(c, t, sub);
+  const fase = [songNo, phase, revealed, answeringTeam, skipping].join("|");
+  // los botones, sin desplazarse: están al fondo de la partida y moverlos
+  // hacia abajo hacía aparecer la barra de scroll por un instante
+  if(fase !== faseVista){ faseVista = fase; entrar(c, 0); }
+  if(t.textContent !== tituloAntes) entrar(t.parentElement, 6, 200);
+}
+function renderGrupo(c, t, sub){
   if(phase==='ready'){
     t.textContent="🎧 Escuchen todos";
     sub.textContent="Suena 1 segundo y se corta. Después, ¿quién arriesga?";
@@ -1317,7 +1912,9 @@ function renderPhase(){
     c.innerHTML=`<button class="btn amber big" onclick="stopPlayback()">✋ Detener</button>`;
   } else if(phase==='decide'){
     t.textContent="✋ ¿Quién arriesga?";
-    sub.textContent="Elijan quién canta la que sigue — o escuchen un poco más";
+    sub.textContent = salaActual()
+      ? "Toquen ¡YO! en el celular (sala " + salaActual().codigo + ") — o elijan acá"
+      : "Elijan quién canta la que sigue — o escuchen un poco más";
     c.innerHTML=`<div class="teamgrid">`+
       teams.map((p,i)=>`<button class="btn lime" onclick="pickTeam(${i})">${esc(p.name)}</button>`).join("")+
       `</div>
@@ -1408,7 +2005,10 @@ function renderProg(){
     const hechas = soloResultados.slice(-30);
     const actual = soloResultados.length < songNo ? 1 : 0;
     const faltan = tot && tot <= 30 ? Math.max(0, tot - soloResultados.length - actual) : 0;
-    el.innerHTML = hechas.map(r=> `<span class="sq ${claseCuadrito(r)}"></span>`).join("") +
+    // el cuadrito de la canción recién resuelta se llena con un salto
+    const nuevo = soloResultados.length > cuadritosVistos ? hechas.length - 1 : -1;
+    cuadritosVistos = soloResultados.length;
+    el.innerHTML = hechas.map((r,i)=> `<span class="sq ${claseCuadrito(r)}${i===nuevo ? ' nuevo' : ''}"></span>`).join("") +
       (actual ? `<span class="sq cur"></span>` : "") + `<span class="sq"></span>`.repeat(faltan);
     return;
   }
@@ -1418,35 +2018,63 @@ function renderProg(){
     : "";
 }
 
+let cuadritosVistos = 0;
+// Al empezar una partida el marcador se arma de nuevo, sin festejar el paso a cero
+function limpiarMarcador(){
+  document.getElementById("board").innerHTML = "";
+  fijar(document.getElementById("solo-pts-n"), 0);
+  puntosVolando = false; cuadritosVistos = 0; escalonVisto = 0; faseVista = "";
+}
 function renderBoard(){
   renderProg();
   const solo = modo==='solo';
+  const board = document.getElementById("board");
   document.getElementById("solo-pts").hidden = !solo;
   if(solo){
-    document.getElementById("solo-pts-n").textContent = soloPuntos;
-    document.getElementById("board").innerHTML = "";
+    // con puntos en camino, el número lo actualiza la llegada (resolverSolo)
+    if(!puntosVolando) fijar(document.getElementById("solo-pts-n"), soloPuntos);
+    board.innerHTML = "";
     return;
   }
-  // Una ficha por equipo: la del que va ganando en amarillo, la del que canta en verde
+  // Una ficha por equipo: la del que va ganando en amarillo, la del que canta en verde.
+  // Las fichas se arman una vez por partida y después solo se les cambia el
+  // contenido: así el número puede saltar cuando cambia, sin que el repintado
+  // siguiente le corte la animación.
   const cur = (i)=> answeringTeam==='all' || i===answeringTeam;
   const max = Math.max(...teams.map(p=> p.score));
   const lider = max > 0 && teams.filter(p=> p.score===max).length === 1;
-  document.getElementById("board").innerHTML = teams.map((p,i)=>`
-    <div class="chip ${cur(i)?'cur':''} ${lider && p.score===max ? 'lead' : ''}">
-      <b>${p.score}</b><span>${cur(i)?'🎤 ':''}${esc(p.name)}</span>
-    </div>`).join("") +
-    // En la compu el marcador va al costado y abajo sobra lugar: el
-    // recordatorio de cómo se anota (el CSS lo muestra solo ahí)
-    `<div class="score-ayuda">
+  let chips = board.querySelectorAll(".chip");
+  const armar = chips.length !== teams.length;
+  if(armar){
+    board.innerHTML = teams.map(()=> `<div class="chip"><b></b><span></span></div>`).join("") + `<div class="score-ayuda"></div>`;
+    chips = board.querySelectorAll(".chip");
+  }
+  teams.forEach((p,i)=>{
+    const chip = chips[i], num = chip.firstElementChild;
+    chip.className = "chip" + (cur(i) ? " cur" : "") + (lider && p.score===max ? " lead" : "");
+    chip.lastElementChild.textContent = (cur(i) ? "🎤 " : "") + p.name;
+    const antes = Number(num.textContent);
+    if(num.textContent !== String(p.score)){
+      num.textContent = p.score;
+      if(!armar){
+        const sumo = p.score > antes;
+        golpe(num, sumo ? "var(--lime)" : "var(--no)");
+        flotar(num, (sumo ? "+" : "−") + Math.abs(p.score - antes), sumo ? "var(--lime)" : "var(--no)");
+      }
+    }
+  });
+  // En la compu el marcador va al costado y abajo sobra lugar: el
+  // recordatorio de cómo se anota (el CSS lo muestra solo ahí)
+  board.querySelector(".score-ayuda").innerHTML = `
       <div class="eyebrow">Cómo se anota</div>
       <div>✋ El primero que grita <b>¡YO!</b> arriesga</div>
       <div>🎤 Canta <b>la que sigue</b> y después se revela</div>
       <div>⚡ Si erra, otro equipo puede <b>robar</b></div>
-      ${opts.penalty ? `<div>➖ Errar <b>resta un punto</b></div>` : ""}
-    </div>`;
+      ${opts.penalty ? `<div>➖ Errar <b>resta un punto</b></div>` : ""}`;
 }
 
 function endGame(reason){
+  pararCuenta(); callarPulsadores(true);
   try{ mediaStop(); }catch(_){}
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
   // canciones que llegaron a terminarse. En solo cuentan las resueltas: si la sacó
@@ -1465,15 +2093,28 @@ function endGame(reason){
     try{ save(LS_JUGADO, jugado); }catch(_){}
   }
   const solo = modo==='solo';
-  document.getElementById("res-titulo").textContent = reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
+  const desafio = fija && fija.tipo==="desafio", duelo = fija && fija.tipo==="duelo";
+  document.getElementById("res-titulo").textContent = desafio ? "¡Desafío de hoy, listo!"
+    : duelo ? "¡Duelo jugado!"
+    : reason==='agotada' ? "¡Se acabaron las canciones!" : "¡Terminó la partida!";
   document.getElementById("res-sub").textContent =
-    (solo ? "Un jugador" : "Con amigos") + " · " + plural(lastGameSongs, "canción", "canciones");
-  document.getElementById("rematch-btn").textContent = solo ? "🔁 Jugar otra vez" : "🔁 Revancha";
+    (desafio ? "Desafío del día · " + fechaCorta(fija.dia) : duelo ? "Duelo" : solo ? "Un jugador" : "Con amigos")
+    + " · " + plural(lastGameSongs, "canción", "canciones");
+  // El desafío y los duelos se juegan una sola vez: no hay "otra vez"
+  const otra = document.getElementById("rematch-btn");
+  otra.hidden = Boolean(fija);
+  otra.textContent = solo ? "🔁 Jugar otra vez" : "🔁 Revancha";
   if(solo) finSolo(); else finGrupo();
+  finExtras();
   document.getElementById("res-record").hidden = !(solo && nuevoRecord);
   mostrarTarjeta();
   pedirCafecito();
   show("s-results");
+  // Papelitos cuando hay algo que festejar: un ganador solo (no un empate) o
+  // un récord nuevo en Un jugador
+  const tope = Math.max(...teams.map(p=> p.score), 0);
+  const festejo = solo ? nuevoRecord : tope > 0 && teams.filter(p=> p.score===tope).length === 1;
+  if(festejo && lastGameSongs > 0) papelitos();
 }
 function duracionPartida(){
   return inicioPartida ? Math.round((Date.now() - inicioPartida) / 1000) : 0;
@@ -1498,19 +2139,35 @@ function finGrupo(){
 // El récord se guarda por cantidad de canciones: 40 puntos en 5 canciones no
 // se compara con 40 en 20.
 function finSolo(){
-  const clave = String(opts.maxSongs);
-  const previo = record[clave] || 0;
-  nuevoRecord = soloResultados.length > 0 && soloPuntos > previo;
-  if(nuevoRecord){
-    record[clave] = soloPuntos;
-    try{ save(LS_RECORD, record); }catch(_){}
-    track("record_nuevo", { puntos: soloPuntos, anterior: previo, canciones_por_partida: opts.maxSongs });
+  const artista = modoAdivina()==="artista";
+  if(fija){
+    // El desafío y los duelos no mueven los récords: son otra cosa
+    nuevoRecord = false; recordPrevio = 0;
+    document.getElementById("share-hint").textContent = fija.tipo==="desafio"
+      ? "Mandá tus cuadritos y que te digan cuánto hicieron"
+      : "Mandá cómo te fue";
+    if(fija.tipo==="desafio" && soloResultados.length){
+      guardarDesafioLocal(fija.dia, soloPuntos, soloResultados.map(r=> r.ok ? r.seg : 0));
+      track("desafio", { accion: "terminar", puntos: soloPuntos, canciones: soloResultados.length });
+    }
+  } else {
+    // El récord adivinando el artista va aparte ("a10"): es más fácil que el título
+    const clave = (artista ? "a" : "") + String(opts.maxSongs);
+    const previo = record[clave] || 0;
+    recordPrevio = previo;
+    nuevoRecord = soloResultados.length > 0 && soloPuntos > previo;
+    if(nuevoRecord){
+      record[clave] = soloPuntos;
+      try{ save(LS_RECORD, record); }catch(_){}
+      track("record_nuevo", { puntos: soloPuntos, anterior: previo, canciones_por_partida: opts.maxSongs, adivina: modoAdivina() });
+    }
+    const mejor = Math.max(previo, soloPuntos);
+    const cuantas = (opts.maxSongs ? " con " + opts.maxSongs + " canciones" : "") + (artista ? " adivinando el artista" : "");
+    document.getElementById("share-hint").textContent = nuevoRecord
+      ? "🏅 ¡Nuevo récord" + cuantas + "! Mandá la imagen y desafiá a alguien"
+      : "Tu récord" + cuantas + ": " + mejor + " puntos · mandá la imagen y desafiá a alguien";
   }
-  const mejor = Math.max(previo, soloPuntos);
-  const cuantas = opts.maxSongs ? " con " + opts.maxSongs + " canciones" : "";
-  document.getElementById("share-hint").textContent = nuevoRecord
-    ? "🏅 ¡Nuevo récord" + cuantas + "! Mandá la imagen y desafiá a alguien"
-    : "Tu récord" + cuantas + ": " + mejor + " puntos · mandá la imagen y desafiá a alguien";
+  guardarPartidaLocal();
   // Respaldo en texto por si no se puede dibujar la imagen
   const posibles = soloResultados.length * PUNTOS_SOLO[0];
   document.getElementById("winner").innerHTML = `
@@ -1521,34 +2178,189 @@ function finSolo(){
   // Con cuenta se guarda en el ranking (la base ya fue anotando cada canción)
   rankingFinal(soloResultados.length);
 }
+// La partida queda también en este navegador: de ahí salen las estadísticas
+// y los logros de quien juega sin cuenta.
+function guardarPartidaLocal(){
+  if(!soloResultados.length) return;
+  partidasLocales.unshift({
+    canciones: fija ? (fija.tipo==="desafio" ? 10 : fija.opcion) : opts.maxSongs,
+    segundos: soloResultados.map(r=> r.ok ? r.seg : 0),
+    puntos: soloPuntos,
+    jugada: Date.now(),
+    videos: soloVideos.slice(),
+    genero: datosPartida().genero || null,
+    modo: modoAdivina(),
+    dia: fija && fija.tipo==="desafio" ? fija.dia : null,
+  });
+  partidasLocales = partidasLocales.slice(0, MAX_PARTIDAS_LOCALES);
+  try{ save(LS_PARTIDAS, partidasLocales); }catch(_){}
+}
+
+/* ---- Lo que se suma a la pantalla final ----
+   Los logros que destrabó esta partida y, en Un jugador, el duelo: armar uno
+   con las canciones que acaban de sonar o, si se estaba respondiendo uno,
+   cómo quedó. */
+let turnoExtras = 0;
+let retoId = null;          // el duelo que ya se armó con esta partida
+async function finExtras(){
+  const turno = ++turnoExtras;
+  retoId = null;
+  const logro = document.getElementById("logro-final");
+  const box = document.getElementById("duelo-final");
+  const nuevos = modo==='solo' && soloResultados.length ? logrosNuevos(partidasLocales) : [];
+  logro.innerHTML = logroNuevoHtml(nuevos);
+  logro.hidden = !nuevos.length;
+  if(nuevos.length) track("logro", { logros: nuevos.map(l=> l.id).join(",") });
+  box.hidden = true; box.innerHTML = "";
+  if(modo!=='solo' || !soloResultados.length || !cuentasActivas || (fija && fija.tipo==="desafio")) return;
+
+  if(fija && fija.tipo==="duelo"){
+    const f = fija, puntos = soloPuntos;
+    box.hidden = false;
+    box.innerHTML = `<p class="hint" style="margin:0">Anotando tu resultado…</p>`;
+    let d = null;
+    try{
+      const partida = await partidaLista();
+      if(partida) d = await anotarDuelo(f.id, partida, puntos, f.nombre);
+    }catch(_){}
+    if(turno !== turnoExtras) return;
+    if(!d){ box.innerHTML = `<p class="hint" style="margin:0">No pudimos anotar tu resultado en el duelo 😕</p>`; return; }
+    const v = veredicto(d);
+    track("duelo", { accion: "terminar", puntos, gano: v.gano ? "si" : "no", jugaron: d.resultados.length });
+    box.innerHTML = `<div class="eyebrow">Duelo</div>
+      ${v.txt ? `<div class="duelo-veredicto ${v.gano ? "gano" : ""}">${v.txt}</div>` : ""}
+      ${tablaDueloHtml(d)}
+      <button type="button" class="btn ghost" onclick="compartirDuelo('${d.id}', this, '🎧 Hice ${puntos} puntos en este duelo de “En una nota”. ¿Me ganás?')">📲 Pasárselo a alguien más</button>`;
+    if(v.gano && pantalla==="s-results") papelitos();
+    return;
+  }
+  // Partida común: se puede retar a alguien con estas mismas canciones, si
+  // la base la dio por buena (con canciones propias no)
+  const partida = await partidaLista().catch(()=> null);
+  if(turno !== turnoExtras || !partida || soloResultados.length < 3) return;
+  box.hidden = false;
+  box.innerHTML = `<button type="button" class="tarjeta reto" onclick="retar(this)">
+      <span class="desafio-ic" aria-hidden="true">⚔️</span>
+      <span class="grow"><span class="eyebrow">Duelo</span>
+        <span class="tarjeta-t">Retá a alguien con estas canciones</span>
+        <span class="tarjeta-d">Le llega un link y juega lo mismo que vos</span></span>
+      <span class="pill amber">Armar ›</span>
+    </button>`;
+  entrar(box, 8, 240);
+}
+// Dos toques a propósito: el primero arma el duelo (hay que esperar a la
+// base) y el segundo lo manda. Compartir necesita un toque recién hecho, y
+// después de esperar algunos celulares ya no lo dejan.
+async function retar(btn){
+  const u = usuarioActual();
+  const nombre = u ? u.nombre : nombreParaDuelo();
+  if(!nombre) return;
+  const box = document.getElementById("duelo-final");
+  const turno = turnoExtras;
+  btn.disabled = true;
+  btn.querySelector(".pill").textContent = "Armando…";
+  const partida = await partidaLista().catch(()=> null);
+  const id = partida ? await crearDuelo(partida, soloInicios, nombre) : null;
+  if(turno !== turnoExtras) return;
+  if(!id){
+    btn.disabled = false;
+    btn.querySelector(".pill").textContent = "Armar ›";
+    alert("No pudimos armar el duelo. Probá de nuevo en un rato.");
+    return;
+  }
+  retoId = id;
+  track("duelo", { accion: "crear", canciones: soloResultados.length });
+  const texto = `🎧 Hice ${soloPuntos} ${soloPuntos===1 ? "punto" : "puntos"} en “En una nota”. Te reto: las mismas canciones, desde el mismo segundo. ¿Me ganás?`;
+  box.innerHTML = `<div class="eyebrow">Duelo armado</div>
+    <div class="tarjeta-t">Mandale el link a quien quieras retar</div>
+    <button type="button" class="btn amber big" id="reto-btn">📲 Mandar el duelo</button>
+    <span class="tarjeta-d">Cuando lo juegue, abrí el mismo link para ver cómo salió.</span>`;
+  document.getElementById("reto-btn").onclick = (ev)=> compartirDuelo(id, ev.currentTarget, texto);
+  entrar(box, 6, 220);
+}
 
 // El pedido de Cafecito sale al terminar cualquier partida con canciones (el
-// cartel fijo al pie casi nadie lo tocaba). Se pide con lo que ya jugaron, que
-// es lo que lo vuelve concreto.
+// cartel fijo al pie casi nadie lo tocaba). La tarjeta entera, solo en los
+// momentos altos y con un texto para cada uno: era la misma en todas las
+// partidas, cada persona la veía casi cinco veces y la tocaba 1 de cada 100.
+// En el resto de las partidas queda solo el botón.
 const PARTIDAS_PARA_PEDIR = 1;
+const DESCANSO_PEDIDO = 3;   // partidas entre dos tarjetas enteras, salvo que toque un hito
+const CON_QR = "(min-width:960px) and (hover:hover) and (pointer:fine)";   // la misma consulta que en styles.css
+let momentoPedido = "";      // el del pedido que está en pantalla, para medir el clic
+// El equipo que ganó solo: sin empate, con puntos y habiendo a quién ganarle
+function ganadorUnico(){
+  if(teams.length < 2) return null;
+  const tope = Math.max(...teams.map(p=> p.score));
+  const arriba = teams.filter(p=> p.score===tope);
+  return tope > 0 && arriba.length === 1 ? arriba[0] : null;
+}
+// primera · hito (3, 5, 10 y cada 10 partidas) · record (pasó uno que ya
+// tenía: el de la primera partida no cuenta) · gano · "" si no toca
+function momentoCafecito(){
+  if(!lastGameSongs) return "";
+  const p = jugado.partidas;
+  if(p === 1) return "primera";
+  const hito = p===3 || p===5 || p%10===0;
+  if(hito || p - (jugado.pedido || 0) >= DESCANSO_PEDIDO){
+    if(modo==='solo'){ if(nuevoRecord && recordPrevio > 0) return "record"; }
+    else if(ganadorUnico()) return "gano";
+  }
+  return hito ? "hito" : "";
+}
 function pedirCafecito(){
+  const caja = document.getElementById("cafecito-final");
   const mostrar = jugado.partidas >= PARTIDAS_PARA_PEDIR;
-  document.getElementById("cafecito-final").hidden = !mostrar;
+  caja.hidden = !mostrar;
   if(!mostrar) return;
   const p = jugado.partidas, c = jugado.canciones;
   // jugado suma las partidas de los dos modos; el texto le habla a quien jugó esta
   const solo = modo==='solo';
-  const lleva = p === 1
-    ? `Ya ${solo ? "jugaste" : "jugaron"} <b>1 partida</b> con <b>${c} ${c===1 ? "canción" : "canciones"}</b>. `
-    : `Ya van <b>${p} partidas</b> y <b>${c} canciones</b>${solo ? "" : " cantadas"}. `;
-  document.getElementById("cafecito-txt").innerHTML = lleva +
-    `El juego es gratis y sin anuncios: si ${solo ? "te divirtió" : "les sacó unas risas"}, un cafecito paga las canciones nuevas 💛`;
-  // Contra los clics en "cafecito" da la conversión del pedido.
-  track("cafecito_visto", { partidas: jugado.partidas, canciones: jugado.canciones });
+  const momento = momentoCafecito();
+  momentoPedido = momento || "chico";
+  caja.classList.toggle("chico", !momento);
+  let titulo = "Bancá el proyecto", texto = "";
+  if(momento === "primera"){
+    titulo = solo ? "¿Te gustó?" : "¿Les gustó?";
+    texto = `Ya ${solo ? "jugaste" : "jugaron"} <b>1 partida</b> con <b>${plural(c, "canción", "canciones")}</b>. ` +
+      `Lo hago solo, en mis ratos libres: si ${solo ? "te divirtió" : "les sacó unas risas"}, un cafecito paga las canciones nuevas 💛`;
+  } else if(momento === "hito"){
+    titulo = `¡Ya van ${p} partidas!`;
+    texto = `<b>${p} partidas</b> y <b>${c} canciones</b>: ya ${solo ? "sos" : "son"} de la casa. ` +
+      `Lo hago solo, en mis ratos libres, y un cafecito es lo que lo mantiene vivo 💛`;
+  } else if(momento === "record"){
+    titulo = "¡Rompiste tu récord!";
+    texto = `De <b>${recordPrevio}</b> a <b>${soloPuntos} puntos</b>. ` +
+      `Si el juego ya te viene acompañando, un cafecito paga las canciones nuevas 💛`;
+  } else if(momento === "gano"){
+    titulo = "El que pierde, invita";
+    texto = `Ganó <b>${esc(ganadorUnico().name)}</b>. ¿Y si los que perdieron invitan el cafecito? ` +
+      `Con eso se suman canciones nuevas 💛`;
+  }
+  document.getElementById("cafe-final").textContent = titulo;
+  document.getElementById("cafecito-txt").innerHTML = texto;
+  document.getElementById("cafe-qr-txt").innerHTML = `<b>¿Más fácil desde el celu?</b>` +
+    (solo ? "Escanealo con la cámara." : "Cualquiera de la juntada lo escanea con la cámara.");
+  if(momento){
+    jugado.pedido = p;
+    try{ save(LS_JUGADO, jugado); }catch(_){}
+  }
+  // Contra los clics en "cafecito" da la conversión del pedido, momento por momento.
+  const conQr = !!momento && !!window.matchMedia && matchMedia(CON_QR).matches;
+  track("cafecito_visto", { partidas: p, canciones: c, momento: momentoPedido, qr: conQr ? "si" : "no" });
 }
 
 // La imagen que se comparte se muestra ya armada en la pantalla final: antes
 // había que tocar "Compartir" para verla, y casi nadie compartía. Reemplaza al
 // marcador en texto, que dice lo mismo; si el canvas falla, queda el texto.
 function dibujarTarjeta(){
-  return modo==='solo'
-    ? drawSoloCard(soloPuntos, soloResultados.length * PUNTOS_SOLO[0], soloResultados, nuevoRecord)
-    : drawCard(teams, lastGameSongs);
+  if(modo!=='solo') return drawCard(teams, lastGameSongs);
+  // El pie dice qué fue: el desafío de un día, un duelo o adivinando el artista
+  const n = soloResultados.length;
+  const pie = fija && fija.tipo==="desafio" ? "Desafío del día · " + fechaCorta(fija.dia)
+    : fija ? "Duelo · " + plural(n, "canción", "canciones")
+    : modoAdivina()==="artista" ? plural(n, "canción", "canciones") + " · adivinando el artista" : "";
+  return drawSoloCard(soloPuntos, n * PUNTOS_SOLO[0], soloResultados, nuevoRecord, pie);
 }
 function mostrarTarjeta(){
   const box = document.getElementById("result-img");
@@ -1564,24 +2376,32 @@ function mostrarTarjeta(){
 }
 
 function rematch(){
+  if(fija){ goHome(); return; }      // el desafío y los duelos no se repiten
   track("revancha", { canciones: lastGameSongs, modo_juego: modo });
   teams.forEach(p=>p.score=0);
   resetSolo();
+  limpiarMarcador();
   played=[]; brokenIds=new Set(); songNo=1;
   inicioPartida = Date.now();
-  if(modo==='solo') soloEmpezar(opts.maxSongs);
+  if(modo==='solo') soloEmpezar(opts.maxSongs, datosPartida());
   show("s-game"); newSong();
 }
 
 // Volver al menú sin recargar la página: así los equipos (y sus nombres) siguen ahí.
 function goHome(){
+  pararCuenta(); callarPulsadores(true);
   try{ mediaStop(); }catch(_){}
   if(yt && yt.stopVideo){ try{ yt.stopVideo(); }catch(_){} }
   teams.forEach(p=>p.score=0);
   resetSolo();
   played=[]; brokenIds=new Set(); songNo=1;
   currentSong=null; phase='ready'; answeringTeam=-1; revealed=false;
+  turnoExtras++;
+  // Después del desafío, la tarjeta del inicio tiene que mostrar el puesto nuevo
+  const eraDesafio = fija && fija.tipo==="desafio";
+  soltarFija();
   show("s-inicio");
+  if(eraDesafio) traerDesafio(true).then(()=>{ if(pantalla==="s-inicio") renderDesafioCard(); });
 }
 
 /* ============================================================
@@ -1605,7 +2425,12 @@ async function shareResult(btn, desde){
     if(modo==='solo'){
       // Los cuadritos también van en el texto, como Wordle: se ven aunque no se abra la imagen
       const tira = soloResultados.slice(0, 30).map(r=> soloTramo(r).emoji).join("");
-      texto = `🎧 Hice ${soloPuntos} punto${soloPuntos!==1?"s":""} adivinando canciones en “En una nota”
+      const pts = `${soloPuntos} punto${soloPuntos!==1?"s":""}`;
+      texto = fija && fija.tipo==="desafio"
+        ? `🗓️ Desafío del día (${fechaCorta(fija.dia)}) en “En una nota”: ${pts}
+${tira}
+¿Cuánto hacés vos?`
+        : `🎧 Hice ${pts} adivinando ${modoAdivina()==="artista" ? "artistas" : "canciones"} en “En una nota”
 ${tira}
 ¿Me superás?`;
     } else {
@@ -1616,7 +2441,9 @@ ${tira}
         ? `🏆 Ganó ${campeon.name} con ${campeon.score} punto${campeon.score!==1?"s":""} en “En una nota”. ¿Se animan?`
         : "🎤 Así quedó nuestra partida de “En una nota”. ¿Se animan?";
     }
-    const r = await shareCard(dibujarTarjeta(), texto, SHARE_URL);
+    // En un duelo el link es el del duelo: el que lo recibe juega lo mismo
+    const link = modo==='solo' && fija && fija.tipo==="duelo" ? LINK_DUELO + fija.id : SHARE_URL;
+    const r = await shareCard(dibujarTarjeta(), texto, link);
     track("compartir", { que: "resultado", resultado: r, canciones: lastGameSongs, desde: desde || "boton", modo_juego: modo });
     if(r === "descargado") alert("Guardamos la imagen del resultado y copiamos el link 🎶 Mandala al grupo.");
     else if(r === "error") alert("No pudimos compartir desde acá. Probá con el botón “Compartir el juego”.");
@@ -1681,6 +2508,9 @@ Object.assign(window, {
   scoreTeam, toggleHit, scoreHits, scoreAllHit, scoreNone, finishRound, endGame, rematch, goHome,
   onYouTubeIframeAPIReady, resetHistory, shareGame, shareResult, sendFeedback,
   onGuessInput, onGuessKey, guessSong, noSe,
+  // desafío del día, duelos, décadas, pistas, tiempo, pulsadores, reportes y listas
+  jugarDesafio, jugarDuelo, compartirDuelo, retar, toggleDecada, todasLasDecadas,
+  setAdivina, setTiempo, setPulsadores, pedirPista, abrirReporte, reportar, compartirLista,
 });
 
 // Clics en Cafecito. Analytics ya cuenta los clics a otros sitios, pero no
@@ -1693,6 +2523,8 @@ document.addEventListener("click", (ev)=>{
     desde: a.dataset.cafecito,
     pantalla: pantalla ? pantalla.id.replace("s-","") : "",
     partidas: jugado.partidas,
+    // en la pantalla final, qué pedido había a la vista (primera, hito, record, gano o chico)
+    ...(a.dataset.cafecito === "final" ? { momento: momentoPedido } : {}),
   });
 });
 
@@ -1715,7 +2547,33 @@ function boot(){
   setModo(modo);
   wireAudio();
   renderLocalList();
+  // Las canciones propias de YouTube ahora van con la ficha "Mis canciones".
+  // A quien ya las tenía y venía jugando con ellas mezcladas, se le deja
+  // elegida esa ficha en su última partida (una sola vez).
+  if(!load(LS_PROPIAS, false)){
+    if(countLinked() && ultima && Array.isArray(ultima.generos) && !ultima.generos.includes("local")){
+      ultima.generos.push("local");
+      try{ save(LS_ULTIMA, ultima); }catch(_){}
+    }
+    try{ save(LS_PROPIAS, true); }catch(_){}
+  }
   show("s-inicio");
+  // Links que abren algo: ?sala= (el pulsador de un celular), ?duelo=, ?lista=
+  // y ?liga= (la toma cuenta.js cuando hay sesión). Se sacan de la barra.
+  codigoDelLink();
+  const sala = salaDelLink();
+  const q = new URLSearchParams(location.search);
+  const duelo = q.get("duelo"), lista = q.get("lista");
+  if(q.has("duelo") || q.has("lista")){
+    q.delete("duelo"); q.delete("lista");
+    const resto = q.toString();
+    history.replaceState(history.state, "", location.pathname + (resto ? "?" + resto : "") + location.hash);
+  }
+  if(sala !== null){ show("s-pulsador"); entrarASala(sala); }
+  else if(duelo && /^[a-z0-9]{8}$/.test(duelo)) abrirDuelo(duelo);
+  else if(lista && /^[a-z0-9]{8}$/.test(lista)) importarLista(lista);
+  // La entrada escalonada del inicio ya terminó: que no se repita al volver
+  setTimeout(()=> document.body.classList.remove("estreno"), 1500);
   // Al entrar o salir de la cuenta cambian el saludo, el récord con su puesto
   // y lo que muestra Mi cuenta
   iniciarCuentas({ show, alCambiar: ()=>{

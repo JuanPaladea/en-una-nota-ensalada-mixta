@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "catalogo": "node scripts/catalogo-solo.mjs",
     "db": "node --env-file=.env scripts/db.mjs",
-    "catalogo:subir": "node --env-file=.env scripts/db.mjs db/catalogo_solo.sql"
+    "catalogo:subir": "node --env-file=.env scripts/db.mjs db/catalogo_solo.sql",
+    "revisar": "node scripts/revisar-videos.mjs",
+    "reportes": "node --env-file=.env scripts/reportes.mjs"
   },
   "devDependencies": {
     "pg": "^8.23.1",

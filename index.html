@@ -58,7 +58,8 @@
   }
   </script>
 </head>
-<body>
+<!-- estreno: la primera vez el inicio entra escalonado (main.js saca la clase) -->
+<body class="estreno">
   <!-- Arriba: el logo y, en la compu, las tres secciones al lado. En el
        celular las secciones bajan a una barra fija abajo (lo hace el CSS) y
        durante la partida no se ve nada de esto. -->
@@ -98,6 +99,8 @@
       <p class="hola"><small id="hola">El juego para cantar con amigos</small>¿Cómo juegan hoy?</p>
       <div class="inicio">
         <div class="inicio-main">
+          <!-- El desafío del día: las mismas 10 canciones para todos (lo arma renderDesafioCard en main.js) -->
+          <div id="desafio-card"></div>
           <div class="modes">
             <button type="button" class="mode mode-grupo" onclick="elegirModo('grupo')">
               <span class="mode-ic" aria-hidden="true">👥</span>
@@ -163,6 +166,10 @@
             <button type="button" class="lbl-acc" id="gen-todos" onclick="toggleTodos()">Elegir todos</button></div>
           <div id="genres" class="genres"></div>
           <p class="hint" style="margin:10px 0 0">Se mezclan todas las canciones de los géneros elegidos.</p>
+          <!-- Un filtro encima de los géneros: sin ninguna elegida van todas -->
+          <div class="lbl"><span>Décadas <span class="lbl-info" id="dec-info">· todas</span></span>
+            <button type="button" class="lbl-acc" id="dec-todas" onclick="todasLasDecadas()" hidden>Todas</button></div>
+          <div class="decadas" id="decadas" role="group" aria-label="Décadas"></div>
         </div>
 
         <div class="armar-opc">
@@ -176,16 +183,32 @@
             <div class="lbl">Equipos</div>
             <div id="teams" class="teams"></div>
             <button type="button" class="btn ghost mini" onclick="addTeam()">＋ Agregar equipo</button>
+
+            <div class="lbl">Tiempo para cantar <span class="lbl-info">después de decir ¡YO!</span></div>
+            <div class="seg" id="opt-tiempo" role="group" aria-label="Tiempo para cantar"></div>
+
+            <!-- Pulsadores: cada equipo toca ¡YO! en su celular (src/sala.js) -->
+            <label class="tog">
+              <span>Pulsadores en los celulares<small>Cada equipo toca ¡YO! en el suyo y el juego dice quién fue primero</small></span>
+              <input type="checkbox" class="switch" id="opt-pulsadores" onchange="setPulsadores(this.checked)">
+            </label>
+            <div id="sala-inv"></div>
           </div>
           <!-- Con un jugador no hay grupo que juzgue: se escribe el título y el juego lo comprueba -->
           <div id="solo-box" hidden>
+            <div class="lbl">Qué adivinás</div>
+            <div class="seg seg-modo" id="opt-adivina" role="group" aria-label="Qué adivinás">
+              <button type="button" data-a="titulo" onclick="setAdivina('titulo')">🎵 El título</button>
+              <button type="button" data-a="artista" onclick="setAdivina('artista')">🎤 El artista</button>
+            </div>
             <div class="lbl">Cuánto vale <span class="lbl-info">según los segundos que hagan falta</span></div>
             <div class="ladder" aria-hidden="true">
               <div><b>10</b><span>1 s</span></div><div><b>7</b><span>2 s</span></div><div><b>5</b><span>3 s</span></div>
               <div><b>3</b><span>4 s</span></div><div><b>2</b><span>5 s</span></div><div><b>1</b><span>6 s</span></div>
             </div>
-            <p class="hint" style="margin:8px 0 0">Suena 1 segundo y escribís el título. Si no sale, se repite desde
+            <p class="hint" id="adivina-hint" style="margin:8px 0 0">Suena 1 segundo y escribís el título. Si no sale, se repite desde
               el mismo punto un segundo más largo, hasta 6. Errar también suma un segundo.</p>
+            <p class="hint" style="margin:6px 0 0">💡 Hay hasta dos pistas por canción: cada una baja un escalón.</p>
           </div>
 
           <div class="lbl">Canciones por partida</div>
@@ -228,6 +251,9 @@
               <button type="button" class="btn ghost mini" onclick="addCustomSong()">＋ Canción propia (YouTube)</button>
             </div>
             <div id="songlist" class="songlist"></div>
+            <!-- Pasarle la lista a otro por link (compartirLista en main.js). Los audios de la compu no viajan. -->
+            <button type="button" class="btn ghost" id="lista-btn" style="width:100%;margin-top:12px" onclick="compartirLista(this)">📤 Compartir esta lista por link</button>
+            <p class="hint" style="margin:8px 0 0">Se comparten las que tienen link de YouTube. Para jugar con ellas, elegí <b>“Mis canciones”</b> en Armar partida.</p>
           </div>
         </div>
       </div>
@@ -243,7 +269,9 @@
       <p class="hint" id="rk-aviso" role="status" style="color:var(--lime)"></p>
       <div class="rk-grid">
         <div class="rk-main">
-          <div class="chips periodos" id="rk-periodos" role="group" aria-label="Período"></div>
+          <div class="seg seg-per" id="rk-periodos" role="group" aria-label="Período"></div>
+          <!-- Género y liga (renderFiltros en src/cuenta.js) -->
+          <div class="rk-filtros" id="rk-filtros"></div>
           <div id="rk-podio" class="podium"></div>
           <div id="rk-lista" class="rk"></div>
         </div>
@@ -260,10 +288,26 @@
               <span class="sq g"></span> 1 s, <span class="sq y"></span> 2–3 s, <span class="sq o"></span> 4–6 s y
               <span class="sq k"></span> no salió.</p>
           </div>
-          <p class="hint rk-nota">Cuentan solo las partidas de 10 canciones. El semanal arranca de cero cada viernes y el mensual cada día 1. A igual puntaje queda arriba el que lo hizo primero. En el ranking se ve solo un nombre corto.</p>
+          <p class="hint rk-nota">Cuentan solo las partidas de 10 canciones adivinando el título. El semanal arranca de cero cada viernes y el mensual cada día 1; “Hoy” es el desafío del día, que cambia a las 0 h. En el de un género entran las partidas jugadas solo con ese género. A igual puntaje queda arriba el que lo hizo primero. En el ranking se ve solo un nombre corto.</p>
           <button type="button" class="btn ghost big rk-jugar" onclick="elegirModo('solo')">🎧 Jugar un jugador</button>
         </div>
       </div>
+    </section>
+
+    <!-- ===================== DUELO ===================== -->
+    <!-- Se llega por un link (?duelo=…): quién retó, cómo le fue y jugar lo mismo (abrirDuelo en main.js) -->
+    <section id="s-duelo" class="screen">
+      <div class="hdr">
+        <button type="button" class="back" onclick="irA('jugar')" aria-label="Ir al inicio">‹</button>
+        <h2 class="hdr-t"><small>Duelo · las mismas canciones</small><span id="duelo-titulo">Te retaron</span></h2>
+      </div>
+      <div class="duelo" id="duelo-box"></div>
+    </section>
+
+    <!-- ===================== PULSADOR ===================== -->
+    <!-- El celular de cada equipo, cuando entra con ?sala=…: elegir equipo y el botón ¡YO! (src/sala.js) -->
+    <section id="s-pulsador" class="screen">
+      <div class="pulsador" id="pulsador"></div>
     </section>
 
     <!-- ===================== MI CUENTA ===================== -->
@@ -380,6 +424,8 @@
             <div class="st" id="cover-state">Listo para sonar 🎧</div>
           </div>
         </div>
+        <!-- Se llena en lo que dura el fragmento que está sonando (barraFragmento en main.js) -->
+        <div class="snip" id="snip" aria-hidden="true" hidden><span></span></div>
       </div>
 
       <!-- Un jugador: cuánto vale acertar con lo que ya sonó -->
@@ -409,6 +455,10 @@
         <div class="res-acc">
           <!-- Un jugador con cuentas activas: dónde quedó en el ranking, o entrar para guardarla -->
           <div id="ranking-final" class="ranking-final" hidden></div>
+          <!-- Los logros que destrabó esta partida (src/logros.js) -->
+          <div id="logro-final" class="logro-final" hidden></div>
+          <!-- Un jugador: retar a alguien con estas canciones o, si era un duelo, cómo quedó (finExtras en main.js) -->
+          <div id="duelo-final" class="ranking-final duelo-final" hidden></div>
           <button type="button" class="btn cyan big" id="share-btn" onclick="shareResult(this, 'boton')">📲 Compartir el resultado</button>
           <p class="hint" id="share-hint" style="margin:0;text-align:center">Manda una imagen con el marcador al grupo</p>
           <div class="g2">
@@ -416,14 +466,23 @@
             <button type="button" class="btn ghost" onclick="goHome()">Volver al inicio</button>
           </div>
           <!-- Al terminar es cuando más ganas hay de bancar el juego: va a mano,
-               debajo de Revancha. Aparece desde la primera partida y con lo que ya
-               jugaron (lo arma pedirCafecito() en main.js). -->
+               debajo de Revancha. La tarjeta entera sale en los momentos altos
+               (primera partida, hitos, récord, un ganador) y con un texto para
+               cada uno; el resto de las partidas queda solo el botón (clase
+               "chico"). Lo arma pedirCafecito() en main.js. -->
           <section id="cafecito-final" class="cafecito" aria-labelledby="cafe-final" hidden>
             <div class="cafe-top">
               <span class="cafe-ic" aria-hidden="true">☕</span>
               <div><h3 id="cafe-final">Bancá el proyecto</h3><p class="cafe-sub">Gratis, sin anuncios y sin registrarse</p></div>
             </div>
             <p class="cafe-txt" id="cafecito-txt"></p>
+            <!-- Solo en la compu (styles.css): en una juntada nadie paga desde la
+                 notebook de otro, pero cualquiera escanea con su celular. Lleva
+                 al mismo link que el botón. -->
+            <div class="cafe-qr">
+              <img src="/qr-cafecito.svg" alt="Código QR que lleva a cafecito.app/juanpaladea" width="104" height="104" loading="lazy" />
+              <p id="cafe-qr-txt"></p>
+            </div>
             <a class="btn amber big" href="https://cafecito.app/juanpaladea" rel="noopener noreferrer" target="_blank"
                data-cafecito="final">☕ Invitame un cafecito</a>
           </section>
